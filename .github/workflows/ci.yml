@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: myfilmpeople
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+      redis:
+        image: redis:6
+        ports:
+          - 6379:6379
+    env:
+      DB_NAME: myfilmpeople
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      SECRET_KEY: ci-secret-key
+      DEBUG: '1'
+      ALLOWED_HOSTS: localhost,127.0.0.1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Wait for MySQL
+        run: |
+          echo "Waiting for MySQL to be healthy..."
+          for i in {1..30}; do
+            if mysqladmin ping -h127.0.0.1 -uroot -proot >/dev/null 2>&1; then
+              echo "MySQL is up"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run migrations
+        run: |
+          python manage.py migrate --noinput
+
+      - name: Collect static
+        run: |
+          python manage.py collectstatic --noinput
+
+      - name: Lint (ruff)
+        run: |
+          python -m pip install ruff
+          ruff check .
+
+      - name: Run tests
+        run: |
+          python -m pytest -q || python manage.py test

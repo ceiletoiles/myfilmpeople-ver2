@@ -1,0 +1,624 @@
+/* Page-specific styles for Person Detail */
+
+main {
+  max-width: none;
+  padding-left: 32px;
+  padding-right: 32px;
+}
+.person-title {
+  margin: 0;
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.person-header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.person-profile {
+  width: 250px;
+  height: 375px;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #e2e8f0;
+  flex: 0 0 auto;
+}
+
+.person-header-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  grid-template-rows: auto auto auto auto auto auto;
+  column-gap: 16px;
+  row-gap: 8px;
+  align-items: start;
+  min-width: 0;
+  align-content: start;
+  min-height: 375px;
+  height: auto;
+}
+
+#person-follow-controls {
+  display: contents;
+}
+
+.person-ajax-status {
+  grid-column: 1 / -1;
+  grid-row: 7;
+  align-self: start;
+}
+
+.person-ajax-status:empty {
+  display: none;
+}
+
+.person-follow-summary {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.person-actions {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.person-note-inline {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+}
+
+.person-note-mobile {
+  display: none;
+}
+
+.person-note-hash {
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.person-note-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.person-follow-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 0;
+}
+
+.person-follow-role {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.person-born {
+  grid-column: 1;
+  grid-row: 3;
+}
+
+.person-comeback-note {
+  grid-column: 1;
+  grid-row: 4;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.person-bio {
+  grid-column: 1 / -1;
+  grid-row: 5;
+  min-width: 0;
+}
+
+.person-extras {
+  grid-column: 1 / -1;
+  grid-row: 6;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  min-width: 0;
+}
+
+.person-aka-list {
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
+.person-known-for-grid {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+
+.person-known-for-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.person-bio-text {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  text-align: justify;
+}
+
+.person-bio[data-expanded="1"] .person-bio-text {
+  -webkit-line-clamp: 999;
+  line-clamp: 999;
+}
+
+.person-bio-toggle {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #0f172a;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.kebab-menu {
+  position: relative;
+}
+
+.kebab-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  list-style: none;
+  padding: 6px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.kebab-trigger:focus,
+.kebab-trigger:focus-visible {
+  outline: none;
+}
+
+.kebab-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.kebab-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.kebab-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  min-width: 220px;
+  z-index: 10;
+}
+
+.kebab-pop form {
+  margin: 0;
+}
+
+.kebab-pop button {
+  width: 100%;
+}
+
+.person-dialog {
+  width: min(560px, 92vw);
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.22);
+  max-height: min(86vh, 720px);
+  overflow: hidden;
+  outline: none;
+}
+
+.person-dialog:not([open]) {
+  display: none;
+}
+
+.person-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.person-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.7);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.person-dialog-header {
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.person-dialog-header strong {
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.person-dialog-header form.inline {
+  margin: 0;
+}
+
+.person-dialog-header button.secondary:where(:not(.nav-icon-btn):not(.menu-close)) {
+  border-color: #e2e8f0;
+}
+
+.person-dialog .dialog-close:where(:not(.nav-icon-btn):not(.menu-close)) {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  line-height: 1;
+  border-color: #e2e8f0;
+}
+
+.person-role-list {
+  padding: 14px 16px 16px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  overflow: auto;
+  min-height: 0;
+}
+
+.person-role-item {
+  margin: 0;
+}
+
+.person-role-item button:where(:not(.nav-icon-btn):not(.menu-close)) {
+  width: 100%;
+  text-align: left;
+  justify-content: flex-start;
+  gap: 10px;
+  border-color: #e2e8f0;
+  background: white;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.person-role-item button:hover:where(:not(.nav-icon-btn):not(.menu-close)) {
+  background: #e2e8f0;
+}
+
+.person-role-item button:focus,
+.person-role-item button:focus-visible {
+  outline: none;
+}
+
+.person-dialog > form:not(.inline) {
+  padding: 14px 16px 16px;
+  margin: 0;
+  overflow: auto;
+  min-height: 0;
+}
+
+.person-dialog textarea {
+  width: 100%;
+  min-height: 110px;
+}
+
+.person-dialog textarea + button {
+  margin-top: 10px;
+}
+
+.person-unfollow-list {
+  padding: 14px 16px 16px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  overflow: auto;
+  min-height: 0;
+}
+
+.person-unfollow-item {
+  margin: 0;
+}
+
+.person-unfollow-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 12px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: white;
+}
+
+.person-unfollow-role {
+  font-weight: 800;
+  color: #0f172a;
+  min-width: 0;
+}
+
+.person-unfollow-action:where(:not(.nav-icon-btn):not(.menu-close)) {
+  padding: 8px 10px;
+  border-color: #e2e8f0;
+  white-space: nowrap;
+}
+
+.person-meta-row {
+  margin-top: 8px;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.person-filmography {
+  margin-top: 8px;
+}
+
+.person-filmography-title {
+  margin: 0;
+}
+
+.filmography-filters {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-btn {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #0f172a;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.filter-btn:focus,
+.filter-btn:focus-visible {
+  outline: none;
+}
+
+.filter-btn.active {
+  font-weight: 700;
+}
+
+
+.filmography-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170.19px, 170.19px));
+  gap: 18px 14px;
+  align-items: start;
+  justify-content: center;
+}
+
+.filmography-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filmography-poster-link {
+  display: block;
+}
+
+.filmography-poster {
+  width: 170.19px;
+  height: 255.28px;
+  object-fit: cover;
+  border-radius: 0;
+  background: #e2e8f0;
+  display: block;
+}
+
+.filmography-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+}
+
+.filmography-title {
+  text-decoration: none;
+  font-size: 14.4px;
+  line-height: 1.2;
+  width: 100%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  min-height: 34.6px;
+}
+
+.filmography-year {
+  font-size: 14.4px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 17.3px;
+}
+
+.filmography-role {
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: normal;
+  min-height: 0;
+}
+
+.filmography-role span {
+  display: none;
+}
+
+/* If JS hasn't run yet, show the combined role text. */
+.filmography-role span[data-role="all"] {
+  display: inline-block;
+}
+
+.film-countdown {
+  margin-bottom: 2px;
+}
+
+@media (max-width: 700px) {
+  main {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .filmography-grid {
+    grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+    gap: 14px 10px;
+  }
+
+  .filmography-poster {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 2 / 3;
+  }
+}
+
+@media (max-width: 700px) {
+  .person-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto auto auto auto auto;
+    gap: 12px 14px;
+    align-items: start;
+  }
+
+  .person-profile {
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+    max-width: 250px;
+    height: auto;
+    aspect-ratio: 2 / 3;
+  }
+
+  .person-header-body {
+    display: contents;
+  }
+
+  .person-title {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin-top: 2px;
+  }
+
+  .person-note-mobile {
+    display: block;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    font-size: 13px;
+    line-height: 1.35;
+    font-weight: 700;
+    color: #0f172a;
+    overflow-wrap: anywhere;
+  }
+
+  .person-actions {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    align-self: start;
+    position: relative;
+    z-index: 2;
+    width: auto;
+    max-width: 100%;
+    flex-direction: column;
+    align-items: flex-end;
+    flex-wrap: nowrap;
+    margin-left: 0;
+  }
+
+  .person-note-inline {
+    display: none;
+  }
+
+  .person-note-hash {
+    display: inline-block;
+    margin-right: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .person-follow-summary {
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
+
+  .person-born {
+    grid-column: 1 / -1;
+    grid-row: 5;
+  }
+
+  .person-comeback-note {
+    grid-column: 1 / -1;
+    grid-row: 6;
+  }
+
+  .person-bio {
+    grid-column: 1 / -1;
+    grid-row: 7;
+  }
+
+  .person-extras {
+    grid-column: 1 / -1;
+    grid-row: 8;
+  }
+
+  .kebab-pop {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    left: auto;
+    min-width: min(220px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    width: clamp(220px, 72vw, 280px);
+    z-index: 61;
+  }
+
+  .kebab-pop button {
+    white-space: normal;
+    line-height: 1.25;
+    text-align: left;
+  }
+}

@@ -1,0 +1,470 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}New Arrivals{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/pages/new_arrivals.css' %}?v=20260509a" />
+{% endblock %}
+
+{% block page_header %}
+  <div class="page-header new-arrivals-header">
+    <button type="button" class="nav-icon-btn" data-menu-toggle aria-controls="site-drawer" aria-expanded="false">
+      <img class="nav-icon" src="{% static 'img/menu.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
+      <span class="sr-only">Open menu</span>
+    </button>
+    <div class="page-header-content">
+      <h1>New Arrivals</h1>
+      <p class="page-tagline" data-mode-tagline>Recently discovered work from the people and studios you follow.</p>
+    </div>
+    <button type="button" class="nav-icon-btn history-toggle" data-history-toggle aria-pressed="false" aria-label="Show history">
+      <img class="nav-icon" src="{% static 'img/history.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
+      <span class="sr-only">Toggle history</span>
+    </button>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div class="new-tabs" aria-label="New arrivals filters">
+    <div class="new-tabs-group" data-tabs-group="new">
+      <button type="button" class="new-tab is-active" data-tab="all" data-count="{{ current_tab_counts.all }}">All</button>
+      <button type="button" class="new-tab" data-tab="dailies" data-count="{{ current_tab_counts.dailies }}">Dailies</button>
+      <button type="button" class="new-tab" data-tab="directors" data-count="{{ current_tab_counts.directors }}">Directors</button>
+      <button type="button" class="new-tab" data-tab="actors" data-count="{{ current_tab_counts.actors }}">Actors</button>
+      <button type="button" class="new-tab" data-tab="crew" data-count="{{ current_tab_counts.crew }}">Crew</button>
+      <button type="button" class="new-tab" data-tab="studios" data-count="{{ current_tab_counts.studios }}">Studios</button>
+    </div>
+    <div class="new-tabs-group" data-tabs-group="history" hidden>
+      <button type="button" class="new-tab" data-tab="all" data-count="{{ history_tab_counts.all }}">All</button>
+      <button type="button" class="new-tab" data-tab="dailies" data-count="{{ history_tab_counts.dailies }}">Dailies</button>
+      <button type="button" class="new-tab" data-tab="directors" data-count="{{ history_tab_counts.directors }}">Directors</button>
+      <button type="button" class="new-tab" data-tab="actors" data-count="{{ history_tab_counts.actors }}">Actors</button>
+      <button type="button" class="new-tab" data-tab="crew" data-count="{{ history_tab_counts.crew }}">Crew</button>
+      <button type="button" class="new-tab" data-tab="studios" data-count="{{ history_tab_counts.studios }}">Studios</button>
+    </div>
+  </div>
+
+  <section class="new-panel is-active" data-panel="all" data-mode-panel="new">
+    {% if current_all_items or current_dailies_items %}
+      <div class="new-list">
+        {% for it in current_all_items %}
+          <a class="new-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+            <div class="new-poster-wrapper">
+              {% if it.poster_path %}
+                <img class="new-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+              {% else %}
+                <img class="new-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+              {% endif %}
+            </div>
+            <div class="new-info">
+              <div class="new-title">{{ it.title }}</div>
+              <div class="new-release">{{ it.release_dt|date:"F j, Y" }}</div>
+              {% if it.event_note %}
+                <div class="new-credit muted">{{ it.event_note }}</div>
+              {% endif %}
+              {% if it.credits %}
+                {% for credit in it.credits %}
+                  <div class="new-credit">{{ credit }}</div>
+                {% endfor %}
+              {% endif %}
+            </div>
+          </a>
+        {% endfor %}
+        {% for it in current_dailies_items %}
+          <article class="new-item">
+            <div class="new-info">
+              <div class="new-title">{{ it.text }}</div>
+              <div class="new-credit muted">{{ it.provider_name }} - {{ it.issue_date|date:"F j, Y" }}</div>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No new arrivals.</p>
+    {% endif %}
+  </section>
+
+  <section class="new-panel" data-panel="dailies" data-mode-panel="new" hidden>
+    {% if current_dailies_items %}
+      <div class="new-list">
+        {% for it in current_dailies_items %}
+          <article class="new-item">
+            <div class="new-info">
+              <div class="new-title">{{ it.text }}</div>
+              <div class="new-credit muted">{{ it.provider_name }} - {{ it.issue_date|date:"F j, Y" }}</div>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No new newsletter updates.</p>
+    {% endif %}
+  </section>
+
+  <section class="new-panel" data-panel="directors" data-mode-panel="new" hidden>
+    {% with items=current_by_role.director %}
+      {% if items %}
+        <div class="new-list">
+          {% for it in items %}
+            <a class="new-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+              <div class="new-poster-wrapper">
+                {% if it.poster_path %}
+                  <img class="new-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                {% else %}
+                  <img class="new-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                {% endif %}
+              </div>
+              <div class="new-info">
+                <div class="new-title">{{ it.title }}</div>
+                <div class="new-release">{{ it.release_dt|date:"F j, Y" }}</div>
+                {% if it.event_note %}<div class="new-credit muted">{{ it.event_note }}</div>{% endif %}
+                {% if it.credits %}{% for credit in it.credits %}<div class="new-credit">{{ credit }}</div>{% endfor %}{% endif %}
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No new arrivals for followed directors.</p>
+      {% endif %}
+    {% endwith %}
+  </section>
+
+  <section class="new-panel" data-panel="actors" data-mode-panel="new" hidden>
+    {% with items=current_by_role.actor %}
+      {% if items %}
+        <div class="new-list">
+          {% for it in items %}
+            <a class="new-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+              <div class="new-poster-wrapper">
+                {% if it.poster_path %}
+                  <img class="new-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                {% else %}
+                  <img class="new-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                {% endif %}
+              </div>
+              <div class="new-info">
+                <div class="new-title">{{ it.title }}</div>
+                <div class="new-release">{{ it.release_dt|date:"F j, Y" }}</div>
+                {% if it.event_note %}<div class="new-credit muted">{{ it.event_note }}</div>{% endif %}
+                {% if it.credits %}{% for credit in it.credits %}<div class="new-credit">{{ credit }}</div>{% endfor %}{% endif %}
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No new arrivals for followed actors.</p>
+      {% endif %}
+    {% endwith %}
+  </section>
+
+  <section class="new-panel" data-panel="crew" data-mode-panel="new" hidden>
+    {% with items=current_by_role.crew %}
+      {% if items %}
+        <div class="new-list">
+          {% for it in items %}
+            <a class="new-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+              <div class="new-poster-wrapper">
+                {% if it.poster_path %}
+                  <img class="new-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                {% else %}
+                  <img class="new-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                {% endif %}
+              </div>
+              <div class="new-info">
+                <div class="new-title">{{ it.title }}</div>
+                <div class="new-release">{{ it.release_dt|date:"F j, Y" }}</div>
+                {% if it.event_note %}<div class="new-credit muted">{{ it.event_note }}</div>{% endif %}
+                {% if it.credits %}{% for credit in it.credits %}<div class="new-credit">{{ credit }}</div>{% endfor %}{% endif %}
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No new arrivals for followed crew.</p>
+      {% endif %}
+    {% endwith %}
+  </section>
+
+  <section class="new-panel" data-panel="studios" data-mode-panel="new" hidden>
+    {% if current_studio_cards %}
+      <div class="new-studio-list">
+        {% for s in current_studio_cards %}
+          <button
+            type="button"
+            class="card card-tight new-studio-card"
+            data-studio-template="studio-template-{{ forloop.counter }}"
+            data-studio-name="{{ s.name|escape }}"
+            data-studio-count="{{ s.recent_count }}"
+          >
+            <div class="new-studio-row">
+              <div>
+                <div><strong>{{ s.name }}</strong></div>
+                <div class="muted">New: {{ s.recent_count }}</div>
+              </div>
+            </div>
+          </button>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No followed studios with new releases.</p>
+    {% endif %}
+
+    {% for s in current_studio_cards %}
+      <template id="studio-template-{{ forloop.counter }}">
+        {% if s.items %}
+          <div class="new-list">
+            {% for it in s.items %}
+              <a class="new-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+                <div class="new-poster-wrapper">
+                  {% if it.poster_path %}
+                    <img class="new-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                  {% else %}
+                    <img class="new-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                  {% endif %}
+                </div>
+                <div class="new-info">
+                  <div class="new-title">{{ it.title }}</div>
+                  <div class="new-release">{{ it.release_dt|date:"F j, Y" }}</div>
+                  {% if it.event_note %}<div class="new-credit muted">{{ it.event_note }}</div>{% endif %}
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted">No new movies found for this studio.</p>
+        {% endif %}
+      </template>
+    {% endfor %}
+  </section>
+
+  <section class="new-panel" data-panel="all" data-mode-panel="history" hidden>
+    {% if history_all_items or history_dailies_items %}
+      <div class="new-list">
+        {% for group in history_all_items %}
+          <div class="history-month-group">
+            <h3 class="history-month-header">{{ group.month }}</h3>
+            {% for it in group.items %}
+              <a class="new-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+                <div class="new-poster-wrapper">
+                  {% if it.poster_path %}
+                    <img class="new-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                  {% else %}
+                    <img class="new-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                  {% endif %}
+                </div>
+                <div class="new-info">
+                  <div class="new-title">{{ it.title }}</div>
+                  <div class="new-release">{{ it.seen_at|date:"M d, Y" }}</div>
+                  {% if it.event_note %}<div class="new-credit muted">{{ it.event_note }}</div>{% endif %}
+                  {% if it.credits %}{% for credit in it.credits %}<div class="new-credit">{{ credit }}</div>{% endfor %}{% endif %}
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% endfor %}
+        {% for group in history_dailies_items %}
+          <div class="history-month-group">
+            <h3 class="history-month-header">{{ group.month }}</h3>
+            {% for it in group.items %}
+              <article class="new-item">
+                <div class="new-info">
+                  <div class="new-title">{{ it.text }}</div>
+                  <div class="new-credit muted">{{ it.provider_name }} - {{ it.seen_at|date:"M d, Y" }}</div>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No history yet.</p>
+    {% endif %}
+  </section>
+
+  <section class="new-panel" data-panel="dailies" data-mode-panel="history" hidden>
+    {% if history_dailies_items %}
+      <div class="new-list">
+        {% for group in history_dailies_items %}
+          <div class="history-month-group">
+            <h3 class="history-month-header">{{ group.month }}</h3>
+            {% for it in group.items %}
+              <article class="new-item">
+                <div class="new-info">
+                  <div class="new-title">{{ it.text }}</div>
+                  <div class="new-credit muted">{{ it.provider_name }} - {{ it.seen_at|date:"M d, Y" }}</div>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No newsletter history yet.</p>
+    {% endif %}
+  </section>
+
+  <section class="new-panel" data-panel="directors" data-mode-panel="history" hidden>
+    {% if history_by_role.director %}
+      <div class="new-list">
+        {% for group in history_by_role.director %}
+          <div class="history-month-group">
+            <h3 class="history-month-header">{{ group.month }}</h3>
+            {% for it in group.items %}
+              <a class="new-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+                <div class="new-poster-wrapper">
+                  {% if it.poster_path %}
+                    <img class="new-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                  {% else %}
+                    <img class="new-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                  {% endif %}
+                </div>
+                <div class="new-info">
+                  <div class="new-title">{{ it.title }}</div>
+                  <div class="new-release">{{ it.seen_at|date:"M d, Y" }}</div>
+                  {% if it.event_note %}<div class="new-credit muted">{{ it.event_note }}</div>{% endif %}
+                  {% if it.credits %}{% for credit in it.credits %}<div class="new-credit">{{ credit }}</div>{% endfor %}{% endif %}
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No history for followed directors.</p>
+    {% endif %}
+  </section>
+
+  <section class="new-panel" data-panel="actors" data-mode-panel="history" hidden>
+    {% if history_by_role.actor %}
+      <div class="new-list">
+        {% for group in history_by_role.actor %}
+          <div class="history-month-group">
+            <h3 class="history-month-header">{{ group.month }}</h3>
+            {% for it in group.items %}
+              <a class="new-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+                <div class="new-poster-wrapper">
+                  {% if it.poster_path %}
+                    <img class="new-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                  {% else %}
+                    <img class="new-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                  {% endif %}
+                </div>
+                <div class="new-info">
+                  <div class="new-title">{{ it.title }}</div>
+                  <div class="new-release">{{ it.seen_at|date:"M d, Y" }}</div>
+                  {% if it.event_note %}<div class="new-credit muted">{{ it.event_note }}</div>{% endif %}
+                  {% if it.credits %}{% for credit in it.credits %}<div class="new-credit">{{ credit }}</div>{% endfor %}{% endif %}
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No history for followed actors.</p>
+    {% endif %}
+  </section>
+
+  <section class="new-panel" data-panel="crew" data-mode-panel="history" hidden>
+    {% if history_by_role.crew %}
+      <div class="new-list">
+        {% for group in history_by_role.crew %}
+          <div class="history-month-group">
+            <h3 class="history-month-header">{{ group.month }}</h3>
+            {% for it in group.items %}
+              <a class="new-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+                <div class="new-poster-wrapper">
+                  {% if it.poster_path %}
+                    <img class="new-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                  {% else %}
+                    <img class="new-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                  {% endif %}
+                </div>
+                <div class="new-info">
+                  <div class="new-title">{{ it.title }}</div>
+                  <div class="new-release">{{ it.seen_at|date:"M d, Y" }}</div>
+                  {% if it.event_note %}<div class="new-credit muted">{{ it.event_note }}</div>{% endif %}
+                  {% if it.credits %}{% for credit in it.credits %}<div class="new-credit">{{ credit }}</div>{% endfor %}{% endif %}
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No history for followed crew.</p>
+    {% endif %}
+  </section>
+
+  <section class="new-panel" data-panel="studios" data-mode-panel="history" hidden>
+    {% if history_studio_cards %}
+      <div class="new-studio-list">
+        {% for s in history_studio_cards %}
+          <button
+            type="button"
+            class="card card-tight new-studio-card"
+            data-studio-template="history-studio-template-{{ forloop.counter }}"
+            data-studio-name="{{ s.name|escape }}"
+            data-studio-count="{{ s.recent_count }}"
+          >
+            <div class="new-studio-row">
+              <div>
+                <div><strong>{{ s.name }}</strong></div>
+                <div class="muted">History: {{ s.recent_count }}</div>
+              </div>
+            </div>
+          </button>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No studio history yet.</p>
+    {% endif %}
+
+    {% for s in history_studio_cards %}
+      <template id="history-studio-template-{{ forloop.counter }}">
+        {% if s.items %}
+          <div class="new-list">
+            {% for it in s.items %}
+              <a class="new-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+                <div class="new-poster-wrapper">
+                  {% if it.poster_path %}
+                    <img class="new-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                  {% else %}
+                    <img class="new-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                  {% endif %}
+                </div>
+                <div class="new-info">
+                  <div class="new-title">{{ it.title }}</div>
+                  <div class="new-release">{{ it.seen_at|date:"F j, Y H:i" }}</div>
+                  {% if it.event_note %}<div class="new-credit muted">{{ it.event_note }}</div>{% endif %}
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted">No history for this studio.</p>
+        {% endif %}
+      </template>
+    {% endfor %}
+  </section>
+
+  <div class="new-modal" id="new-studio-modal" hidden>
+    <div class="new-modal-backdrop" data-modal-close></div>
+    <div class="new-modal-dialog card">
+      <div class="new-modal-header">
+        <div class="row new-modal-title-row">
+          <div>
+            <h2 id="new-studio-modal-title"></h2>
+            <div class="muted" id="new-studio-modal-count"></div>
+          </div>
+        </div>
+        <button type="button" class="secondary" data-modal-close>Close</button>
+      </div>
+      <div id="new-studio-modal-body"></div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/pages/new_arrivals.js' %}"></script>
+{% endblock %}

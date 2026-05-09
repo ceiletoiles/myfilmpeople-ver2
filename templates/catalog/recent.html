@@ -1,0 +1,251 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Recent Films{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/pages/recent.css' %}?v=20260509a" />
+{% endblock %}
+
+{% block page_header %}
+  <div class="page-header">
+    <button type="button" class="nav-icon-btn" data-menu-toggle aria-controls="site-drawer" aria-expanded="false">
+      <img class="nav-icon" src="{% static 'img/menu.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
+      <span class="sr-only">Open menu</span>
+    </button>
+    <div class="page-header-content">
+      <h1>Recent Films</h1>
+      <p class="page-tagline">Recent releases from the past year based on the people and studios you follow.</p>
+    </div>
+      <span class="page-header-spacer" aria-hidden="true"></span>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div class="recent-tabs" aria-label="Recent filters">
+    <button type="button" class="recent-tab is-active" data-tab="all">All</button>
+    <button type="button" class="recent-tab" data-tab="directors">Directors</button>
+    <button type="button" class="recent-tab" data-tab="actors">Actors</button>
+    <button type="button" class="recent-tab" data-tab="crew">Crew</button>
+    <button type="button" class="recent-tab" data-tab="studios">Studios</button>
+  </div>
+
+  <section class="recent-panel is-active" data-panel="all">
+    {% if all_items %}
+      <div class="recent-list">
+        {% for it in all_items %}
+          <a class="recent-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+            <div class="recent-poster-wrapper">
+              {% if it.poster_path %}
+                <img class="recent-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+              {% else %}
+                <img class="recent-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+              {% endif %}
+            </div>
+            <div class="recent-info">
+              <div class="recent-title">{{ it.title }}</div>
+              <div class="recent-release">{{ it.release_dt|date:"F j, Y" }}</div>
+              {% if it.released_ago %}
+                <div class="recent-released">{{ it.released_ago }}</div>
+              {% endif %}
+              {% if it.credits %}
+                {% for credit in it.credits %}
+                  <div class="recent-credit">{{ credit }}</div>
+                {% endfor %}
+              {% endif %}
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No recent movies found.</p>
+    {% endif %}
+  </section>
+
+  <section class="recent-panel" data-panel="directors" hidden>
+    {% with items=recent_by_role.director %}
+      {% if items %}
+        <div class="recent-list">
+          {% for it in items %}
+            <a class="recent-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+              <div class="recent-poster-wrapper">
+                {% if it.poster_path %}
+                  <img class="recent-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                {% else %}
+                  <img class="recent-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                {% endif %}
+              </div>
+              <div class="recent-info">
+                <div class="recent-title">{{ it.title }}</div>
+                <div class="recent-release">{{ it.release_dt|date:"F j, Y" }}</div>
+                {% if it.released_ago %}
+                  <div class="recent-released">{{ it.released_ago }}</div>
+                {% endif %}
+                {% if it.credits %}
+                  {% for credit in it.credits %}
+                    <div class="recent-credit">{{ credit }}</div>
+                  {% endfor %}
+                {% endif %}
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No recent movies found for followed directors.</p>
+      {% endif %}
+    {% endwith %}
+  </section>
+
+  <section class="recent-panel" data-panel="actors" hidden>
+    {% with items=recent_by_role.actor %}
+      {% if items %}
+        <div class="recent-list">
+          {% for it in items %}
+            <a class="recent-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+              <div class="recent-poster-wrapper">
+                {% if it.poster_path %}
+                  <img class="recent-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                {% else %}
+                  <img class="recent-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                {% endif %}
+              </div>
+              <div class="recent-info">
+                <div class="recent-title">{{ it.title }}</div>
+                <div class="recent-release">{{ it.release_dt|date:"F j, Y" }}</div>
+                {% if it.released_ago %}
+                  <div class="recent-released">{{ it.released_ago }}</div>
+                {% endif %}
+                {% if it.credits %}
+                  {% for credit in it.credits %}
+                    <div class="recent-credit">{{ credit }}</div>
+                  {% endfor %}
+                {% endif %}
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No recent movies found for followed actors.</p>
+      {% endif %}
+    {% endwith %}
+  </section>
+
+  <section class="recent-panel" data-panel="crew" hidden>
+    {% with items=recent_by_role.crew %}
+      {% if items %}
+        <div class="recent-list">
+          {% for it in items %}
+            <a class="recent-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+              <div class="recent-poster-wrapper">
+                {% if it.poster_path %}
+                  <img class="recent-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                {% else %}
+                  <img class="recent-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                {% endif %}
+              </div>
+              <div class="recent-info">
+                <div class="recent-title">{{ it.title }}</div>
+                <div class="recent-release">{{ it.release_dt|date:"F j, Y" }}</div>
+                {% if it.released_ago %}
+                  <div class="recent-released">{{ it.released_ago }}</div>
+                {% endif %}
+                {% if it.credits %}
+                  {% for credit in it.credits %}
+                    <div class="recent-credit">{{ credit }}</div>
+                  {% endfor %}
+                {% endif %}
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No recent movies found for followed crew.</p>
+      {% endif %}
+    {% endwith %}
+  </section>
+
+  <section class="recent-panel" data-panel="studios" hidden>
+    {% if studio_cards %}
+      <div class="recent-studio-list">
+        {% for s in studio_cards %}
+          <button
+            type="button"
+            class="card card-tight recent-studio-card"
+            data-studio-template="studio-template-{{ forloop.counter }}"
+            data-studio-name="{{ s.name|escape }}"
+            data-studio-count="{{ s.recent_count }}"
+            data-studio-logo="{% if s.logo_path %}https://image.tmdb.org/t/p/w185{{ s.logo_path }}{% else %}{% static 'img/placeholder-company.svg' %}{% endif %}"
+          >
+            <div class="recent-studio-row">
+              <div class="recent-studio-logo-slot">
+                {% if s.logo_path %}
+                  <img class="recent-studio-logo" src="https://image.tmdb.org/t/p/w185{{ s.logo_path }}" alt="" />
+                {% else %}
+                  <img class="recent-studio-logo" src="{% static 'img/placeholder-company.svg' %}" alt="" />
+                {% endif %}
+              </div>
+              <div>
+                <div><strong>{{ s.name }}</strong></div>
+                <div class="muted">Recent: {{ s.recent_count }}</div>
+              </div>
+            </div>
+          </button>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No followed studios with recent releases yet.</p>
+    {% endif %}
+
+    {% for s in studio_cards %}
+      <template id="studio-template-{{ forloop.counter }}">
+        {% if s.items %}
+          <div class="recent-list">
+            {% for it in s.items %}
+              <a class="recent-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+                <div class="recent-poster-wrapper">
+                  {% if it.poster_path %}
+                    <img class="recent-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                  {% else %}
+                    <img class="recent-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                  {% endif %}
+                </div>
+                <div class="recent-info">
+                  <div class="recent-title">{{ it.title }}</div>
+                  <div class="recent-release">{{ it.release_dt|date:"F j, Y" }}</div>
+                  {% if it.released_ago %}
+                    <div class="recent-released">{{ it.released_ago }}</div>
+                  {% endif %}
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted">No recent movies found for this studio.</p>
+        {% endif %}
+      </template>
+    {% endfor %}
+  </section>
+
+  <div class="recent-modal" id="recent-studio-modal" hidden>
+    <div class="recent-modal-backdrop" data-modal-close></div>
+    <div class="recent-modal-dialog card">
+      <div class="recent-modal-header">
+        <div class="row recent-modal-title-row">
+          <div class="recent-studio-logo-slot recent-studio-logo-slot-modal">
+            <img class="recent-studio-logo recent-studio-logo-modal" id="recent-studio-modal-logo" src="" alt="" />
+          </div>
+          <div>
+            <h2 id="recent-studio-modal-title"></h2>
+            <div class="muted" id="recent-studio-modal-count"></div>
+          </div>
+        </div>
+        <button type="button" class="secondary" data-modal-close>Close</button>
+      </div>
+      <div id="recent-studio-modal-body"></div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/pages/recent.js' %}"></script>
+{% endblock %}

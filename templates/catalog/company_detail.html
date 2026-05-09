@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% load static tz %}
+
+{% block title %}{{ company.name }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/pages/company_detail.css' %}" />
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/pages/company_detail.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+  <div class="company-top">
+    <div class="company-header">
+      <div class="company-logo-frame" aria-hidden="true">
+        {% if company.logo_path %}
+          <img class="company-logo" src="https://image.tmdb.org/t/p/w500{{ company.logo_path }}" alt="" />
+        {% else %}
+          <img class="company-logo" src="{% static 'img/placeholder-company.svg' %}" alt="" />
+        {% endif %}
+      </div>
+
+      <div class="company-header-body">
+        <h1 class="company-title">{{ company.name }}</h1>
+
+        <div id="company-follow-controls">
+          {% include 'catalog/_company_follow_controls.html' %}
+        </div>
+
+        {% if company.tmdb_raw.headquarters %}
+          <div class="muted company-hq">HQ: {{ company.tmdb_raw.headquarters }}</div>
+        {% endif %}
+        {% if company.tmdb_raw.origin_country %}
+          <div class="muted company-origin">Origin: {{ company.tmdb_raw.origin_country }}</div>
+        {% endif %}
+        {% if company.tmdb_raw.parent_company and company.tmdb_raw.parent_company.id and company.tmdb_raw.parent_company.name %}
+          <div class="muted company-parent">
+            Parent company:
+            <a href="{% url 'company_detail' company.tmdb_raw.parent_company.id %}">{{ company.tmdb_raw.parent_company.name }}</a>
+          </div>
+        {% endif %}
+        {% if company.tmdb_raw.homepage %}
+          <div class="company-homepage">
+            <a href="{{ company.tmdb_raw.homepage }}" target="_blank" rel="noreferrer">Homepage</a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="company-meta-row">
+      <div class="muted">
+        {% if company.tmdb_last_sync_at %}
+          Last synced (IST): {{ company.tmdb_last_sync_at|localtime|date:"F j, Y H:i" }}
+        {% else %}
+          Last synced: not cached (live TMDb)
+        {% endif %}
+      </div>
+      <div class="muted">TMDb: {{ company.tmdb_id }}</div>
+    </div>
+  </div>
+
+  {% if company.tmdb_raw.description %}
+    <div class="card">
+      <h2>Overview</h2>
+      <p>{{ company.tmdb_raw.description }}</p>
+    </div>
+  {% endif %}
+
+  <div class="company-filmography">
+    <h2 class="company-filmography-title">
+      {% if filmography_mode == 'upcoming' %}Upcoming{% else %}Filmography{% endif %}
+    </h2>
+
+    <div class="row company-filmography-header">
+      <div class="muted">
+        {% if filmography_mode == 'upcoming' %}
+          Page {{ page }}{% if upcoming_total_pages %} of {{ upcoming_total_pages }}{% if upcoming_total_pages_plus %}+{% endif %}{% endif %}
+        {% else %}
+          Page {{ page }} of {{ total_pages }}{% if total_results %} · Total: {{ total_results }}{% endif %}
+        {% endif %}
+      </div>
+      <div class="company-filmography-pager">
+        <div class="company-filmography-prev">
+          {% if has_prev %}
+            {% if filmography_mode == 'upcoming' %}
+              <a class="muted" href="{% url 'company_detail' company.tmdb_id %}?mode=upcoming&page={{ prev_page }}">Prev</a>
+            {% else %}
+              <a class="muted" href="{% url 'company_detail' company.tmdb_id %}?page={{ prev_page }}">Prev</a>
+            {% endif %}
+          {% endif %}
+        </div>
+
+        <div class="company-filmography-toggle">
+          {% if filmography_mode == 'upcoming' %}
+            <a class="muted" href="{% url 'company_detail' company.tmdb_id %}?page=1">Filmography</a>
+          {% else %}
+            <a class="muted" href="{% url 'company_detail' company.tmdb_id %}?mode=upcoming&page=1">Upcoming</a>
+          {% endif %}
+        </div>
+
+        <div class="company-filmography-next">
+          {% if has_next %}
+            {% if filmography_mode == 'upcoming' %}
+              <a class="muted" href="{% url 'company_detail' company.tmdb_id %}?mode=upcoming&page={{ next_page }}">Next</a>
+            {% else %}
+              <a class="muted" href="{% url 'company_detail' company.tmdb_id %}?page={{ next_page }}">Next</a>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if filmography_items %}
+      <div class="filmography-grid">
+        {% for m in filmography_items %}
+          <div class="filmography-item">
+            <a class="filmography-poster-link" href="{% url 'movie_detail' m.id %}">
+              {% if m.poster_path %}
+                <img class="filmography-poster" src="https://image.tmdb.org/t/p/w342{{ m.poster_path }}" alt="" />
+              {% else %}
+                <img class="filmography-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+              {% endif %}
+            </a>
+
+            <div class="filmography-meta">
+              <a class="filmography-title" href="{% url 'movie_detail' m.id %}"><strong>{% if m.title %}{{ m.title }}{% elif m.name %}{{ m.name }}{% else %}-{% endif %}</strong></a>
+              <div class="filmography-year muted">
+                {% if filmography_mode == 'upcoming' %}
+                  TBA
+                {% else %}
+                  {% if m.release_date %}{{ m.release_date|slice:":4" }}{% else %}TBA{% endif %}
+                {% endif %}
+              </div>
+              {% if filmography_mode != 'upcoming' and m.countdown_text %}
+                <div class="muted filmography-role">
+                  <div class="film-countdown">{{ m.countdown_text }}</div>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">
+        {% if filmography_mode == 'upcoming' %}
+          No upcoming (TBA) movies found for this company.
+        {% else %}
+          No movies found for this company.
+        {% endif %}
+      </p>
+    {% endif %}
+  </div>
+{% endblock %}

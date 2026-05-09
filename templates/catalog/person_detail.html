@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+{% load static tz iso_dates %}
+
+{% block title %}{{ person.name }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/pages/person_detail.css' %}?v=20260509b" />
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/pages/person_detail.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+  <div class="person-header">
+    {% if person.profile_path %}
+      <img
+        class="person-profile"
+        src="https://image.tmdb.org/t/p/w342{{ person.profile_path }}"
+        alt=""
+      />
+    {% else %}
+      <img class="person-profile" src="{% static 'img/placeholder-person.svg' %}" alt="" />
+    {% endif %}
+
+    <div class="person-header-body">
+      {% if note_text %}
+        <div class="muted person-note-mobile">#{{ note_text|linebreaksbr }}</div>
+      {% endif %}
+
+      <h1 class="person-title">{{ person.name }}</h1>
+
+      <div id="person-follow-controls">
+        {% include 'catalog/_person_follow_controls.html' %}
+      </div>
+
+      {% if born_display %}
+        <div class="muted person-born">Born: {{ born_display }}</div>
+      {% endif %}
+
+      {% if comeback_info %}
+        <div class="person-comeback-note">
+          <strong>
+            Inactive {{ comeback_info.gap_label }}{% if comeback_info.followed_role %} as {{ comeback_info.followed_role }}{% endif %}
+          </strong>
+          <span class="muted">Last release: {{ comeback_info.last_release_date|iso_date_long }}</span>
+        </div>
+      {% endif %}
+
+      <div class="person-bio" data-bio data-expanded="0">
+        {% if person.tmdb_raw.biography %}
+          <div class="person-bio-text">{{ person.tmdb_raw.biography|linebreaksbr }}</div>
+          <button type="button" class="person-bio-toggle" data-bio-toggle>Show more</button>
+        {% else %}
+          <div class="muted">No biography available.</div>
+        {% endif %}
+      </div>
+
+      {% if also_known_as or known_for_items %}
+        <div class="person-extras">
+          {% if also_known_as %}
+            <div class="person-aka">
+              <div class="muted">Also known as</div>
+              <div class="person-aka-list">
+                {% for n in also_known_as %}
+                  <span class="person-aka-item">{{ n }}</span>{% if not forloop.last %}<span class="muted">, </span>{% endif %}
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+
+          {% if known_for_items %}
+            <div class="person-known-for">
+              <div class="muted">Known for</div>
+              <div class="person-known-for-grid">
+                {% for it in known_for_items %}
+                  <a class="person-known-for-item no-decoration" href="{% url 'movie_detail' it.id %}"><strong>{{ it.title }}</strong></a>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="person-filmography">
+    <h2 class="person-filmography-title">Filmography</h2>
+
+    <div class="filmography-filters" id="filmographyFilters">
+      {% for f in filmography_filters %}
+        <button
+          type="button"
+          class="filter-btn{% if f.key == default_filmography_filter %} active{% endif %}"
+          data-filter="{{ f.key }}"
+        >
+          {{ f.label }} ({{ f.count }})
+        </button>
+      {% endfor %}
+    </div>
+
+    <div class="filmography-grid" id="filmographyList" data-default-filter="{{ default_filmography_filter }}">
+      {% if filmography_items %}
+        {% for it in filmography_items %}
+          <div
+            class="filmography-item"
+            data-filmography-item
+            data-depts="{% for k in it.filters %}{{ k }} {% endfor %}"
+          >
+            <a class="filmography-poster-link" href="{% url 'movie_detail' it.id %}">
+              {% if it.poster_path %}
+                <img class="filmography-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+              {% else %}
+                <img class="filmography-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+              {% endif %}
+            </a>
+
+            <div class="filmography-meta">
+              <a class="filmography-title" href="{% url 'movie_detail' it.id %}"><strong>{{ it.title }}</strong></a>
+              <div class="filmography-year muted">{% if it.year %}{{ it.year }}{% else %}TBA{% endif %}</div>
+              <div class="muted filmography-role">
+                {% if it.countdown_text %}
+                  <div class="film-countdown">{{ it.countdown_text }}</div>
+                {% endif %}
+                <span data-role="all">
+                  {% for role in it.roles_all_parts %}
+                    {{ role }}{% if not forloop.last %},{% endif %}{% if forloop.counter|divisibleby:2 and not forloop.last %}<br />{% else %}{% if not forloop.last %} {% endif %}{% endif %}
+                  {% endfor %}
+                </span>
+                {% for r in it.roles_by_filter %}
+                  <span data-role="{{ r.key }}">
+                    {% for role in r.parts %}
+                      {{ role }}{% if not forloop.last %},{% endif %}{% if forloop.counter|divisibleby:2 and not forloop.last %}<br />{% else %}{% if not forloop.last %} {% endif %}{% endif %}
+                    {% endfor %}
+                  </span>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="muted">No credits found.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="person-meta-row">
+    <div class="muted">
+      {% if person.tmdb_last_sync_at %}
+        Last synced (IST): {{ person.tmdb_last_sync_at|localtime|date:"F j, Y H:i" }}
+      {% else %}
+        Last synced: not cached (live TMDb)
+      {% endif %}
+    </div>
+    <div class="muted">TMDb: {{ person.tmdb_id }}</div>
+  </div>
+{% endblock %}

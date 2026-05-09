@@ -1,0 +1,73 @@
+// CORS proxy options (for regions where TMDb is blocked)
+  CORS_PROXIES: [
+    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?',
+    'https://cors-anywhere.herokuapp.com/',
+    'https://api.codetabs.com/v1/proxy?quest=',
+    'https://yacdn.org/proxy/'
+  ],
+
+TMDb endpoints added + next steps (Apr 17, 2026)
+
+What we decided to add (now supported in code)
+
+Movie
+- GET /movie/{movie_id}/images
+- GET /movie/{movie_id}/watch/providers
+- GET /movie/{movie_id}/recommendations (paged)
+- GET /movie/{movie_id}/similar (paged)
+
+Person
+- GET /person/{person_id}/images
+
+Company
+- GET /company/{company_id}/movies (paged)
+
+Where this is implemented
+- catalog/tmdb.py
+  - TMDbClient methods:
+    - get_movie_images, get_movie_watch_providers, get_movie_recommendations, get_movie_similar
+    - get_person_images
+    - get_company_movies
+- catalog/services.py
+  - Caching helpers + service functions:
+    - get_or_sync_person_images(tmdb_id)
+    - get_or_sync_company_movies_page(company, page)
+    - get_or_sync_movie(... include_images/include_watch_providers/include_recommendations/include_similar ...)
+      - recommendations/similar are cached as paged payloads in Movie.tmdb_raw
+- catalog/views.py
+  - company_detail now uses /company/{id}/movies instead of discover
+
+Next work (UI + wiring)
+
+Movie detail page
+- Decide how to display:
+  - Images gallery (posters/backdrops)
+  - Watch providers (per country; probably use TMDB_REGION or show a chosen region)
+  - Recommendations + Similar (as horizontal cards/carousel-like lists)
+- Wire view logic to call get_or_sync_movie() with include_* flags depending on selected tab/section.
+
+Person detail page
+- Add optional profile photo gallery using either:
+  - Followed person: get_or_sync_person_images(tmdb_id)
+  - Not followed: live fetch via TMDbClient.get_person_images(tmdb_id) (do NOT store)
+
+Company detail page
+- Verify template fields match the /company/{id}/movies payload structure (results[].title, poster_path, release_date, etc.).
+- Optional: add pagination meta (total_pages/total_results) using cached company_movies_meta.
+
+Notes
+- Caching rule to keep: followed people/companies are stored & DB-first; non-followed should be live-fetch only (no DB write).
+- Django check already passed after backend changes.
+
+Company filmography caching
+- Filmography is cached on the Company row (Company.tmdb_raw), not on CompanyFollow.
+- When following/syncing a company, the app can prefetch the full filmography (all discover pages).
+- Optional safety cap (0 or unset means ALL pages): TMDB_COMPANY_FILMOGRAPHY_PREFETCH_MAX_PAGES
+
+Image loading in blocked regions (revisit later)
+- Problem: `CORS_PROXIES` helps only for TMDb API JSON (server-side requests to `api.themoviedb.org`), not for browser `<img src="https://image.tmdb.org/...">`.
+- Option A (fastest): Keep direct `https://image.tmdb.org/t/p/...` URLs (CDN).
+- Option B (works when images blocked): Add a Django image proxy endpoint (e.g. `/tmdb-image/<size>/<path>`) that fetches images server-side and can fall back through `CORS_PROXIES`.
+- Option C (best-of-both): Hybrid client behavior — try direct TMDb image URL first, and on error swap to the proxy URL.
+

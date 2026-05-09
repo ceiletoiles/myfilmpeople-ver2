@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}My Profile{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/pages/profile.css' %}" />
+{% endblock %}
+
+{% block page_header %}
+  <div class="page-header">
+    <button type="button" class="nav-icon-btn" data-menu-toggle aria-controls="site-drawer" aria-expanded="false">
+      <img class="nav-icon" src="{% static 'img/menu.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
+      <span class="sr-only">Open menu</span>
+    </button>
+    <div class="page-header-content">
+      <h1>My Profile</h1>
+      <p class="page-tagline">Account and following overview</p>
+    </div>
+    <span class="page-header-spacer" aria-hidden="true"></span>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div class="profile-page">
+    <div class="profile-summary">
+      <p><strong>Username:</strong> {{ user.username }}</p>
+      <p><strong>Email:</strong> {{ user.email|default:'-' }}</p>
+      <p><strong>Followed entities:</strong> {{ follow_count }}</p>
+    </div>
+
+    <div class="profile-separator" aria-hidden="true"></div>
+
+    <div class="following-head">Following:</div>
+
+    <div class="following-tabs">
+      <input type="radio" name="following-tab" id="tab-director" checked />
+      <input type="radio" name="following-tab" id="tab-actor" />
+      <input type="radio" name="following-tab" id="tab-crew" />
+      <input type="radio" name="following-tab" id="tab-studio" />
+
+      <div class="tab-list" role="tablist" aria-label="Following tabs">
+        <label for="tab-director" class="tab-label" role="tab">Director</label>
+        <label for="tab-actor" class="tab-label" role="tab">Actor</label>
+        <label for="tab-crew" class="tab-label" role="tab">Crew</label>
+        <label for="tab-studio" class="tab-label" role="tab">Studios</label>
+      </div>
+
+      <div class="tab-panels">
+        <section class="tab-panel panel-director">
+          {% if directors %}
+            {% for f in directors %}
+              <a class="following-row" href="{% url 'person_detail' f.person.tmdb_id %}">
+                {% if f.person.profile_path %}
+                  <img class="person-thumb" src="https://image.tmdb.org/t/p/w185{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" />
+                {% else %}
+                  <img class="person-thumb" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
+                {% endif %}
+                <span class="entity-name">{{ f.person.name }}</span>
+              </a>
+            {% endfor %}
+          {% else %}
+            <p class="muted">No followed directors yet.</p>
+          {% endif %}
+        </section>
+
+        <section class="tab-panel panel-actor">
+          {% if actors %}
+            {% for f in actors %}
+              <a class="following-row" href="{% url 'person_detail' f.person.tmdb_id %}">
+                {% if f.person.profile_path %}
+                  <img class="person-thumb" src="https://image.tmdb.org/t/p/w185{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" />
+                {% else %}
+                  <img class="person-thumb" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
+                {% endif %}
+                <span class="entity-name">{{ f.person.name }}</span>
+              </a>
+            {% endfor %}
+          {% else %}
+            <p class="muted">No followed actors yet.</p>
+          {% endif %}
+        </section>
+
+        <section class="tab-panel panel-crew">
+          {% if crew %}
+            {% for f in crew %}
+              <a class="following-row" href="{% url 'person_detail' f.person.tmdb_id %}">
+                {% if f.person.profile_path %}
+                  <img class="person-thumb" src="https://image.tmdb.org/t/p/w185{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" />
+                {% else %}
+                  <img class="person-thumb" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
+                {% endif %}
+                <span class="entity-copy">
+                  <span class="entity-name">{{ f.person.name }}</span>
+                  <span class="entity-meta">{{ f.role }}</span>
+                </span>
+              </a>
+            {% endfor %}
+          {% else %}
+            <p class="muted">No followed crew yet.</p>
+          {% endif %}
+        </section>
+
+        <section class="tab-panel panel-studio">
+          {% if companies %}
+            {% for f in companies %}
+              <a class="following-row" href="{% url 'company_detail' f.company.tmdb_id %}">
+                <span class="studio-logo-wrap">
+                  {% if f.company.logo_path %}
+                    <img class="studio-logo" src="https://image.tmdb.org/t/p/w300{{ f.company.logo_path }}" alt="{{ f.company.name }} logo" loading="lazy" />
+                  {% else %}
+                    <img class="studio-logo" src="{% static 'img/placeholder-company.svg' %}" alt="{{ f.company.name }} logo" loading="lazy" />
+                  {% endif %}
+                </span>
+                <span class="entity-name">{{ f.company.name }}</span>
+              </a>
+            {% endfor %}
+          {% else %}
+            <p class="muted">No followed studios yet.</p>
+          {% endif %}
+        </section>
+      </div>
+    </div>
+  </div>
+{% endblock %}

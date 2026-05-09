@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block title %}Sign up - MyFilmPeople{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/pages/auth.css' %}" />
+{% endblock %}
+
+{% block content %}
+  <section class="auth-shell auth-shell-signup">
+    <div class="auth-hero">
+      <p class="auth-eyebrow">Join the network</p>
+      <h1>Create an account and start following your favorites.</h1>
+      <p class="auth-copy">
+        Build your personal film board, save the people you care about and keep upcoming projects within reach.
+      </p>
+
+      <div class="auth-feature-grid">
+        <div class="auth-feature">
+          <span class="auth-feature-kicker">One place</span>
+          <p>Directors, actors, crew and studios together.</p>
+        </div>
+        <div class="auth-feature">
+          <span class="auth-feature-kicker">Fast follow</span>
+          <p>Search once and add the people you want to keep track of.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="auth-panel">
+      <div class="auth-panel-card">
+        <h2>Create account</h2>
+        <p class="muted">A quick signup and you’re ready to go.</p>
+
+        <form class="auth-form" method="post">
+          {% csrf_token %}
+          {% if next %}
+            <input type="hidden" name="next" value="{{ next }}" />
+          {% endif %}
+          {{ form.as_p }}
+          <button type="submit">Sign up</button>
+        </form>
+
+        <p class="auth-switch muted">
+          Already have an account?
+          <a class="auth-link" href="{% url 'login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Login</a>
+        </p>
+      </div>
+    </div>
+  </section>
+{% endblock %}

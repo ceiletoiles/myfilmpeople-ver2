@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Collaboration Finder{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/pages/collaboration.css' %}" />
+{% endblock %}
+
+{% block page_header %}
+  <div class="page-header">
+    <button type="button" class="nav-icon-btn" data-menu-toggle aria-controls="site-drawer" aria-expanded="false">
+      <img class="nav-icon" src="{% static 'img/menu.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
+      <span class="sr-only">Open menu</span>
+    </button>
+    <div class="page-header-content">
+      <h1>Collaboration Finder</h1>
+      <p class="page-tagline">Discover movies where cast and crew worked together</p>
+    </div>
+      <span class="page-header-spacer" aria-hidden="true"></span>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div class="collab-main-container">
+    <div class="collab-left-section">
+      <div class="collab-search-wrap">
+        <input
+          id="person-query"
+          type="text"
+          value=""
+          autocomplete="off"
+          placeholder="Type a person name"
+          class="collab-search-input"
+          data-suggest-url="{% url 'collaboration_suggest' %}"
+          data-placeholder-person="{% static 'img/placeholder-person.svg' %}"
+        />
+        <div id="suggestions" class="collab-suggestions"></div>
+      </div>
+
+      <form method="post" class="mt-12">
+        {% csrf_token %}
+        <div class="collab-section">
+          <h2>Selected people</h2>
+          <div id="selected-people" class="collab-person-grid">
+            {% for sp in selected_people %}
+              <div class="collab-person-tile" id="selected-person-{{ sp.tmdb_id }}">
+                <input type="hidden" name="person_ids" value="{{ sp.tmdb_id }}" />
+                <button type="button" class="collab-person-remove" data-remove-selected-person="{{ sp.tmdb_id }}" aria-label="Remove {{ sp.name }}">&times;</button>
+                {% if sp.profile_path %}
+                  <img class="collab-person-avatar" src="https://image.tmdb.org/t/p/w185{{ sp.profile_path }}" alt="" />
+                {% else %}
+                  <img class="collab-person-avatar" src="{% static 'img/placeholder-person.svg' %}" alt="" />
+                {% endif %}
+                <div class="collab-person-name"><strong>{{ sp.name }}</strong></div>
+                <div class="muted collab-person-role">{{ sp.known_for_department|default:'Unknown' }}</div>
+              </div>
+            {% empty %}
+              <p class="muted" id="selected-empty">No people selected yet.</p>
+            {% endfor %}
+          </div>
+          <button type="submit" class="collab-submit">Find shared movies</button>
+        </div>
+      </form>
+
+      {% if has_results_request %}
+        <div class="collab-results">
+          <div class="collab-results-header">
+            <div>
+              <h2>Shared Movies</h2>
+              <p class="collab-results-summary">
+                <strong>{{ results_count }}</strong> Movies Together · <strong>{{ collaborators_count }}</strong> collaborators
+              </p>
+            </div>
+            <button type="button" class="collab-results-clear" id="clear-results-btn" aria-label="Clear results">Reset</button>
+          </div>
+          {% if results %}
+            <div class="collab-movie-list">
+              {% for r in results %}
+                <article class="collab-movie-row">
+                  {% if r.poster_path %}
+                    <img class="collab-movie-poster" src="https://image.tmdb.org/t/p/w342{{ r.poster_path }}" alt="" />
+                  {% else %}
+                    <img class="collab-movie-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                  {% endif %}
+                  <div class="collab-movie-meta">
+                    <a class="collab-movie-title" href="{% url 'movie_detail' r.tmdb_id %}">{{ r.title }}</a>
+                    <div class="collab-movie-year muted">{{ r.release_date|slice:':4'|default:'TBA' }}</div>
+                    <div class="collab-movie-roles">
+                      {% for x in r.roles %}
+                        <div class="collab-movie-role-line">{{ x.person.name }}{% if x.role %} - {{ x.role }}{% endif %}</div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="muted collab-results-empty">No shared movies found.</p>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+
+    {% if frequent_collaborators %}
+      <div class="collab-right-section">
+        <div class="collab-frequent-section">
+          <h2>Frequent Collaborators</h2>
+          <div class="collab-frequent-list">
+            {% for fc in frequent_collaborators %}
+              <div
+                class="collab-frequent-pair"
+                data-pair-ids="{{ fc.pair_ids|join:',' }}"
+                data-pair-names="{{ fc.pair_names|join:'|' }}"
+                data-pair-profiles="{{ fc.pair_profiles|join:'|' }}"
+                data-pair-departments="{{ fc.pair_departments|join:'|' }}"
+                role="button"
+                tabindex="0"
+                aria-label="View {{ fc.pair_names|join:' & ' }} - {{ fc.shared_count }} films together"
+              >
+                <div class="collab-frequent-avatars">
+                  {% if fc.pair_profiles.0 %}
+                    <img class="collab-frequent-avatar" src="https://image.tmdb.org/t/p/w185{{ fc.pair_profiles.0 }}" alt="" />
+                  {% else %}
+                    <img class="collab-frequent-avatar" src="{% static 'img/placeholder-person.svg' %}" alt="" />
+                  {% endif %}
+                  {% if fc.pair_profiles.1 %}
+                    <img class="collab-frequent-avatar" src="https://image.tmdb.org/t/p/w185{{ fc.pair_profiles.1 }}" alt="" />
+                  {% else %}
+                    <img class="collab-frequent-avatar" src="{% static 'img/placeholder-person.svg' %}" alt="" />
+                  {% endif %}
+                </div>
+                <div class="collab-frequent-info">
+                  <div class="collab-frequent-names">
+                    <strong>{{ fc.pair_names|join:" & " }}</strong>
+                  </div>
+                  <div class="collab-frequent-count muted">{{ fc.shared_count }} film{{ fc.shared_count|pluralize }}</div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/pages/collaboration.js' %}"></script>
+{% endblock %}

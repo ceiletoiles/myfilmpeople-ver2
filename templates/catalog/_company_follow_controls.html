@@ -1,0 +1,64 @@
+{% load static %}
+
+<div class="muted" data-ajax-status></div>
+
+{% if is_followed %}
+  <div class="muted company-ajax-status" data-ajax-status></div>
+  <div class="company-actions">
+    {% if note_text %}
+      <div class="muted company-note-inline">
+        <span class="company-note-hash">#{{ note_text|linebreaksbr }}</span>
+      </div>
+    {% endif %}
+
+    <details class="kebab-menu" data-kebab-menu>
+      <summary class="kebab-trigger" aria-label="Actions" title="Actions">
+        <img class="kebab-icon" src="{% static 'img/menu.svg' %}" width="18" height="18" alt="" aria-hidden="true" />
+      </summary>
+      <div class="kebab-pop" role="menu">
+        <form
+          method="post"
+          action="{% url 'company_sync' company.tmdb_id %}"
+          role="none"
+          data-sync-job-form
+          data-sync-job-start-url="{% url 'company_sync_start' company.tmdb_id %}"
+        >
+          {% csrf_token %}
+          <button type="submit" role="menuitem">Sync now</button>
+        </form>
+
+        <form method="post" action="{% url 'company_unfollow' company.tmdb_id %}" data-ajax="1" role="none">
+          {% csrf_token %}
+          <input type="hidden" name="ajax_context" value="company_detail" />
+          <button type="submit" role="menuitem">Unfollow</button>
+        </form>
+
+        <button type="button" role="menuitem" data-open-dialog="#company-edit-note">{% if note_text %}Edit note{% else %}Create note{% endif %}</button>
+      </div>
+    </details>
+  </div>
+
+  <dialog id="company-edit-note" class="company-dialog">
+    <div class="row company-dialog-header">
+      <strong>{% if note_text %}Edit note{% else %}Create note{% endif %}</strong>
+      <form method="dialog" class="inline">
+        <button type="submit" class="secondary">Close</button>
+      </form>
+    </div>
+
+    <form method="post" action="{% url 'company_note' company.tmdb_id %}" data-ajax="1">
+      {% csrf_token %}
+      <input type="hidden" name="ajax_context" value="company_detail" />
+      <textarea name="notes" placeholder="Add notes...">{{ note_text }}</textarea>
+      <button type="submit">Save</button>
+    </form>
+  </dialog>
+{% else %}
+  <form method="post" action="{% url 'follow' %}" class="mt-2" data-ajax="1">
+    {% csrf_token %}
+    <input type="hidden" name="ajax_context" value="company_detail" />
+    <input type="hidden" name="entity_type" value="company" />
+    <input type="hidden" name="tmdb_id" value="{{ company.tmdb_id }}" />
+    <button type="submit">Follow</button>
+  </form>
+{% endif %}

@@ -1,0 +1,42 @@
+from django.urls import path
+
+from . import views
+
+urlpatterns = [
+    path("", views.home, name="home"),
+    path("search/", views.search, name="search"),
+    path("search/suggest/", views.search_suggest, name="search_suggest"),
+    path("follow/", views.follow, name="follow"),
+    path("sync/all/", views.sync_all_followed, name="sync_all_followed"),
+    path("sync/all/start/", views.sync_all_followed_start, name="sync_all_followed_start"),
+    path(
+        "sync/all/progress/<uuid:job_id>/",
+        views.sync_all_followed_progress,
+        name="sync_all_followed_progress",
+    ),
+    path("collaboration/", views.collaboration_finder, name="collaboration_finder"),
+    path("collaboration/suggest/", views.collaboration_suggest, name="collaboration_suggest"),
+    path("upcoming/", views.upcoming, name="upcoming"),
+    path("recent/", views.recent, name="recent"),
+    path("new/", views.new_arrivals, name="new_arrivals"),
+    path("person/<int:tmdb_id>/", views.person_detail, name="person_detail"),
+    path(
+        "person/<int:tmdb_id>/toggle-self-appearances/",
+        views.person_toggle_self_appearances,
+        name="person_toggle_self_appearances",
+    ),
+    path("person/<int:tmdb_id>/note/", views.person_note, name="person_note"),
+    path("person/<int:tmdb_id>/sync/", views.person_sync, name="person_sync"),
+    path("person/<int:tmdb_id>/sync/start/", views.person_sync_start, name="person_sync_start"),
+    path("person/sync/progress/<uuid:job_id>/", views.person_sync_progress, name="person_sync_progress"),
+    path("person/<int:tmdb_id>/unfollow/", views.person_unfollow, name="person_unfollow"),
+    path("company/<int:tmdb_id>/", views.company_detail, name="company_detail"),
+    path("company/<int:tmdb_id>/note/", views.company_note, name="company_note"),
+    path("company/<int:tmdb_id>/sync/", views.company_sync, name="company_sync"),
+    path("company/<int:tmdb_id>/sync/start/", views.company_sync_start, name="company_sync_start"),
+    path("company/sync/progress/<uuid:job_id>/", views.company_sync_progress, name="company_sync_progress"),
+    path("company/<int:tmdb_id>/unfollow/", views.company_unfollow, name="company_unfollow"),
+    path("movie/<int:tmdb_id>/", views.movie_detail, name="movie_detail"),
+    path("movie/<int:tmdb_id>/similar/", views.movie_similar, name="movie_similar"),
+    path("movie/<int:tmdb_id>/related/", views.movie_related, name="movie_related"),
+]

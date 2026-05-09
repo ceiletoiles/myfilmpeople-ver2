@@ -1,0 +1,319 @@
+/* Page-specific styles for Company Detail */
+
+.company-top {
+  background: transparent;
+  border-radius: 10px;
+  padding: 8px;
+  margin-bottom: 12px;
+}
+
+.company-header {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.company-logo-frame {
+  width: 220px;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.company-logo {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 0;
+  background: transparent;
+}
+
+.company-header-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  column-gap: 16px;
+  row-gap: 8px;
+  align-items: start;
+  min-width: 0;
+}
+
+.company-hq,
+.company-origin,
+.company-parent,
+.company-homepage {
+  grid-column: 1;
+}
+
+#company-follow-controls {
+  display: contents;
+}
+
+.company-ajax-status:empty {
+  display: none;
+}
+
+.company-actions {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  align-self: start;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.company-note-inline {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+}
+
+.company-note-hash {
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.company-note-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.kebab-menu {
+  position: relative;
+}
+
+.kebab-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  list-style: none;
+  padding: 6px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.kebab-trigger:focus,
+.kebab-trigger:focus-visible {
+  outline: none;
+}
+
+.kebab-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.kebab-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.kebab-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  min-width: 220px;
+  z-index: 10;
+}
+
+.kebab-pop form {
+  margin: 0;
+}
+
+.kebab-pop button {
+  width: 100%;
+}
+
+.company-dialog {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  width: min(520px, 92vw);
+}
+
+.company-dialog::backdrop {
+  background: #0f172a;
+  opacity: 0.35;
+}
+
+.company-dialog-header {
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.company-meta-row {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.company-filmography {
+  margin-top: 8px;
+}
+
+.company-filmography-title {
+  margin: 0;
+}
+
+.company-title {
+  margin: 0;
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.company-filmography-header {
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.company-filmography-pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 1;
+  min-width: 220px;
+  align-items: center;
+}
+
+.company-filmography-prev,
+.company-filmography-next {
+  flex: 1;
+}
+
+.company-filmography-toggle {
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+.company-filmography-next {
+  text-align: right;
+}
+
+/* Countdown styling (matches person filmography). */
+.filmography-role {
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: normal;
+  min-height: 0;
+}
+
+.film-countdown {
+  margin-bottom: 2px;
+}
+
+/* Reuse the same filmography tile layout as the person page for consistency. */
+.filmography-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170.19px, 170.19px));
+  gap: 18px 14px;
+  align-items: start;
+  justify-content: center;
+}
+
+.filmography-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filmography-poster-link {
+  display: block;
+}
+
+.filmography-poster {
+  width: 170.19px;
+  height: 255.28px;
+  object-fit: cover;
+  border-radius: 0;
+  background: #e2e8f0;
+  display: block;
+}
+
+.filmography-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+}
+
+.filmography-title {
+  text-decoration: none;
+  font-size: 14.4px;
+  line-height: 1.2;
+  width: 100%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  min-height: 34.6px;
+}
+
+.filmography-year {
+  font-size: 14.4px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 17.3px;
+}
+
+@media (max-width: 700px) {
+  main {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .filmography-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 150px));
+  }
+
+  .filmography-poster {
+    width: 150px;
+    height: 225px;
+  }
+}
+
+@media (max-width: 700px) {
+  .company-header {
+    flex-direction: column;
+  }
+
+  .company-logo-frame {
+    width: 100%;
+    max-width: 220px;
+    height: 220px;
+  }
+
+  .company-header-body {
+    grid-template-columns: 1fr;
+  }
+
+  .company-actions {
+    grid-column: 1;
+    grid-row: auto;
+    width: 100%;
+    justify-self: end;
+  }
+}

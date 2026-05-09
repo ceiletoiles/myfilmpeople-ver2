@@ -1,0 +1,158 @@
+{% load static %}
+
+<div class="muted person-ajax-status" data-ajax-status></div>
+
+<div class="person-actions">
+  {% if follow_roles and note_text %}
+    <div class="muted person-note-inline">
+      <span class="person-note-hash">#{{ note_text|linebreaksbr }}</span>
+    </div>
+  {% endif %}
+
+  <details class="kebab-menu" data-kebab-menu>
+    <summary class="kebab-trigger" aria-label="Actions" title="Actions">
+      <img class="kebab-icon" src="{% static 'img/menu.svg' %}" width="18" height="18" alt="" aria-hidden="true" />
+    </summary>
+    <div class="kebab-pop" role="menu">
+      <form method="post" action="{% url 'person_toggle_self_appearances' person.tmdb_id %}" role="none">
+        {% csrf_token %}
+        <button type="submit" role="menuitem">
+          {% if hide_self_appearances %}Show self appearances{% else %}Hide self appearances{% endif %}
+        </button>
+      </form>
+
+      {% if follow_roles %}
+        <form
+          method="post"
+          action="{% url 'person_sync' person.tmdb_id %}"
+          role="none"
+          data-sync-job-form
+          data-sync-job-start-url="{% url 'person_sync_start' person.tmdb_id %}"
+        >
+          {% csrf_token %}
+          <button type="submit" role="menuitem">Sync now</button>
+        </form>
+
+        {% if role_options_remaining %}
+          <button type="button" role="menuitem" data-open-dialog="#person-follow-other-roles">Follow for other roles</button>
+        {% endif %}
+
+        {% if follow_roles|length == 1 %}
+          <form method="post" action="{% url 'person_unfollow' person.tmdb_id %}" data-ajax="1" role="none">
+            {% csrf_token %}
+            <input type="hidden" name="ajax_context" value="person_detail" />
+            <input type="hidden" name="role" value="{{ follow_roles.0 }}" />
+            <button type="submit" role="menuitem">Unfollow</button>
+          </form>
+        {% else %}
+          <button type="button" role="menuitem" data-open-dialog="#person-unfollow-roles-{{ person.tmdb_id }}">Unfollow</button>
+        {% endif %}
+
+        <button type="button" role="menuitem" data-open-dialog="#person-edit-note">{% if note_text %}Edit note{% else %}Create note{% endif %}</button>
+      {% endif %}
+    </div>
+  </details>
+</div>
+
+{% if follow_roles %}
+
+  <div class="person-follow-summary">
+    {% for r in follow_roles %}
+      <strong>{{ r }}</strong>{% if not forloop.last %}, {% endif %}
+    {% endfor %}
+  </div>
+
+  {% if role_options_remaining %}
+    <dialog id="person-follow-other-roles" class="person-dialog">
+      <div class="row person-dialog-header">
+        <strong>Follow for other roles</strong>
+        <form method="dialog" class="inline">
+          <button type="submit" class="secondary dialog-close" aria-label="Close dialog">&times;</button>
+        </form>
+      </div>
+
+      <div class="person-role-list">
+        {% for r in role_options_remaining %}
+          <form method="post" action="{% url 'follow' %}" data-ajax="1" class="person-role-item">
+            {% csrf_token %}
+            <input type="hidden" name="ajax_context" value="person_detail" />
+            <input type="hidden" name="entity_type" value="person" />
+            <input type="hidden" name="tmdb_id" value="{{ person.tmdb_id }}" />
+            <input type="hidden" name="role" value="{{ r }}" />
+            <button type="submit" class="secondary">{{ r }}</button>
+          </form>
+        {% endfor %}
+      </div>
+    </dialog>
+  {% endif %}
+
+  {% if follow_roles|length > 1 %}
+    <dialog id="person-unfollow-roles-{{ person.tmdb_id }}" class="person-dialog">
+      <div class="row person-dialog-header">
+        <strong>Unfollow</strong>
+        <form method="dialog" class="inline">
+          <button type="submit" class="secondary dialog-close" aria-label="Close dialog">&times;</button>
+        </form>
+      </div>
+
+      <div class="person-unfollow-list">
+        {% for r in follow_roles %}
+          <form method="post" action="{% url 'person_unfollow' person.tmdb_id %}" data-ajax="1" class="person-unfollow-item">
+            {% csrf_token %}
+            <input type="hidden" name="ajax_context" value="person_detail" />
+            <input type="hidden" name="role" value="{{ r }}" />
+            <div class="person-unfollow-row">
+              <span class="person-unfollow-role">{{ r }}</span>
+              <button type="submit" class="secondary person-unfollow-action">Unfollow</button>
+            </div>
+          </form>
+        {% endfor %}
+
+        <form method="post" action="{% url 'person_unfollow' person.tmdb_id %}" data-ajax="1" class="person-unfollow-item">
+          {% csrf_token %}
+          <input type="hidden" name="ajax_context" value="person_detail" />
+          <div class="person-unfollow-row">
+            <span class="person-unfollow-role">All roles</span>
+            <button type="submit" class="secondary person-unfollow-action">Unfollow all</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+  {% endif %}
+
+  <dialog id="person-edit-note" class="person-dialog">
+    <div class="row person-dialog-header">
+      <strong>{% if note_text %}Edit note{% else %}Create note{% endif %}</strong>
+      <form method="dialog" class="inline">
+        <button type="submit" class="secondary dialog-close" aria-label="Close dialog">&times;</button>
+      </form>
+    </div>
+
+    <form method="post" action="{% url 'person_note' person.tmdb_id %}" data-ajax="1">
+      {% csrf_token %}
+      <input type="hidden" name="ajax_context" value="person_detail" />
+      <textarea name="notes" placeholder="Add notes...">{{ note_text }}</textarea>
+      <button type="submit">Save</button>
+    </form>
+  </dialog>
+{% else %}
+  <div class="person-follow-summary">
+    <form method="post" action="{% url 'follow' %}" class="person-follow-form" data-ajax="1">
+      {% csrf_token %}
+      <input type="hidden" name="ajax_context" value="person_detail" />
+      <input type="hidden" name="entity_type" value="person" />
+      <input type="hidden" name="tmdb_id" value="{{ person.tmdb_id }}" />
+      <label class="person-follow-role">
+        Role
+        <select name="role">
+          {% for r in role_options %}
+            <option value="{{ r }}">{{ r }}</option>
+          {% empty %}
+            <option value="" disabled selected>Roles unavailable</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit">Follow</button>
+    </form>
+  </div>
+{% endif %}

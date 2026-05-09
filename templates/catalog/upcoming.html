@@ -1,0 +1,251 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Upcoming Films{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/pages/upcoming.css' %}?v=20260509a" />
+{% endblock %}
+
+{% block page_header %}
+  <div class="page-header">
+    <button type="button" class="nav-icon-btn" data-menu-toggle aria-controls="site-drawer" aria-expanded="false">
+      <img class="nav-icon" src="{% static 'img/menu.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
+      <span class="sr-only">Open menu</span>
+    </button>
+    <div class="page-header-content">
+      <h1>Upcoming Films</h1>
+      <p class="page-tagline">Upcoming movies based on the people and studios you follow.</p>
+    </div>
+      <span class="page-header-spacer" aria-hidden="true"></span>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div class="upcoming-tabs" aria-label="Upcoming filters">
+    <button type="button" class="upcoming-tab is-active" data-tab="all">All</button>
+    <button type="button" class="upcoming-tab" data-tab="directors">Directors</button>
+    <button type="button" class="upcoming-tab" data-tab="actors">Actors</button>
+    <button type="button" class="upcoming-tab" data-tab="crew">Crew</button>
+    <button type="button" class="upcoming-tab" data-tab="studios">Studios</button>
+  </div>
+
+  <section class="upcoming-panel is-active" data-panel="all">
+    {% if all_items %}
+      <div class="upcoming-list">
+        {% for it in all_items %}
+          <a class="upcoming-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+            <div class="upcoming-poster-wrapper">
+              {% if it.poster_path %}
+                <img class="upcoming-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+              {% else %}
+                <img class="upcoming-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+              {% endif %}
+            </div>
+            <div class="upcoming-info">
+              <div class="upcoming-title">{{ it.title }}</div>
+              <div class="upcoming-release">{{ it.release_dt|date:"F j, Y" }}</div>
+              {% if it.countdown %}
+                <div class="upcoming-countdown">{{ it.countdown }}</div>
+              {% endif %}
+              {% if it.credits %}
+                {% for credit in it.credits %}
+                  <div class="upcoming-credit">{{ credit }}</div>
+                {% endfor %}
+              {% endif %}
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No upcoming movies found yet.</p>
+    {% endif %}
+  </section>
+
+  <section class="upcoming-panel" data-panel="directors" hidden>
+    {% with items=upcoming_by_role.director %}
+      {% if items %}
+        <div class="upcoming-list">
+          {% for it in items %}
+            <a class="upcoming-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+              <div class="upcoming-poster-wrapper">
+                {% if it.poster_path %}
+                  <img class="upcoming-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                {% else %}
+                  <img class="upcoming-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                {% endif %}
+              </div>
+              <div class="upcoming-info">
+                <div class="upcoming-title">{{ it.title }}</div>
+                <div class="upcoming-release">{{ it.release_dt|date:"F j, Y" }}</div>
+                {% if it.countdown %}
+                  <div class="upcoming-countdown">{{ it.countdown }}</div>
+                {% endif %}
+                {% if it.credits %}
+                  {% for credit in it.credits %}
+                    <div class="upcoming-credit">{{ credit }}</div>
+                  {% endfor %}
+                {% endif %}
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No upcoming movies found for followed directors.</p>
+      {% endif %}
+    {% endwith %}
+  </section>
+
+  <section class="upcoming-panel" data-panel="actors" hidden>
+    {% with items=upcoming_by_role.actor %}
+      {% if items %}
+        <div class="upcoming-list">
+          {% for it in items %}
+            <a class="upcoming-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+              <div class="upcoming-poster-wrapper">
+                {% if it.poster_path %}
+                  <img class="upcoming-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                {% else %}
+                  <img class="upcoming-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                {% endif %}
+              </div>
+              <div class="upcoming-info">
+                <div class="upcoming-title">{{ it.title }}</div>
+                <div class="upcoming-release">{{ it.release_dt|date:"F j, Y" }}</div>
+                {% if it.countdown %}
+                  <div class="upcoming-countdown">{{ it.countdown }}</div>
+                {% endif %}
+                {% if it.credits %}
+                  {% for credit in it.credits %}
+                    <div class="upcoming-credit">{{ credit }}</div>
+                  {% endfor %}
+                {% endif %}
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No upcoming movies found for followed actors.</p>
+      {% endif %}
+    {% endwith %}
+  </section>
+
+  <section class="upcoming-panel" data-panel="crew" hidden>
+    {% with items=upcoming_by_role.crew %}
+      {% if items %}
+        <div class="upcoming-list">
+          {% for it in items %}
+            <a class="upcoming-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+              <div class="upcoming-poster-wrapper">
+                {% if it.poster_path %}
+                  <img class="upcoming-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                {% else %}
+                  <img class="upcoming-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                {% endif %}
+              </div>
+              <div class="upcoming-info">
+                <div class="upcoming-title">{{ it.title }}</div>
+                <div class="upcoming-release">{{ it.release_dt|date:"F j, Y" }}</div>
+                {% if it.countdown %}
+                  <div class="upcoming-countdown">{{ it.countdown }}</div>
+                {% endif %}
+                {% if it.credits %}
+                  {% for credit in it.credits %}
+                    <div class="upcoming-credit">{{ credit }}</div>
+                  {% endfor %}
+                {% endif %}
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No upcoming movies found for followed crew.</p>
+      {% endif %}
+    {% endwith %}
+  </section>
+
+  <section class="upcoming-panel" data-panel="studios" hidden>
+    {% if studio_cards %}
+      <div class="upcoming-studio-list">
+        {% for s in studio_cards %}
+          <button
+            type="button"
+            class="card card-tight upcoming-studio-card"
+            data-studio-template="studio-template-{{ forloop.counter }}"
+            data-studio-name="{{ s.name|escape }}"
+            data-studio-count="{{ s.upcoming_count }}"
+            data-studio-logo="{% if s.logo_path %}https://image.tmdb.org/t/p/w185{{ s.logo_path }}{% else %}{% static 'img/placeholder-company.svg' %}{% endif %}"
+          >
+            <div class="upcoming-studio-row">
+              <div class="upcoming-studio-logo-slot">
+                {% if s.logo_path %}
+                  <img class="upcoming-studio-logo" src="https://image.tmdb.org/t/p/w185{{ s.logo_path }}" alt="" />
+                {% else %}
+                  <img class="upcoming-studio-logo" src="{% static 'img/placeholder-company.svg' %}" alt="" />
+                {% endif %}
+              </div>
+              <div>
+                <div><strong>{{ s.name }}</strong></div>
+                <div class="muted">Upcoming: {{ s.upcoming_count }}</div>
+              </div>
+            </div>
+          </button>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No followed studios with upcoming movies yet.</p>
+    {% endif %}
+
+    {% for s in studio_cards %}
+      <template id="studio-template-{{ forloop.counter }}">
+        {% if s.items %}
+          <div class="upcoming-list">
+            {% for it in s.items %}
+              <a class="upcoming-item no-decoration" href="{% url 'movie_detail' it.movie_id %}">
+                <div class="upcoming-poster-wrapper">
+                  {% if it.poster_path %}
+                    <img class="upcoming-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                  {% else %}
+                    <img class="upcoming-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                  {% endif %}
+                </div>
+                <div class="upcoming-info">
+                  <div class="upcoming-title">{{ it.title }}</div>
+                  <div class="upcoming-release">{{ it.release_dt|date:"F j, Y" }}</div>
+                  {% if it.countdown %}
+                    <div class="upcoming-countdown">{{ it.countdown }}</div>
+                  {% endif %}
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted">No upcoming movies found for this studio.</p>
+        {% endif %}
+      </template>
+    {% endfor %}
+  </section>
+
+  <div class="upcoming-modal" id="upcoming-studio-modal" hidden>
+    <div class="upcoming-modal-backdrop" data-modal-close></div>
+    <div class="upcoming-modal-dialog card">
+      <div class="upcoming-modal-header">
+        <div class="row upcoming-modal-title-row">
+          <div class="upcoming-studio-logo-slot upcoming-studio-logo-slot-modal">
+            <img class="upcoming-studio-logo upcoming-studio-logo-modal" id="upcoming-studio-modal-logo" src="" alt="" />
+          </div>
+          <div>
+            <h2 id="upcoming-studio-modal-title"></h2>
+            <div class="muted" id="upcoming-studio-modal-count"></div>
+          </div>
+        </div>
+        <button type="button" class="secondary" data-modal-close>Close</button>
+      </div>
+      <div id="upcoming-studio-modal-body"></div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/pages/upcoming.js' %}"></script>
+{% endblock %}

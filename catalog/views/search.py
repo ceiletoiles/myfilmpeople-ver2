@@ -1,0 +1,498 @@
+from __future__ import annotations
+
+from concurrent.futures import ThreadPoolExecutor
+import hashlib
+import json
+
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.db.models import Q
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import render
+from django.urls import reverse
+
+from ..models import CompanyFollow, PersonFollow
+from ..tmdb import TMDbClient
+
+
+def _clamp_int(value: str, *, default: int, min_value: int, max_value: int) -> int:
+	try:
+		n = int((value or "").strip())
+	except (TypeError, ValueError):
+		n = default
+	if n < min_value:
+		return min_value
+	if n > max_value:
+		return max_value
+	return n
+
+
+def _cache_key(prefix: str, payload: dict) -> str:
+	"""Build a stable, short cache key from a dict payload."""
+	digest = hashlib.sha256(
+		json.dumps(payload, sort_keys=True, ensure_ascii=True, default=str).encode("utf-8")
+	).hexdigest()
+	return f"{prefix}:{digest}"
+
+
+def _tmdb_entity_search(
+	query: str,
+	*,
+	limit: int,
+	include_movie_director: bool = False,
+) -> dict[str, list[dict]]:
+	people: list[dict] = []
+	companies: list[dict] = []
+	movies: list[dict] = []
+
+	client = TMDbClient.from_settings()
+	with ThreadPoolExecutor(max_workers=3) as ex:
+		people_future = ex.submit(client.search_people, query)
+		companies_future = ex.submit(client.search_companies, query)
+		movies_future = ex.submit(client.search_movies, query)
+
+		tmdb_people = (people_future.result() or {}).get("results") or []
+		tmdb_companies = (companies_future.result() or {}).get("results") or []
+		tmdb_movies = (movies_future.result() or {}).get("results") or []
+
+	for r in tmdb_people:
+		if len(people) >= limit:
+			break
+		pid = r.get("id")
+		if not isinstance(pid, int):
+			continue
+		known_for_titles: list[str] = []
+		for kf in (r.get("known_for") or []):
+			title = str((kf or {}).get("title") or (kf or {}).get("name") or "").strip()
+			if not title:
+				continue
+			known_for_titles.append(title)
+			if len(known_for_titles) >= 3:
+				break
+		people.append(
+			{
+				"id": pid,
+				"name": r.get("name") or str(pid),
+				"profile_path": r.get("profile_path") or "",
+				"known_for_department": str(r.get("known_for_department") or "").strip(),
+				"known_for_titles": known_for_titles,
+				"url": reverse("person_detail", args=[pid]),
+			}
+		)
+
+	for r in tmdb_companies:
+		if len(companies) >= limit:
+			break
+		cid = r.get("id")
+		if not isinstance(cid, int):
+			continue
+		origin = str(r.get("origin_country") or "").strip()
+		companies.append(
+			{
+				"id": cid,
+				"name": r.get("name") or str(cid),
+				"logo_path": r.get("logo_path") or "",
+				"origin": origin,
+				"url": reverse("company_detail", args=[cid]),
+			}
+		)
+
+	for r in tmdb_movies:
+		if len(movies) >= limit:
+			break
+		mid = r.get("id")
+		if not isinstance(mid, int):
+			continue
+		movies.append(
+			{
+				"id": mid,
+				"title": r.get("title") or str(mid),
+				"poster_path": r.get("poster_path") or "",
+				"release_date": r.get("release_date") or "",
+				"director": "",
+				"url": reverse("movie_detail", args=[mid]),
+			}
+		)
+
+	if include_movie_director and movies:
+		def _director_for_movie(movie_id: int) -> str:
+			credits = client.get_movie_credits(movie_id) or {}
+			crew = credits.get("crew") or []
+			directors = [
+				str(c.get("name") or "").strip()
+				for c in crew
+				if str(c.get("job") or "").strip().lower() == "director" and str(c.get("name") or "").strip()
+			]
+			return ", ".join(directors[:2])
+
+		with ThreadPoolExecutor(max_workers=min(5, len(movies))) as ex:
+			future_to_mid = {ex.submit(_director_for_movie, int(m["id"])): m for m in movies}
+			for fut, movie in future_to_mid.items():
+				try:
+					movie["director"] = fut.result()
+				except Exception:
+					movie["director"] = ""
+
+	return {"people": people, "companies": companies, "movies": movies}
+
+
+def _known_for_titles_from_credits(credits_raw: object, *, limit: int = 3) -> list[str]:
+	if not isinstance(credits_raw, dict):
+		return []
+	items = list(credits_raw.get("cast") or []) + list(credits_raw.get("crew") or [])
+	if not items:
+		return []
+
+	scored: list[tuple[float, str]] = []
+	seen: set[str] = set()
+	for item in items:
+		if not isinstance(item, dict):
+			continue
+		title = str(item.get("title") or item.get("name") or "").strip()
+		if not title:
+			continue
+		key = title.casefold()
+		if key in seen:
+			continue
+		seen.add(key)
+		try:
+			score = float(item.get("popularity") or 0)
+		except (TypeError, ValueError):
+			score = 0.0
+		scored.append((score, title))
+
+	scored.sort(key=lambda x: (x[0], x[1].casefold()), reverse=True)
+	return [title for _, title in scored[:limit]]
+
+
+def _origin_from_company_raw(raw: object) -> str:
+	if not isinstance(raw, dict):
+		return ""
+	origin = raw.get("origin_country")
+	if isinstance(origin, list) and origin:
+		return str(origin[0] or "").strip()
+	if isinstance(origin, str):
+		return origin.strip()
+	for key in ("country", "headquarters"):
+		value = raw.get(key)
+		if isinstance(value, str) and value.strip():
+			return value.strip()
+	return ""
+
+
+def _tmdb_prefixed_query(query: str) -> tuple[str, int] | None:
+	query = (query or "").strip()
+	if ":" not in query:
+		return None
+	prefix, raw_id = query.split(":", 1)
+	prefix = prefix.strip().lower()
+	raw_id = raw_id.strip()
+	if prefix not in {"p", "c", "m"} or not raw_id.isdigit():
+		return None
+	try:
+		value = int(raw_id)
+	except (TypeError, ValueError):
+		return None
+	return (prefix, value) if value > 0 else None
+
+
+def _person_result_from_tmdb_raw(raw: dict[str, object]) -> dict:
+	known_for_titles: list[str] = []
+	for kf in (raw.get("known_for") or []):
+		title = str((kf or {}).get("title") or (kf or {}).get("name") or "").strip()
+		if not title:
+			continue
+		known_for_titles.append(title)
+		if len(known_for_titles) >= 3:
+			break
+	person_id = int(raw.get("id") or 0)
+	return {
+		"id": person_id,
+		"name": str(raw.get("name") or person_id),
+		"profile_path": str(raw.get("profile_path") or ""),
+		"known_for_department": str(raw.get("known_for_department") or "").strip(),
+		"known_for_titles": known_for_titles,
+		"url": reverse("person_detail", args=[person_id]),
+	}
+
+
+def _company_result_from_tmdb_raw(raw: dict[str, object]) -> dict:
+	company_id = int(raw.get("id") or 0)
+	return {
+		"id": company_id,
+		"name": str(raw.get("name") or company_id),
+		"logo_path": str(raw.get("logo_path") or ""),
+		"origin": _origin_from_company_raw(raw),
+		"url": reverse("company_detail", args=[company_id]),
+	}
+
+
+def _movie_result_from_tmdb_raw(raw: dict[str, object]) -> dict:
+	movie_id = int(raw.get("id") or 0)
+	return {
+		"id": movie_id,
+		"title": str(raw.get("title") or movie_id),
+		"poster_path": str(raw.get("poster_path") or ""),
+		"release_date": str(raw.get("release_date") or ""),
+		"director": "",
+		"url": reverse("movie_detail", args=[movie_id]),
+	}
+
+
+@login_required
+def search_suggest(request: HttpRequest) -> JsonResponse:
+	"""Lightweight JSON suggestions for the Search page.
+
+	TMDb-first for entity suggestions (people, companies, movies).
+	Intended for AJAX/autocomplete (no role options / follow actions here).
+	"""
+	query = (request.GET.get("q") or "").strip()
+	limit = _clamp_int(request.GET.get("limit") or "", default=5, min_value=1, max_value=10)
+
+	# Cache globally (not user-specific).
+	# Short TTL because suggestions should stay fresh.
+	suggest_cache_key = _cache_key(
+		"search:suggest:v4",
+		{
+			"q": query,
+			"limit": int(limit),
+		},
+	)
+	try:
+		cached = cache.get(suggest_cache_key)
+		if isinstance(cached, dict):
+			return JsonResponse(cached)
+	except Exception:
+		pass
+
+	if len(query) < 2:
+		return JsonResponse({"q": query, "people": [], "companies": [], "movies": []})
+
+	prefixed_query = _tmdb_prefixed_query(query)
+	if prefixed_query is not None:
+		query_kind, query_id = prefixed_query
+		client = TMDbClient.from_settings()
+		people: list[dict] = []
+		companies: list[dict] = []
+		movies: list[dict] = []
+		lookup_plan = {
+			"p": (client.get_person, _person_result_from_tmdb_raw, people),
+			"c": (client.get_company, _company_result_from_tmdb_raw, companies),
+			"m": (client.get_movie, _movie_result_from_tmdb_raw, movies),
+		}
+		fetcher, builder, bucket = lookup_plan[query_kind]
+		try:
+			raw = fetcher(query_id) or {}
+			if isinstance(raw, dict) and int(raw.get("id") or 0) == query_id:
+				bucket.append(builder(raw))
+		except Exception:
+			pass
+		payload = {"q": query, "people": people, "companies": companies, "movies": movies}
+		try:
+			cache.set(suggest_cache_key, payload, timeout=60)
+		except Exception:
+			pass
+		return JsonResponse(payload)
+
+	entities: dict[str, list[dict]] = {"people": [], "companies": [], "movies": []}
+	try:
+		entities = _tmdb_entity_search(query, limit=limit, include_movie_director=True)
+	except Exception:
+		# If TMDb is unavailable, keep suggestions empty.
+		pass
+
+	payload = {"q": query, **entities}
+	try:
+		cache.set(suggest_cache_key, payload, timeout=60)
+	except Exception:
+		pass
+	return JsonResponse(payload)
+
+
+@login_required
+def search(request: HttpRequest) -> HttpResponse:
+	query = (request.GET.get("q") or "").strip()
+	query_norm = " ".join(query.split()).strip()
+	prefixed_query = _tmdb_prefixed_query(query_norm)
+	people_results: list[dict] = []
+	company_results: list[dict] = []
+	movie_results: list[dict] = []
+	following_people_results: list[dict] = []
+	following_company_results: list[dict] = []
+	user_results = []
+	error: str | None = None
+
+	if not query:
+		return render(
+			request,
+			"catalog/search.html",
+			{
+				"q": query,
+				"user_results": user_results,
+				"people_results": people_results,
+				"company_results": company_results,
+				"movie_results": movie_results,
+				"following_people_results": following_people_results,
+				"following_company_results": following_company_results,
+				"following_count": 0,
+				"error": error,
+			},
+		)
+
+	# Cache the search page payload by query (not user-specific).
+	# TMDb results are cached to keep repeat searches responsive.
+	page_cache_key = _cache_key(
+		"search:page:v4",
+		{
+			"q": query_norm,
+			"uid": int(getattr(request.user, "id", 0) or 0),
+		},
+	)
+	try:
+		cached = cache.get(page_cache_key)
+		if isinstance(cached, dict):
+			return render(
+				request,
+				"catalog/search.html",
+				{
+					"q": query,
+					"user_results": cached.get("user_results") or [],
+					"people_results": cached.get("people_results") or [],
+					"company_results": cached.get("company_results") or [],
+					"movie_results": cached.get("movie_results") or [],
+					"following_people_results": cached.get("following_people_results") or [],
+					"following_company_results": cached.get("following_company_results") or [],
+					"following_count": int(cached.get("following_count") or 0),
+					"error": cached.get("error"),
+				},
+			)
+	except Exception:
+		pass
+
+	User = get_user_model()
+	user_results = [
+		{"username": u.username}
+		for u in (
+		User.objects.filter(username__icontains=query)
+		.only("username")
+		.order_by("username")[:10]
+		)
+	]
+
+	entities: dict[str, list[dict]] = {"people": [], "companies": [], "movies": []}
+	try:
+		if prefixed_query is not None:
+			query_kind, query_id = prefixed_query
+			client = TMDbClient.from_settings()
+			if query_kind == "p":
+				raw = client.get_person(query_id) or {}
+				if isinstance(raw, dict) and int(raw.get("id") or 0) == query_id:
+					entities["people"] = [_person_result_from_tmdb_raw(raw)]
+			elif query_kind == "c":
+				raw = client.get_company(query_id) or {}
+				if isinstance(raw, dict) and int(raw.get("id") or 0) == query_id:
+					entities["companies"] = [_company_result_from_tmdb_raw(raw)]
+			elif query_kind == "m":
+				raw = client.get_movie(query_id) or {}
+				if isinstance(raw, dict) and int(raw.get("id") or 0) == query_id:
+					entities["movies"] = [_movie_result_from_tmdb_raw(raw)]
+		else:
+			entities = _tmdb_entity_search(query, limit=10)
+	except Exception:
+		# Keep the page usable if TMDb is unavailable.
+		pass
+
+	people_results = entities.get("people") or []
+	company_results = entities.get("companies") or []
+	movie_results = entities.get("movies") or []
+
+	# Fast local "Following" results (DB only), independent from TMDb API fetch.
+	# Build filter to match all words in query (any order) in person name.
+	people_q = Q(user=request.user)
+	for word in query_norm.split():
+		people_q &= Q(person__name__icontains=word)
+	follow_people_qs = PersonFollow.objects.select_related("person").filter(people_q).order_by("person__name", "role")
+	seen_people: set[int] = set()
+	for f in follow_people_qs:
+		person = getattr(f, "person", None)
+		pid = int(getattr(person, "tmdb_id", 0) or 0)
+		if not person or pid <= 0 or pid in seen_people:
+			continue
+		seen_people.add(pid)
+		tmdb_raw = getattr(person, "tmdb_raw", {}) or {}
+		known_for_department = str((tmdb_raw.get("known_for_department") if isinstance(tmdb_raw, dict) else "") or "").strip()
+		if not known_for_department:
+			known_for_department = str(getattr(f, "role", "") or "").strip()
+		following_people_results.append(
+			{
+				"id": pid,
+				"name": str(getattr(person, "name", "") or pid),
+				"profile_path": str(getattr(person, "profile_path", "") or ""),
+				"known_for_department": known_for_department,
+				"url": reverse("person_detail", args=[pid]),
+			}
+		)
+		if len(following_people_results) >= 10:
+			break
+
+	# Build filter to match all words in query (any order) in company name.
+	company_q = Q(user=request.user)
+	for word in query_norm.split():
+		company_q &= Q(company__name__icontains=word)
+	follow_company_qs = CompanyFollow.objects.select_related("company").filter(company_q).order_by("company__name")
+	seen_companies: set[int] = set()
+	for f in follow_company_qs:
+		company = getattr(f, "company", None)
+		cid = int(getattr(company, "tmdb_id", 0) or 0)
+		if not company or cid <= 0 or cid in seen_companies:
+			continue
+		seen_companies.add(cid)
+		tmdb_raw = getattr(company, "tmdb_raw", {}) or {}
+		following_company_results.append(
+			{
+				"id": cid,
+				"name": str(getattr(company, "name", "") or cid),
+				"logo_path": str(getattr(company, "logo_path", "") or ""),
+				"url": reverse("company_detail", args=[cid]),
+			}
+		)
+		if len(following_company_results) >= 10:
+			break
+
+	following_count = len(following_people_results) + len(following_company_results)
+
+	# Cache computed payload.
+	try:
+		cache.set(
+			page_cache_key,
+			{
+				"user_results": user_results,
+				"people_results": people_results,
+				"company_results": company_results,
+				"movie_results": movie_results,
+				"following_people_results": following_people_results,
+				"following_company_results": following_company_results,
+				"following_count": following_count,
+				"error": error,
+			},
+			timeout=10 * 60,
+		)
+	except Exception:
+		pass
+
+	return render(
+		request,
+		"catalog/search.html",
+		{
+			"q": query,
+			"user_results": user_results,
+			"people_results": people_results,
+			"company_results": company_results,
+			"movie_results": movie_results,
+			"following_people_results": following_people_results,
+			"following_company_results": following_company_results,
+			"following_count": following_count,
+			"error": error,
+		},
+	)

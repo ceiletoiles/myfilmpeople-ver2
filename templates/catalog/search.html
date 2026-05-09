@@ -1,0 +1,260 @@
+{% extends 'base.html' %}
+{% load static iso_dates %}
+
+{% block title %}Search{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/pages/search.css' %}?v=20260509b" />
+{% endblock %}
+
+{% block page_header %}
+  <div class="page-header search-page-header">
+    <button type="button" class="nav-icon-btn" data-menu-toggle aria-controls="site-drawer" aria-expanded="false">
+      <img class="nav-icon" src="{% static 'img/menu.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
+      <span class="sr-only">Open menu</span>
+    </button>
+    <div class="page-header-content">
+      <h1>Search</h1>
+      <p class="page-tagline">People, studios and movies</p>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div class="search-page">
+    {% if not q %}
+      <div class="search-form">
+        <form method="get" class="search-bar search-hero-bar">
+          <input
+            id="search-q"
+            type="text"
+            name="q"
+            value="{{ q }}"
+            placeholder="Search people, studios, movies"
+            autocomplete="off"
+            data-suggest-url="{% url 'search_suggest' %}"
+            data-placeholder-person="{% static 'img/placeholder-person.svg' %}"
+            data-placeholder-company="{% static 'img/placeholder-company.svg' %}"
+            data-placeholder-movie="{% static 'img/placeholder-movie.svg' %}"
+          />
+          <button type="submit">Search</button>
+        </form>
+
+        <div id="search-suggestions" class="search-suggestions-panel" aria-live="polite">
+          <div class="muted search-suggestions-title">Suggestions</div>
+          <div id="search-suggestions-body"></div>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if q %}
+      <div class="search-surface">
+        <div class="search-form">
+          <form method="get" class="search-bar">
+            <input
+              id="search-q"
+              type="text"
+              name="q"
+              value="{{ q }}"
+              placeholder="Search people, studios, movies"
+              autocomplete="off"
+              data-suggest-url="{% url 'search_suggest' %}"
+              data-placeholder-person="{% static 'img/placeholder-person.svg' %}"
+              data-placeholder-company="{% static 'img/placeholder-company.svg' %}"
+              data-placeholder-movie="{% static 'img/placeholder-movie.svg' %}"
+            />
+            <button type="submit">Search</button>
+          </form>
+        </div>
+
+        <div id="search-suggestions" class="search-suggestions-panel" aria-live="polite">
+          <div class="muted search-suggestions-title">Suggestions</div>
+          <div id="search-suggestions-body"></div>
+        </div>
+
+        {% if error %}
+          <div class="search-error">{{ error }}</div>
+        {% endif %}
+
+        <div class="search-tabs" id="searchTabs" role="tablist" aria-label="Search result categories">
+          <div class="search-tab" data-tab="users" role="tab" aria-selected="false">
+            <span class="tab-text">Users</span>
+            <span class="tab-count">({{ user_results|length }})</span>
+          </div>
+          <div class="search-tab active" data-tab="people" role="tab" aria-selected="true">
+            <span class="tab-text">People</span>
+            <span class="tab-count">({{ people_results|length }})</span>
+          </div>
+          <div class="search-tab" data-tab="following" role="tab" aria-selected="false">
+            <span class="tab-text">Following</span>
+            <span class="tab-count">({{ following_count }})</span>
+          </div>
+          <div class="search-tab" data-tab="companies" role="tab" aria-selected="false">
+            <span class="tab-text">Companies</span>
+            <span class="tab-count">({{ company_results|length }})</span>
+          </div>
+          <div class="search-tab" data-tab="movies" role="tab" aria-selected="false">
+            <span class="tab-text">Movies</span>
+            <span class="tab-count">({{ movie_results|length }})</span>
+          </div>
+        </div>
+
+        <div class="search-panels">
+          <section class="search-panel" data-panel="users" role="tabpanel">
+            {% if user_results %}
+              <div class="search-result-list">
+                {% for u in user_results %}
+                  <a class="search-result-card search-user-card no-decoration" href="{% url 'user_following' u.username %}">
+                    <div class="search-result-card-main">
+                      <div class="search-result-title-row">
+                        <strong>{{ u.username }}</strong>
+                      </div>
+                      <div class="muted search-result-meta">View followed people and studios</div>
+                    </div>
+                    <span class="search-result-badge">Profile</span>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="search-empty">No users found.</div>
+            {% endif %}
+          </section>
+
+          <section class="search-panel active" data-panel="people" role="tabpanel">
+            {% if people_results %}
+              <div class="search-result-list">
+                {% for p in people_results %}
+                  <a class="search-result-card search-entity-card no-decoration" href="{% url 'person_detail' p.id %}">
+                    <div class="search-result-media">
+                      {% if p.profile_path %}
+                        <img class="search-result-avatar search-result-avatar-person" src="https://image.tmdb.org/t/p/w185{{ p.profile_path }}" alt="" />
+                      {% else %}
+                        <img class="search-result-avatar search-result-avatar-person" src="{% static 'img/placeholder-person.svg' %}" alt="" />
+                      {% endif %}
+                    </div>
+                    <div class="search-result-card-main">
+                      <div class="search-result-title-row">
+                        <strong>{{ p.name }}</strong>
+                      </div>
+                      <div class="muted search-result-meta">{{ p.known_for_department|default:'Unknown' }}</div>
+                    </div>
+                    <div class="search-result-knownfor muted">
+                      <div class="search-result-left-label">Known for</div>
+                      <div class="search-result-left-value small">
+                        {% if p.known_for_titles %}{{ p.known_for_titles|join:', ' }}{% else %}Not available{% endif %}
+                      </div>
+                    </div>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="search-empty">No people found.</div>
+            {% endif %}
+          </section>
+
+          <section class="search-panel" data-panel="companies" role="tabpanel">
+            {% if company_results %}
+              <div class="search-result-list">
+                {% for c in company_results %}
+                  <a class="search-result-card search-entity-card no-decoration" href="{% url 'company_detail' c.id %}">
+                    <div class="search-result-right">
+                      <div class="search-result-media search-result-media-company">
+                        {% if c.logo_path %}
+                          <img class="search-result-logo" src="https://image.tmdb.org/t/p/w185{{ c.logo_path }}" alt="" />
+                        {% else %}
+                          <span class="search-result-logo-fallback">No logo</span>
+                        {% endif %}
+                      </div>
+                      <div class="search-result-card-main search-result-card-main-right">
+                        <div class="search-result-title-row search-result-title-row-stack">
+                          <span class="muted search-result-department">Origin: {{ c.origin|default:'Unknown' }}</span>
+                          <strong>{{ c.name }}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="search-empty">No companies found.</div>
+            {% endif %}
+          </section>
+
+          <section class="search-panel" data-panel="following" role="tabpanel">
+            {% if following_count %}
+              <div class="search-result-list">
+                {% for p in following_people_results %}
+                  <a class="search-result-card search-entity-card no-decoration" href="{% url 'person_detail' p.id %}">
+                    <div class="search-result-media">
+                      {% if p.profile_path %}
+                        <img class="search-result-avatar search-result-avatar-person" src="https://image.tmdb.org/t/p/w185{{ p.profile_path }}" alt="" />
+                      {% else %}
+                        <img class="search-result-avatar search-result-avatar-person" src="{% static 'img/placeholder-person.svg' %}" alt="" />
+                      {% endif %}
+                    </div>
+                    <div class="search-result-card-main">
+                      <div class="search-result-title-row">
+                        <strong>{{ p.name }}</strong>
+                      </div>
+                      <div class="muted search-result-meta">{{ p.known_for_department|default:'Unknown' }}</div>
+                    </div>
+                    <div class="search-result-knownfor muted">Following</div>
+                  </a>
+                {% endfor %}
+
+                {% for c in following_company_results %}
+                  <a class="search-result-card search-entity-card search-company-card no-decoration" href="{% url 'company_detail' c.id %}">
+                    <div class="search-result-media search-result-media-company">
+                      {% if c.logo_path %}
+                        <img class="search-result-logo" src="https://image.tmdb.org/t/p/w185{{ c.logo_path }}" alt="" />
+                      {% else %}
+                        <span class="search-result-logo-fallback">No logo</span>
+                      {% endif %}
+                    </div>
+                    <div class="search-result-card-main search-result-card-main-right">
+                      <div class="search-result-title-row search-result-title-row-stack">
+                        <strong>{{ c.name }}</strong>
+                      </div>
+                    </div>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="search-empty">No followed people or companies found for this search.</div>
+            {% endif %}
+          </section>
+
+          <section class="search-panel" data-panel="movies" role="tabpanel">
+            {% if movie_results %}
+              <div class="search-result-list search-movie-list">
+                {% for m in movie_results %}
+                  <a class="search-result-card search-movie-card no-decoration" href="{% url 'movie_detail' m.id %}">
+                    <div class="search-result-media search-result-media-movie">
+                      {% if m.poster_path %}
+                        <img class="search-result-poster" src="https://image.tmdb.org/t/p/w185{{ m.poster_path }}" alt="" />
+                      {% else %}
+                        <img class="search-result-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                      {% endif %}
+                    </div>
+                    <div class="search-result-card-main">
+                      <div class="search-result-title-row">
+                        <strong>{{ m.title }}</strong>
+                      </div>
+                      <div class="muted search-result-meta">{{ m.release_date|iso_date_long }}</div>
+                    </div>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="search-empty">No movies found.</div>
+            {% endif %}
+          </section>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/pages/search.js' %}"></script>
+{% endblock %}

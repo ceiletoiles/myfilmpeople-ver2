@@ -1,0 +1,241 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ movie.title }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/pages/movie_detail.css' %}" />
+  {% if movie.tmdb_raw.backdrop_path %}
+    <style>
+      .movie-backdrop.has-image {
+        background-image: url('https://image.tmdb.org/t/p/original{{ movie.tmdb_raw.backdrop_path }}');
+      }
+    </style>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  {% if movie.tmdb_raw.backdrop_path %}
+    <div class="movie-backdrop movie-backdrop-visible has-image fade-in"></div>
+  {% endif %}
+
+  <div class="movie-page-container">
+    <div class="movie-content">
+      <div class="movie-info fade-in">
+        <div class="movie-poster-container">
+          {% if movie.poster_path %}
+            <img class="movie-poster-image" src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" alt="" />
+          {% else %}
+            <img class="movie-poster-image" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+          {% endif %}
+        </div>
+
+        <div class="movie-details">
+          <h1 class="movie-title">{{ movie.title }}</h1>
+          <p class="movie-year-runtime" id="movieYearRuntime">{{ movie_year_runtime }}</p>
+          <p class="movie-director" id="movieDirector">Directed by {{ movie_director }}</p>
+          <div class="movie-ratings" id="movieRatings">
+            <span class="rating-tmdb" id="tmdbRating">{{ movie_rating_text }}</span>
+          </div>
+        </div>
+      </div>
+
+      {% if movie.tmdb_raw.tagline %}
+        <div class="movie-tagline-section fade-in">
+          <p class="movie-tagline">{{ movie.tmdb_raw.tagline }}</p>
+        </div>
+      {% endif %}
+
+      <div class="movie-synopsis fade-in" id="movieSynopsis">
+        {% if movie.tmdb_raw.overview %}
+          <p id="synopsisText">{{ movie.tmdb_raw.overview }}</p>
+        {% endif %}
+      </div>
+
+      <div class="credits-section">
+        <div class="movie-tabs credits-tabs">
+          <button type="button" class="movie-tab-btn credits-tab{% if tab == 'cast' %} active{% endif %}" data-tab="cast">Cast</button>
+          <button type="button" class="movie-tab-btn credits-tab{% if tab == 'crew' %} active{% endif %}" data-tab="crew">Crew</button>
+          <button type="button" class="movie-tab-btn credits-tab{% if tab == 'release' %} active{% endif %}" data-tab="release">Releases</button>
+          <button type="button" class="movie-tab-btn credits-tab{% if tab == 'details' %} active{% endif %}" data-tab="details">Details</button>
+        </div>
+
+        <div class="credits-content">
+          <section class="tab-panel cast-section{% if tab == 'cast' %} active{% endif %}" data-panel="cast" id="castSection">
+            <div class="cast-list" id="castList">
+              {% for c in cast %}
+                <a href="{% url 'person_detail' c.id %}" class="cast-person">
+                  {% if c.profile_path %}
+                    <img class="cast-profile-pic" src="https://image.tmdb.org/t/p/w185{{ c.profile_path }}" alt="" />
+                  {% else %}
+                    <img class="cast-profile-pic" src="{% static 'img/placeholder-person.svg' %}" alt="" />
+                  {% endif %}
+                  <p class="cast-name">{{ c.name }}</p>
+                  {% if c.character %}<p class="cast-character">{{ c.character }}</p>{% endif %}
+                </a>
+              {% empty %}
+                <p class="muted">No cast available.</p>
+              {% endfor %}
+            </div>
+          </section>
+
+          <section class="tab-panel crew-section{% if tab == 'crew' %} active{% endif %}" data-panel="crew" id="crewSection">
+            {% if crew_groups %}
+              {% for g in crew_groups %}
+                <div class="crew-category">
+                  <h3 class="crew-category-title">{{ g.job }}</h3>
+                  <div class="crew-members">
+                    {% for c in g.people %}
+                      <a href="{% url 'person_detail' c.id %}" class="crew-person">
+                        {% if c.profile_path %}
+                          <img class="crew-profile-pic" src="https://image.tmdb.org/t/p/w185{{ c.profile_path }}" alt="" />
+                        {% else %}
+                          <img class="crew-profile-pic" src="{% static 'img/placeholder-person.svg' %}" alt="" />
+                        {% endif %}
+                        <p class="crew-name">{{ c.name }}</p>
+                        {% if c.job %}<p class="crew-job">{{ c.job }}</p>{% endif %}
+                      </a>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <p class="muted">No crew available.</p>
+            {% endif %}
+          </section>
+
+          <section class="tab-panel releases-section{% if tab == 'release' %} active{% endif %}" data-panel="release" id="releasesSection">
+            {% if release_groups %}
+              <div class="releases-list" id="releasesList">
+                {% for group in release_groups %}
+                  <div class="release-type-separator{% if forloop.first %} first-type{% endif %}">{{ group.label }}</div>
+                  {% for rd in group.releases %}
+                      <div class="release-item">
+                        <div class="release-content">
+                          <div class="release-left">
+                            <div class="release-top">
+                              <div class="release-date-block">
+                                <span class="release-date">{% if rd.show_date %}{{ rd.date_display|default:rd.date }}{% else %}&nbsp;{% endif %}</span>
+                                {% if rd.show_date and rd.note %}<p class="release-note">{{ rd.note }}</p>{% endif %}
+                              </div>
+                              <div class="release-country-wrapper">
+                                <span class="release-country">{{ rd.country_name|default:rd.country_code }}{% if rd.certification %} <span class="release-certification">{{ rd.certification }}</span>{% endif %}</span>
+                                {% if not rd.show_date and rd.note %}<p class="release-note">{{ rd.note }}</p>{% endif %}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                  {% endfor %}
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="muted">No release date data available.</p>
+            {% endif %}
+          </section>
+
+          <section class="tab-panel details-section{% if tab == 'details' %} active{% endif %}" data-panel="details" id="detailsSection">
+            <div class="details-list" id="detailsList">
+              <div class="detail-category">
+                <h3 class="detail-category-title">Production Companies</h3>
+                <div class="detail-items">
+                  {% if movie.tmdb_raw.production_companies %}
+                    {% for c in movie.tmdb_raw.production_companies %}
+                      <a href="{% url 'company_detail' c.id %}" class="detail-item detail-item-interactive">
+                        <p class="detail-name">{{ c.name }}</p>
+                      </a>
+                    {% endfor %}
+                  {% else %}
+                    <p class="no-data">No companies available.</p>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="detail-category">
+                <h3 class="detail-category-title">Genres</h3>
+                <div class="detail-items">
+                  {% if movie.tmdb_raw.genres %}
+                    {% for g in movie.tmdb_raw.genres %}
+                      <div class="detail-content-item">{{ g.name }}</div>
+                    {% endfor %}
+                  {% else %}
+                    <p class="no-data">No genres available.</p>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="detail-category">
+                <h3 class="detail-category-title">Production Countries</h3>
+                <div class="detail-items">
+                  {% if movie.tmdb_raw.production_countries %}
+                    {% for country in movie.tmdb_raw.production_countries %}
+                      <div class="country-item">{{ country.name|default:country.iso_3166_1|default:'-' }}</div>
+                    {% endfor %}
+                  {% else %}
+                    <p class="no-data">No production countries available.</p>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="detail-category">
+                <h3 class="detail-category-title">Languages</h3>
+                <div class="detail-items">
+                  {% if movie.tmdb_raw.spoken_languages %}
+                    {% for lang in movie.tmdb_raw.spoken_languages %}
+                      <div class="language-item">{{ lang.english_name|default:lang.name|default:'-' }}</div>
+                    {% endfor %}
+                  {% else %}
+                    <p class="no-data">No languages available.</p>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="detail-category">
+                <h3 class="detail-category-title">Technical Details</h3>
+                <div class="detail-items">
+                  <div class="tech-spec-item">Budget: {{ movie_budget_text }}</div>
+                  <div class="tech-spec-item">Box Office: {{ movie_box_office_text }}</div>
+                  <div class="tech-spec-item">Status: {{ movie.tmdb_raw.status|default:'-' }}</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      {% if movie.tmdb_raw.belongs_to_collection %}
+        <section
+          class="movie-section related-movies-section fade-in"
+          aria-label="Related Movies"
+          data-lazy-movies
+          data-src="{% url 'movie_related' movie.tmdb_id %}"
+          data-empty="No related movies available."
+          data-placeholder="{% static 'img/placeholder-movie.svg' %}"
+        >
+          <h2 class="movie-section-title">Related Movies</h2>
+          <p class="muted" data-movies-status>Loading…</p>
+          <div class="movie-card-grid" role="list" data-movies-grid></div>
+        </section>
+      {% endif %}
+
+      {% if movie.tmdb_raw.release_date %}
+        <section
+          class="movie-section similar-movies-section fade-in"
+          aria-label="Similar Movies"
+          data-lazy-movies
+          data-src="{% url 'movie_similar' movie.tmdb_id %}"
+          data-empty="No similar movies available."
+          data-placeholder="{% static 'img/placeholder-movie.svg' %}"
+        >
+          <h2 class="movie-section-title">Similar Movies</h2>
+          <p class="muted" data-movies-status>Loading…</p>
+          <div class="movie-card-grid" role="list" data-movies-grid></div>
+        </section>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/pages/movie_detail.js' %}"></script>
+{% endblock %}

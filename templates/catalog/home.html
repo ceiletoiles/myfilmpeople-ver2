@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Home - MyFilmPeople{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/pages/home.css' %}?v=20260509a" />
+{% endblock %}
+
+{% block page_header %}
+  {% if user.is_authenticated %}
+    <div class="page-header">
+      <button
+        type="button"
+        class="nav-icon-btn"
+        data-menu-toggle
+        aria-controls="site-drawer"
+        aria-expanded="false"
+      >
+        <img class="nav-icon" src="{% static 'img/menu.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
+        <span class="sr-only">Open menu</span>
+      </button>
+      <div class="page-header-content">
+        <h1>Home</h1>
+        <p class="page-tagline">Your followed people and studios</p>
+      </div>
+      <button type="button" class="nav-icon-btn" data-search-open aria-label="Search" title="Search">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M10.5 18.5C14.9183 18.5 18.5 14.9183 18.5 10.5C18.5 6.08172 14.9183 2.5 10.5 2.5C6.08172 2.5 2.5 6.08172 2.5 10.5C2.5 14.9183 6.08172 18.5 10.5 18.5Z" stroke="currentColor" stroke-width="2" />
+          <path d="M21.5 21.5L16.9 16.9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg>
+      </button>
+    </div>
+  {% else %}
+    <div class="page-header">
+      <span class="page-header-spacer" aria-hidden="true"></span>
+      <div class="page-header-content">
+        <h1>MyFilmPeople</h1>
+        <p class="page-tagline">Track film people & studios you care about</p>
+      </div>
+      <button type="button" class="nav-icon-btn" data-search-open aria-label="Search" title="Search">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M10.5 18.5C14.9183 18.5 18.5 14.9183 18.5 10.5C18.5 6.08172 14.9183 2.5 10.5 2.5C6.08172 2.5 2.5 6.08172 2.5 10.5C2.5 14.9183 6.08172 18.5 10.5 18.5Z" stroke="currentColor" stroke-width="2" />
+          <path d="M21.5 21.5L16.9 16.9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg>
+      </button>
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  {% if user.is_authenticated %}
+    <div class="home-tabs">
+      <input type="radio" name="home-tab" id="home-tab-director" checked />
+      <input type="radio" name="home-tab" id="home-tab-actor" />
+      <input type="radio" name="home-tab" id="home-tab-crew" />
+      <input type="radio" name="home-tab" id="home-tab-studio" />
+
+      <div class="tab-list" role="tablist" aria-label="Home tabs">
+        <label for="home-tab-director" class="tab-label" role="tab">Director</label>
+        <label for="home-tab-actor" class="tab-label" role="tab">Actor</label>
+        <label for="home-tab-crew" class="tab-label" role="tab">Crew</label>
+        <label for="home-tab-studio" class="tab-label" role="tab">Studios</label>
+      </div>
+
+      <div class="tab-panels">
+        <section class="tab-panel panel-director" aria-label="Directors">
+          {% if directors %}
+            <div class="home-people-grid">
+              {% for f in directors %}
+                <a class="home-person" href="{% url 'person_detail' f.person.tmdb_id %}">
+                  <span class="home-person-media">
+                    {% if f.person.profile_path %}
+                      <img class="home-person-img" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                    {% else %}
+                      <img class="home-person-img" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                    {% endif %}
+                    {% if f.comeback_info %}
+                      <span class="home-person-badge">Inactive {{ f.comeback_info.gap_label }}</span>
+                    {% endif %}
+                  </span>
+                  <div class="home-person-name">{{ f.person.name }}</div>
+                </a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="muted">No followed directors yet. <br>Search for directors and follow them to see them here.</p>
+          {% endif %}
+        </section>
+
+        <section class="tab-panel panel-actor" aria-label="Actors">
+          {% if actors %}
+            <div class="home-people-grid">
+              {% for f in actors %}
+                <a class="home-person" href="{% url 'person_detail' f.person.tmdb_id %}">
+                  <span class="home-person-media">
+                    {% if f.person.profile_path %}
+                      <img class="home-person-img" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                    {% else %}
+                      <img class="home-person-img" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                    {% endif %}
+                    {% if f.comeback_info %}
+                      <span class="home-person-badge">Inactive {{ f.comeback_info.gap_label }}</span>
+                    {% endif %}
+                  </span>
+                  <div class="home-person-name">{{ f.person.name }}</div>
+                </a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="muted">No followed actors yet. <br>Search for actors and follow them to see them here.</p>
+          {% endif %}
+        </section>
+
+        <section class="tab-panel panel-crew" aria-label="Crew">
+          {% if crew %}
+            <div class="home-people-grid">
+              {% for f in crew %}
+                <a class="home-person" href="{% url 'person_detail' f.person.tmdb_id %}">
+                  <span class="home-person-media">
+                    {% if f.person.profile_path %}
+                      <img class="home-person-img" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                    {% else %}
+                      <img class="home-person-img" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                    {% endif %}
+                    {% if f.comeback_info %}
+                      <span class="home-person-badge">Inactive {{ f.comeback_info.gap_label }}</span>
+                    {% endif %}
+                  </span>
+                  <div class="home-person-name">{{ f.person.name }}</div>
+                  <div class="home-person-meta muted">{{ f.role }}</div>
+                </a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="muted">No followed crew yet. <br>Search for crew and follow them to see them here.</p>
+          {% endif %}
+        </section>
+
+        <section class="tab-panel panel-studio" aria-label="Studios">
+          {% if companies %}
+            <div class="home-studio-grid">
+              {% for f in companies %}
+                <a class="home-studio" href="{% url 'company_detail' f.company.tmdb_id %}">
+                  <span class="home-studio-media">
+                    {% if f.company.logo_path %}
+                      <img class="home-studio-logo" src="https://image.tmdb.org/t/p/w300{{ f.company.logo_path }}" alt="{{ f.company.name }}" loading="lazy" width="300" height="120" />
+                    {% else %}
+                      <img class="home-studio-logo" src="{% static 'img/placeholder-company.svg' %}" alt="{{ f.company.name }}" loading="lazy" width="300" height="120" />
+                    {% endif %}
+                  </span>
+                  <span class="home-studio-name">{{ f.company.name }}</span>
+                </a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="muted">No followed studios yet. <br>Search for studios and follow them to see them here.</p>
+          {% endif %}
+        </section>
+      </div>
+    </div>
+  {% else %}
+    <section class="home-landing" aria-labelledby="landing-title">
+      <div class="home-landing-copy">
+        <p class="home-eyebrow">A better way to track film people</p>
+        <h1 id="landing-title">Welcome to MyFilmPeople</h1>
+        <p class="home-intro">
+          Follow directors, actors, crew, and studios in one place, then come back anytime to see the people you care about.
+        </p>
+
+        <div class="home-feature-grid" aria-label="What you can do">
+          <div class="home-feature">
+            <span class="home-feature-kicker">Discover</span>
+            <p>Search people and studios.</p>
+          </div>
+          <div class="home-feature">
+            <span class="home-feature-kicker">Follow</span>
+            <p>Build a personal list of favorites you want to track.</p>
+          </div>
+          <div class="home-feature">
+            <span class="home-feature-kicker">Plan</span>
+            <p>Use collaboration and upcoming once you’re signed in.</p>
+          </div>
+        </div>
+
+        {% if next_url %}
+          <p class="home-login-note"><strong>Login required</strong> to continue where you left off.</p>
+        {% endif %}
+
+        <div class="home-cta-row">
+          <a class="home-cta home-cta-primary" href="{% url 'login' %}{% if next_url %}?next={{ next_url|urlencode }}{% endif %}">Login</a>
+          <a class="home-cta home-cta-secondary" href="{% url 'signup' %}{% if next_url %}?next={{ next_url|urlencode }}{% endif %}">Sign up</a>
+        </div>
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}

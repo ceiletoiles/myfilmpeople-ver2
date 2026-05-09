@@ -1,0 +1,106 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}MyFilmPeople{% endblock %}</title>
+    <link rel="icon" href="{% static 'img/favicon.ico' %}" sizes="any" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{% static 'css/base.css' %}?v=20260507" />
+    {% block extra_css %}{% endblock %}
+  </head>
+  <body>
+    {% if user.is_authenticated %}
+      <div class="menu-overlay" data-menu-overlay hidden></div>
+
+      <aside class="menu-drawer" id="site-drawer" data-menu-drawer hidden aria-label="Menu">
+        <div class="menu-header">
+          <strong>Menu</strong>
+          <button type="button" class="menu-close" data-menu-close-btn aria-label="Close menu">×</button>
+        </div>
+
+        <div class="menu-section">
+          <a href="{% url 'home' %}" data-menu-close>Home</a>
+          <a href="{% url 'collaboration_finder' %}" data-menu-close>Collaboration</a>
+          <a href="{% url 'upcoming' %}" data-menu-close>Upcoming</a>
+          <a href="{% url 'recent' %}" data-menu-close>Recent</a>
+          <a href="{% url 'new_arrivals' %}" data-menu-close>New arrivals</a>
+
+          <form
+            method="post"
+            action="{% url 'sync_all_followed' %}"
+            class="menu-action"
+            data-sync-all-form
+            data-sync-all-start-url="{% url 'sync_all_followed_start' %}"
+          >
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+            <button type="submit" class="menu-link-btn" data-menu-close>Sync data</button>
+          </form>
+        </div>
+
+        <div class="menu-bottom">
+          <a href="{% url 'user_profile' %}" data-menu-close>Profile</a>
+          <form method="post" action="{% url 'logout' %}" class="menu-signout">
+            {% csrf_token %}
+            <button type="submit">Sign out</button>
+          </form>
+        </div>
+      </aside>
+    {% endif %}
+
+    <div class="search-overlay" data-search-overlay hidden></div>
+    <div class="search-prompt" data-search-prompt hidden role="dialog" aria-modal="true" aria-labelledby="search-prompt-title">
+      <span class="sr-only" id="search-prompt-title">Search</span>
+      <form class="search-prompt-form" action="{% url 'search' %}" method="get" data-search-form>
+        <label class="sr-only" for="search-prompt-input">Search</label>
+        <input
+          id="search-prompt-input"
+          type="text"
+          name="q"
+          autocomplete="off"
+          autocorrect="off"
+          spellcheck="false"
+          placeholder="Search people, studios, movies"
+          data-search-input
+        />
+      </form>
+    </div>
+
+    {% if user.is_authenticated %}
+      {% if new_arrivals_count > 0 %}
+        <div class="header-actions">
+          <a href="{% url 'new_arrivals' %}" class="nav-icon-btn new-indicator" aria-label="New arrivals">
+            <img src="{% static 'img/notification.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
+            <span class="new-badge">{{ new_arrivals_count }}</span>
+          </a>
+        </div>
+      {% endif %}
+    {% endif %}
+
+    <main>
+      <div class="sync-progress" data-sync-progress hidden>
+        <div class="sync-progress-text" data-sync-progress-text>Starting…</div>
+        <div class="sync-progress-bar" data-sync-progress-bar role="progressbar" aria-label="Sync progress" aria-valuemin="0" aria-valuemax="100">
+          <div class="sync-progress-bar-fill" data-sync-progress-fill></div>
+        </div>
+      </div>
+      {% block page_header %}{% endblock %}
+      {% if messages %}
+        <div class="messages">
+          {% for message in messages %}
+            <div class="msg">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% block content %}{% endblock %}
+    </main>
+    <script src="{% static 'js/base.js' %}?v=20260507b"></script>
+    {% block extra_js %}{% endblock %}
+  </body>
+</html>

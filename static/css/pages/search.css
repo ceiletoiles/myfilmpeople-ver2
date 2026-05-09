@@ -1,0 +1,670 @@
+/* Page-specific styles for Search */
+
+.search-page {
+	display: grid;
+	gap: 18px;
+}
+
+.search-page-header {
+	margin-bottom: 2px;
+}
+
+.search-bar {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 12px;
+	align-items: center;
+}
+
+#search-q {
+	min-width: 0;
+	width: 100%;
+	height: 52px;
+	padding: 0 18px;
+	border-radius: 18px;
+	border: 1px solid rgba(255, 255, 255, 0.36);
+	background: rgba(255, 255, 255, 0.95);
+	font-size: 1rem;
+	color: #0f172a;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 8px 22px rgba(15, 23, 42, 0.1);
+	transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease, transform 140ms ease;
+}
+
+#search-q:focus {
+	outline: none;
+	border-color: #0ea5e9;
+	background: #ffffff;
+	box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.18), 0 10px 20px rgba(15, 23, 42, 0.12);
+	transform: translateY(-1px);
+}
+
+#search-q:focus-visible {
+	outline: none;
+}
+
+.search-surface {
+	margin-top: 18px;
+	padding: clamp(12px, 2.5vw, 20px);
+	border-radius: 6px;
+	border: none;
+	background: transparent;
+	backdrop-filter: none;
+	box-shadow: none;
+}
+
+.search-suggestions-panel {
+	display: none;
+	margin-bottom: 20px;
+	padding: 14px;
+	border-radius: 20px;
+	border: 1px solid rgba(148, 163, 184, 0.26);
+	background: rgba(248, 250, 252, 0.88);
+	box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+}
+
+#search-suggestions {
+	display: none;
+	margin-top: 0;
+}
+
+.search-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin: 16px 0 16px;
+}
+
+.search-tab {
+	appearance: none;
+	padding: 10px 14px;
+	border: 1px solid #cbd5e1;
+	border-radius: 999px;
+	background: white;
+	color: #334155;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+	font-weight: 700;
+	box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+	transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.search-tab:focus-visible {
+	outline: 3px solid rgba(14, 165, 233, 0.22);
+	outline-offset: 2px;
+}
+
+.search-tab.active {
+	background: #0f172a;
+	border-color: #0f172a;
+	color: white;
+	transform: translateY(-1px);
+}
+
+.tab-count {
+	min-width: 0;
+	height: auto;
+	padding: 0;
+	border-radius: 0;
+	background: transparent;
+	color: inherit;
+	font-size: inherit;
+	line-height: inherit;
+	text-align: center;
+	font-weight: inherit;
+}
+
+.search-tab.active .tab-count {
+	color: inherit;
+}
+
+.search-panel {
+	display: none;
+	margin-top: 8px;
+}
+
+.search-panel.active {
+	display: block;
+}
+
+.search-result-list {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 12px;
+}
+
+.search-result-card {
+	display: grid;
+	grid-template-columns: minmax(160px, 28%) minmax(0, 1fr);
+	align-items: start;
+	gap: 12px;
+	padding: 6px 8px;
+	border-radius: 0;
+	border: none;
+	background: transparent;
+	box-shadow: none;
+	transition: none;
+}
+
+.search-result-card:hover {
+	transform: none;
+	box-shadow: none;
+	border-color: transparent;
+	background: transparent;
+}
+
+.search-entity-card,
+.search-user-card,
+.search-movie-card {
+	color: inherit;
+	text-decoration: none;
+}
+
+
+.search-result-left,
+.search-result-right {
+	min-width: 0;
+	align-self: stretch;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 6px;
+}
+
+.search-result-left {
+	padding-right: 6px;
+	border-right: none;
+}
+
+.search-result-left-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    color: #94a3b8;
+}
+
+.search-result-left-value {
+	display: block;
+	font-size: 0.84rem;
+	line-height: 1.5;
+	color: #475569;
+}
+
+.search-result-right {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 100px;
+	align-items: center;
+	gap: 12px;
+}
+
+.search-result-media {
+	flex: 0 0 auto;
+	width: 100px;
+	height: 100px;
+	border-radius: 50%;
+	overflow: hidden;
+	background: #f1f5f9;
+	display: grid;
+	place-items: center;
+	box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.14);
+}
+
+.search-result-media-company,
+.search-result-media-movie {
+	border-radius: 18px;
+	height: 100px;
+}
+
+.search-result-avatar,
+.search-result-logo,
+.search-result-poster {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.search-result-logo {
+	object-fit: contain;
+	padding: 0;
+	background: transparent;
+}
+
+.search-result-logo-fallback {
+	display: grid;
+	place-items: center;
+	width: 100%;
+	height: 100%;
+	padding: 0 10px;
+	font-size: 0.82rem;
+	font-weight: 700;
+	color: #94a3b8;
+	background: #f8fafc;
+}
+
+.search-result-card-main {
+	min-width: 0;
+	display: grid;
+	gap: 6px;
+}
+
+.search-result-card-main-right {
+	gap: 3px;
+}
+
+.search-result-title-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+
+.search-result-title-row strong {
+	color: #0f172a;
+	font-size: 0.93rem;
+	line-height: 1.2;
+	overflow: visible;
+	text-overflow: initial;
+	white-space: normal;
+}
+
+.search-result-title-row-stack {
+	display: grid;
+	gap: 4px;
+	align-content: start;
+}
+
+.search-result-meta {
+	line-height: 1.45;
+	font-size: 0.82rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Right-side known-for column for people */
+.search-result-knownfor {
+	min-width: 0;
+	max-width: 320px;
+	text-align: right;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 6px;
+}
+
+.search-result-knownfor .search-result-left-value.small {
+	font-size: 0.85rem;
+	color: #64748b;
+}
+
+/* People panel: media | main | known-for */
+.search-panel[data-panel="people"] .search-result-card,
+.search-panel[data-panel="following"] .search-result-card {
+	grid-template-columns: 100px 1fr 260px;
+	align-items: center;
+}
+
+/* Movie list: small poster on left, title + release to the right */
+.search-movie-list .search-result-card {
+	grid-template-columns: 66px auto;
+	align-items: center;
+}
+
+.search-movie-list .search-result-media {
+	width: 66px;
+	height: 96px;
+	border-radius: 8px;
+}
+
+/* Company logos: allow dynamic sizing and avoid clipping */
+.search-panel[data-panel="companies"] .search-result-card {
+	grid-template-columns: minmax(120px, 320px) 1fr;
+	align-items: center;
+	gap: 12px;
+}
+
+/* Following panel company items should use the same layout as companies */
+.search-panel[data-panel="following"] .search-company-card {
+	grid-template-columns: minmax(120px, 320px) 1fr;
+	align-items: center;
+	gap: 12px;
+}
+
+.search-result-media.search-result-media-company {
+	width: auto;
+	height: auto;
+	max-height: 120px;
+	max-width: 320px;
+	border-radius: 0;
+	overflow: visible;
+	background: transparent;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	box-shadow: none;
+}
+
+.search-result-logo {
+	width: auto;
+	height: auto;
+	max-height: 120px;
+	max-width: 320px;
+	object-fit: contain;
+	display: block;
+}
+
+/* Ensure company name aligns vertically with logo */
+.search-panel[data-panel="companies"] .search-result-card .search-result-card-main {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+
+.search-result-card .search-result-card-main {
+	align-self: center;
+}
+
+/* People avatars: enforce circular crop */
+.search-panel[data-panel="people"] .search-result-media,
+.search-panel[data-panel="following"] .search-result-media:not(.search-result-media-company) {
+	width: 100px;
+	height: 100px;
+	border-radius: 50%;
+	overflow: hidden;
+}
+
+.search-result-avatar-person {
+	width: 100px;
+	height: 100px;
+	border-radius: 50%;
+	object-fit: cover;
+	background: #e2e8f0;
+	border: 2px solid #e2e8f0;
+	display: block;
+}
+
+/* Movie spacing tweaks: reduce gap between poster and text */
+.search-movie-list .search-result-card {
+	gap: 8px;
+	padding: 6px 8px;
+}
+
+.search-result-department {
+	font-size: 0.8rem;
+}
+
+.search-movie-list .search-result-card .search-result-title-row strong {
+	white-space: normal;
+}
+
+.search-error,
+.search-empty {
+	margin: 6px 0 18px;
+	padding: 14px 16px;
+	border-radius: 16px;
+	border: 1px solid rgba(148, 163, 184, 0.34);
+	background: rgba(248, 250, 252, 0.9);
+	color: #475569;
+	box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
+}
+
+@media (max-width: 860px) {
+	.page-header {
+		padding: 14px 16px 12px;
+	}
+
+	.search-bar {
+		grid-template-columns: 1fr;
+	}
+
+	.search-form button {
+		width: 100%;
+	}
+}
+
+.search-suggestions-title {
+	margin-bottom: 8px;
+	font-size: 0.82rem;
+	font-weight: 400;
+	letter-spacing: 0;
+	text-transform: none;
+	color: #64748b;
+}
+
+.search-suggestion-section {
+	font-size: 0.95rem;
+	font-weight: 400;
+	margin-bottom: 10px;
+}
+
+.search-suggestion-category {
+	margin-top: 14px;
+}
+
+.search-suggestion-category:first-child {
+	margin-top: 6px;
+}
+
+.search-suggestion-list {
+	display: grid;
+	gap: 10px;
+}
+
+.search-suggestion-item {
+	display: grid;
+	grid-template-columns: 60px minmax(0, 1fr);
+	align-items: center;
+	gap: 14px;
+	padding: 12px 14px;
+	border-radius: 16px;
+	border: 1px solid rgba(148, 163, 184, 0.18);
+	background: rgba(255, 255, 255, 0.9);
+	color: inherit;
+	transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.search-suggestion-item:hover {
+	transform: translateY(-1px);
+	border-color: rgba(14, 165, 233, 0.2);
+	box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+}
+
+.search-suggestion-text {
+	min-width: 0;
+	display: grid;
+	gap: 4px;
+}
+
+.search-suggestion-title {
+	font-size: 0.97rem;
+	line-height: 1.25;
+	font-weight: 700;
+	color: #0f172a;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.search-suggestion-meta {
+	margin-top: 0;
+	font-size: 0.83rem;
+	line-height: 1.35;
+	color: #64748b;
+}
+
+.search-suggestion-avatar {
+	width: 60px;
+	height: 60px;
+	background: #f1f5f9;
+	flex: 0 0 auto;
+}
+
+.search-suggestion-avatar-person {
+	border-radius: 50%;
+	object-fit: cover;
+}
+
+.search-suggestion-avatar-company-wrap {
+	border-radius: 14px;
+	display: grid;
+	place-items: center;
+	padding: 7px;
+	border: 1px solid #e2e8f0;
+	background: white;
+}
+
+.search-suggestion-avatar-company {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+.search-suggestion-poster {
+	width: 56px;
+	height: 84px;
+	border-radius: 12px;
+	object-fit: cover;
+	background: #e2e8f0;
+}
+
+.search-result-card.no-decoration:hover,
+.search-result-card.no-decoration:focus-visible {
+	text-decoration: none;
+}
+
+@media (max-width: 640px) {
+	.page-header-content h1 {
+		font-size: 1.6rem;
+	}
+
+	.search-form.search-hero {
+		padding: 18px;
+		border-radius: 6px;
+	}
+
+	.search-surface {
+		padding: 12px;
+		border-radius: 0;
+		border: none;
+		background: transparent;
+	}
+
+	.search-result-card {
+		padding: 6px;
+		border-radius: 0;
+		border: none;
+		background: transparent;
+	}
+
+	.search-suggestion-avatar {
+		width: 68px;
+		height: 68px;
+	}
+
+	.search-suggestions-panel {
+		padding: 12px;
+	}
+
+	.search-suggestion-item {
+		grid-template-columns: 68px minmax(0, 1fr);
+		gap: 12px;
+		padding: 11px 12px;
+	}
+
+	.search-suggestion-text {
+		gap: 2px;
+	}
+
+	.search-suggestion-title {
+		font-size: 0.95rem;
+	}
+
+	.search-suggestion-meta {
+		font-size: 0.8rem;
+	}
+
+	.search-result-card {
+		grid-template-columns: 1fr;
+		align-items: start;
+	}
+
+	.search-panel[data-panel="people"] .search-result-card,
+	.search-panel[data-panel="following"] .search-result-card {
+		grid-template-columns: 100px minmax(0, 1fr);
+		grid-template-rows: auto auto;
+		align-items: start;
+		gap: 1px 12px;
+		padding: 6px 6px;
+	}
+
+	.search-panel[data-panel="people"] .search-result-card .search-result-media,
+	.search-panel[data-panel="following"] .search-result-card .search-result-media {
+		grid-column: 1;
+		grid-row: 1;
+		width: 100px;
+		height: 100px;
+	}
+
+	.search-panel[data-panel="people"] .search-result-card .search-result-card-main,
+	.search-panel[data-panel="following"] .search-result-card .search-result-card-main {
+		grid-column: 2;
+		grid-row: 1;
+	}
+
+	.search-panel[data-panel="people"] .search-result-card .search-result-knownfor,
+	.search-panel[data-panel="following"] .search-result-card .search-result-knownfor {
+		grid-column: 2;
+		grid-row: 2;
+		max-width: none;
+		text-align: left;
+		margin-top: 0;
+		gap: 1px;
+	}
+
+	.search-panel[data-panel="people"] .search-result-card .search-result-card-main,
+	.search-panel[data-panel="following"] .search-result-card .search-result-card-main {
+		min-width: 0;
+	}
+
+	.search-panel[data-panel="people"] .search-result-card .search-result-title-row strong,
+	.search-panel[data-panel="following"] .search-result-card .search-result-title-row strong {
+		white-space: normal;
+	}
+
+	.search-panel[data-panel="people"] .search-result-card .search-result-left-value.small,
+	.search-panel[data-panel="following"] .search-result-card .search-result-left-value.small {
+		white-space: normal;
+	}
+
+	.search-panel[data-panel="people"] .search-result-card .search-result-left-value.small,
+	.search-panel[data-panel="following"] .search-result-card .search-result-left-value.small {
+		font-size: 0.8rem;
+		line-height: 1.35;
+	}
+
+	.search-result-media {
+		width: 72px;
+		height: 72px;
+	}
+
+	.search-result-avatar-person {
+		width: 100px;
+		height: 100px;
+		border-radius: 50%;
+	}
+
+	.search-panel[data-panel="people"] .search-result-card .search-result-media,
+	.search-panel[data-panel="following"] .search-result-card .search-result-media {
+		width: 100px;
+		height: 100px;
+	}
+
+	.search-movie-list .search-result-card .search-result-media {
+		width: 56px;
+		height: 84px;
+	}
+}
