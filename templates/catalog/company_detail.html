@@ -4,7 +4,7 @@
 {% block title %}{{ company.name }}{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'css/pages/company_detail.css' %}" />
+  <link rel="stylesheet" href="{% static 'css/pages/company_detail.css' %}?v=20260509c" />
 {% endblock %}
 
 {% block extra_js %}
@@ -23,6 +23,10 @@
       </div>
 
       <div class="company-header-body">
+        {% if note_text %}
+          <div class="muted company-note-mobile">#{{ note_text|linebreaksbr }}</div>
+        {% endif %}
+
         <h1 class="company-title">{{ company.name }}</h1>
 
         <div id="company-follow-controls">

@@ -73,6 +73,10 @@
   text-align: right;
 }
 
+.company-note-mobile {
+  display: none;
+}
+
 .company-note-hash {
   font-weight: 700;
   margin-right: 4px;
@@ -307,12 +311,34 @@
   }
 
   .company-header-body {
+    display: contents;
     grid-template-columns: 1fr;
+  }
+
+  .company-title {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin-top: 2px;
+  }
+
+  .company-note-mobile {
+    display: block;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    font-size: 13px;
+    line-height: 1.35;
+    font-weight: 700;
+    color: #0f172a;
+    overflow-wrap: anywhere;
+  }
+
+  .company-note-inline {
+    display: none;
   }
 
   .company-actions {
     grid-column: 1;
-    grid-row: auto;
+    grid-row: 1;
     width: 100%;
     justify-self: end;
   }
