@@ -290,29 +290,47 @@
   }
 
   .filmography-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 150px));
+    grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+    gap: 14px 10px;
   }
 
   .filmography-poster {
-    width: 150px;
-    height: 225px;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 2 / 3;
   }
 }
 
 @media (max-width: 700px) {
   .company-header {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 12px;
+    align-items: start;
   }
 
   .company-logo-frame {
-    width: 100%;
-    max-width: 220px;
-    height: 220px;
+    width: 100px;
+    height: 100px;
+    grid-column: 1;
+    grid-row: 1;
+    flex: none;
   }
 
   .company-header-body {
     display: contents;
-    grid-template-columns: 1fr;
+  }
+
+  .company-note-mobile {
+    display: block;
+    grid-column: 2;
+    grid-row: 2;
+    font-size: 13px;
+    line-height: 1.35;
+    font-weight: 700;
+    color: #0f172a;
+    overflow-wrap: anywhere;
+    margin-bottom: 2px;
   }
 
   .company-title {
@@ -321,25 +339,15 @@
     margin-top: 2px;
   }
 
-  .company-note-mobile {
-    display: block;
-    grid-column: 1 / -1;
-    grid-row: 2;
-    font-size: 13px;
-    line-height: 1.35;
-    font-weight: 700;
-    color: #0f172a;
-    overflow-wrap: anywhere;
-  }
-
   .company-note-inline {
     display: none;
   }
 
   .company-actions {
-    grid-column: 1;
+    grid-column: 2;
     grid-row: 1;
-    width: 100%;
     justify-self: end;
+    align-self: start;
+    width: auto;
   }
 }

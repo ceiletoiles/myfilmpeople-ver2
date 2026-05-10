@@ -4,7 +4,7 @@
 {% block title %}{{ company.name }}{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'css/pages/company_detail.css' %}?v=20260509c" />
+  <link rel="stylesheet" href="{% static 'css/pages/company_detail.css' %}?v=20260510c" />
 {% endblock %}
 
 {% block extra_js %}
@@ -51,17 +51,6 @@
           </div>
         {% endif %}
       </div>
-    </div>
-
-    <div class="company-meta-row">
-      <div class="muted">
-        {% if company.tmdb_last_sync_at %}
-          Last synced (IST): {{ company.tmdb_last_sync_at|localtime|date:"F j, Y H:i" }}
-        {% else %}
-          Last synced: not cached (live TMDb)
-        {% endif %}
-      </div>
-      <div class="muted">TMDb: {{ company.tmdb_id }}</div>
     </div>
   </div>
 
@@ -155,5 +144,16 @@
         {% endif %}
       </p>
     {% endif %}
+  </div>
+
+  <div class="company-meta-row">
+    <div class="muted">
+      {% if company.tmdb_last_sync_at %}
+        Last synced (IST): {{ company.tmdb_last_sync_at|localtime|date:"F j, Y H:i" }}
+      {% else %}
+        Last synced: not cached (live TMDb)
+      {% endif %}
+    </div>
+    <div class="muted">TMDb: {{ company.tmdb_id }}</div>
   </div>
 {% endblock %}
