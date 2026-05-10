@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: myfilmpeople-web
+    runtime: python
+    runtimeVersion: 3.11.8
+    plan: standard
+    buildCommand: bash build.sh
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --log-level info
+    
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.8"
+      - key: DEBUG
+        value: "0"
+      - key: ALLOWED_HOSTS
+        fromService:
+          type: web
+          property: host
+
+  - type: redis
+    name: myfilmpeople-redis
+    plan: standard
+    ipAllowList: []
