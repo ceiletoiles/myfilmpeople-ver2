@@ -203,7 +203,6 @@ def follow(request: HttpRequest) -> HttpResponse:
 		if not created and (pf.name or "") != (person.name or ""):
 			pf.name = person.name or ""
 			pf.save(update_fields=["name", "updated_at"])
-		messages.success(request, f"Now following {person.name} as {role}.")
 		if wants_json:
 			payload: dict[str, object] = {
 				"ok": True,
@@ -215,7 +214,11 @@ def follow(request: HttpRequest) -> HttpResponse:
 			if ajax_context == "person_detail":
 				payload["controls_target"] = "#person-follow-controls"
 				payload["controls_html"] = _render_person_follow_controls(request, tmdb_id=tmdb_id)
+				payload["status_target"] = "#person-follow-message"
+			else:
+				messages.success(request, f"Now following {person.name} as {role}.")
 			return JsonResponse(payload)
+		messages.success(request, f"Now following {person.name} as {role}.")
 		return redirect("home")
 
 	if entity_type == "company":
@@ -604,7 +607,6 @@ def person_unfollow(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	if role:
 		deleted_count, _ = qs.filter(role=role).delete()
 		if deleted_count:
-			messages.success(request, f"Unfollowed role: {role}.")
 			if wants_json:
 				payload: dict[str, object] = {
 					"ok": True,
@@ -615,7 +617,11 @@ def person_unfollow(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				if ajax_context == "person_detail":
 					payload["controls_target"] = "#person-follow-controls"
 					payload["controls_html"] = _render_person_follow_controls(request, tmdb_id=tmdb_id)
+					payload["status_target"] = "#person-follow-message"
+				else:
+					messages.success(request, f"Unfollowed role: {role}.")
 				return JsonResponse(payload)
+			messages.success(request, f"Unfollowed role: {role}.")
 		else:
 			messages.info(request, f"You were not following this person as {role}.")
 			if wants_json:
@@ -630,7 +636,6 @@ def person_unfollow(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 
 	deleted_count, _ = qs.delete()
 	if deleted_count:
-		messages.success(request, "Unfollowed person (all roles).")
 		if wants_json:
 			payload = {
 				"ok": True,
@@ -640,7 +645,11 @@ def person_unfollow(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			if ajax_context == "person_detail":
 				payload["controls_target"] = "#person-follow-controls"
 				payload["controls_html"] = _render_person_follow_controls(request, tmdb_id=tmdb_id)
+				payload["status_target"] = "#person-follow-message"
+			else:
+				messages.success(request, "Unfollowed person (all roles).")
 			return JsonResponse(payload)
+		messages.success(request, "Unfollowed person (all roles).")
 	else:
 		messages.info(request, "You were not following this person.")
 		if wants_json:

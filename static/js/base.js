@@ -400,6 +400,46 @@
     return root.querySelector('[data-ajax-status]');
   }
 
+  function setStatusBySelector(selector, msg) {
+    if (!selector) return false;
+    const el = document.querySelector(selector);
+    if (!el) return false;
+    const messageEl = el.matches('.msg, [data-ajax-status]') ? el : el.querySelector('.msg, [data-ajax-status]');
+    const target = messageEl || el;
+    target.textContent = msg || '';
+    if (el.hasAttribute('hidden')) {
+      el.removeAttribute('hidden');
+    }
+    return true;
+  }
+
+  function showPageMessage(msg) {
+    let container = document.querySelector('.page-inline-messages');
+    if (!container) {
+      const main = document.querySelector('main');
+      if (!main) return false;
+      container = document.createElement('div');
+      container.className = 'messages page-inline-messages';
+      const msgEl = document.createElement('div');
+      msgEl.className = 'msg';
+      container.appendChild(msgEl);
+
+      const syncProgress = main.querySelector('.sync-progress');
+      if (syncProgress && syncProgress.parentNode === main) {
+        syncProgress.insertAdjacentElement('afterend', container);
+      } else {
+        main.insertBefore(container, main.firstChild);
+      }
+    }
+
+    const msgEl = container.querySelector('.msg');
+    if (msgEl) {
+      msgEl.textContent = msg || '';
+    }
+    container.hidden = false;
+    return true;
+  }
+
   function setStatus(root, msg) {
     const el = findStatusEl(root);
     if (el) {
@@ -450,8 +490,8 @@
         const target = document.querySelector(data.controls_target);
         if (target) {
           target.innerHTML = data.controls_html;
-          if (data.message) {
-            setStatus(target, data.message);
+          if (data.message && !setStatusBySelector(data.status_target, data.message)) {
+            showPageMessage(data.message);
           }
         }
         return;
@@ -466,12 +506,14 @@
       }
 
       if (data.message) {
-        setStatus(form, data.message);
+        if (!setStatusBySelector(data.status_target, data.message)) {
+          showPageMessage(data.message);
+        }
       } else {
-        setStatus(form, 'Done.');
+        showPageMessage('Done.');
       }
     } catch (err) {
-      setStatus(form, 'Network error.');
+      showPageMessage('Network error.');
       if (btn) btn.disabled = false;
     }
   });

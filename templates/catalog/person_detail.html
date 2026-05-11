@@ -34,6 +34,10 @@
         {% include 'catalog/_person_follow_controls.html' %}
       </div>
 
+      <div id="person-follow-message" class="person-follow-message" hidden>
+        <div class="msg"></div>
+      </div>
+
       {% if born_display %}
         <div class="muted person-born">Born: {{ born_display }}</div>
       {% endif %}
