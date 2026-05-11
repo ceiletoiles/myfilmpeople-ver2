@@ -35,7 +35,8 @@ def _is_self_character(character: str) -> bool:
 	if _SELF_CHARACTER_RE.search(ch_l):
 		return True
 	# Common TMDb variants that imply a self appearance.
-	if ch_l in {"himself", "herself", "themselves"}:
+	self_variants = ("himself", "herself", "themselves", "archive footage")
+	if any(variant in ch_l for variant in self_variants):
 		return True
 	return False
 
@@ -152,7 +153,8 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			job = str(item.get("job") or "").strip()
 			if _is_self_character(job) or _is_self_character(dept):
 				self_credit_movie_ids.add(mid)
-				continue
+				if hide_self_appearances:
+					continue
 			if not dept:
 				job_l = job.lower()
 				if job_l == "director":
@@ -299,6 +301,9 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			continue
 		dept = str(item.get("department") or "").strip()
 		job = str(item.get("job") or "").strip()
+		# Skip self-appearance crew roles when hide_self_appearances is enabled
+		if hide_self_appearances and (_is_self_character(job) or _is_self_character(dept)):
+			continue
 		if not dept:
 			job_l = job.lower()
 			if job_l == "director":
@@ -693,6 +698,9 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			continue
 		dept = str(item.get("department") or "").strip()
 		job = str(item.get("job") or "").strip()
+		# Skip self-appearance crew roles when hide_self_appearances is enabled
+		if hide_self_appearances and (_is_self_character(job) or _is_self_character(dept)):
+			continue
 		if not dept:
 			job_l = job.lower()
 			if job_l == "director":

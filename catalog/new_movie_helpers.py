@@ -31,7 +31,12 @@ def _is_self_character(value: object) -> bool:
 	character = value.strip().lower()
 	if not character:
 		return False
-	return "self" in character
+	if "self" in character:
+		return True
+	self_variants = ("himself", "herself", "themselves", "archive footage")
+	if any(variant in character for variant in self_variants):
+		return True
+	return False
 
 
 def _is_passive_crew_job(value: object) -> bool:

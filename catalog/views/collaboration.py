@@ -24,7 +24,8 @@ def _is_self_character(character: str) -> bool:
 	ch_l = ch.lower()
 	if _SELF_CHARACTER_RE.search(ch_l):
 		return True
-	return ch_l in {"himself", "herself", "themselves"}
+	self_variants = ("himself", "herself", "themselves", "archive footage")
+	return any(variant in ch_l for variant in self_variants)
 
 
 def _role_priority(role: str) -> tuple[int, str]:
