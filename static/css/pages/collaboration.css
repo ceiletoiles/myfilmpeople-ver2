@@ -185,8 +185,51 @@
 	padding-left: 30px;
 }
 
-.collab-frequent-section h2 {
+.collab-frequent-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
 	margin-bottom: 14px;
+}
+
+.collab-frequent-header h2 {
+	margin: 0;
+}
+
+.collab-frequent-sort {
+	appearance: none;
+	border: 1px solid #cbd5e1;
+	border-radius: 999px;
+	background: #fff;
+	color: #334155;
+	padding: 8px 12px;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 0.9rem;
+	font-weight: 600;
+	white-space: nowrap;
+	flex-shrink: 0;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.collab-frequent-sort:hover,
+.collab-frequent-sort:focus-visible {
+	border-color: #94a3b8;
+	background: #f8fafc;
+	outline: none;
+}
+
+.collab-frequent-sort-icon {
+	font-size: 1rem;
+	line-height: 1;
+	flex-shrink: 0;
+}
+
+.collab-frequent-sort-label {
+	white-space: nowrap;
 }
 
 .collab-frequent-list {
@@ -270,6 +313,10 @@
 		border-top: 1px solid #e2e8f0;
 		padding-left: 0;
 		padding-top: 30px;
+	}
+
+	.collab-frequent-header {
+		flex-wrap: wrap;
 	}
 
 	.collab-frequent-list {

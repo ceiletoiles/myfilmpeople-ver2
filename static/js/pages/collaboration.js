@@ -277,4 +277,57 @@
     e.preventDefault();
     handleFrequentPairClick(div);
   });
+
+  const frequentList = document.querySelector('.collab-frequent-list');
+  const frequentSortToggle = document.querySelector('[data-frequent-sort-toggle]');
+
+  if (frequentList && frequentSortToggle) {
+    const originalItems = Array.from(frequentList.querySelectorAll('.collab-frequent-pair'));
+    let currentSort = frequentSortToggle.dataset.currentSort || 'random';
+
+    function updateFrequentSortButton() {
+      const label = frequentSortToggle.querySelector('[data-frequent-sort-label]');
+      if (label) {
+        label.textContent = currentSort === 'most' ? 'Random' : 'Most films';
+      }
+      frequentSortToggle.setAttribute('aria-pressed', currentSort === 'most' ? 'true' : 'false');
+    }
+
+    function renderFrequentOrder(mode) {
+      const items = originalItems.slice();
+
+      if (mode === 'most') {
+        items.sort(function (a, b) {
+          const countA = Number(a.dataset.sharedCount || '0');
+          const countB = Number(b.dataset.sharedCount || '0');
+          if (countA !== countB) {
+            return countB - countA;
+          }
+
+          const orderA = Number(a.dataset.originalOrder || '0');
+          const orderB = Number(b.dataset.originalOrder || '0');
+          return orderA - orderB;
+        });
+      } else {
+        items.sort(function (a, b) {
+          const orderA = Number(a.dataset.originalOrder || '0');
+          const orderB = Number(b.dataset.originalOrder || '0');
+          return orderA - orderB;
+        });
+      }
+
+      items.forEach(function (item) {
+        frequentList.appendChild(item);
+      });
+
+      currentSort = mode;
+      updateFrequentSortButton();
+    }
+
+    frequentSortToggle.addEventListener('click', function () {
+      renderFrequentOrder(currentSort === 'most' ? 'random' : 'most');
+    });
+
+    updateFrequentSortButton();
+  }
 })();

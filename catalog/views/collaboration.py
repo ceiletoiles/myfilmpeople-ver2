@@ -48,7 +48,13 @@ def _is_documentary(item: dict) -> bool:
 	return 99 in genres
 
 
-def _get_frequent_collaborators(user_id: int, limit: int = 6) -> list[dict]:
+def _get_frequent_collaborators(
+	user_id: int,
+	limit: int | None = None,
+	*,
+	sort_mode: str = "random",
+	min_shared_count: int = 2,
+) -> list[dict]:
 	"""
 	Get frequent collaborators from user's following list.
 	Returns pairs of followed people with their shared movie counts.
@@ -109,11 +115,17 @@ def _get_frequent_collaborators(user_id: int, limit: int = 6) -> list[dict]:
 		movies2 = set(person_movie_index.get(p2.tmdb_id, {}).keys())
 		shared_count = len(movies1 & movies2)
 
-		if shared_count > 0:
+		if shared_count >= min_shared_count:
 			pair_counts.append(((p1.tmdb_id, p2.tmdb_id), shared_count, p1, p2))
 
-	# Randomize the eligible pairs so the list does not always appear in the same order.
-	random.shuffle(pair_counts)
+	if sort_mode == "most":
+		pair_counts.sort(key=lambda item: (-item[1], item[2].name.lower(), item[3].name.lower()))
+	else:
+		# Randomize the eligible pairs so the list does not always appear in the same order.
+		random.shuffle(pair_counts)
+
+	if limit is not None and limit > 0:
+		pair_counts = pair_counts[:limit]
 
 	# Build result
 	result = []
@@ -179,13 +191,20 @@ def _roles_for_movie(*, credits_raw: dict, movie_id: int) -> tuple[list[str], bo
 @login_required
 def collaboration_finder(request: HttpRequest) -> HttpResponse:
 	query = (request.GET.get("q") or "").strip()
+	frequent_sort = (request.GET.get("collab_sort") or request.POST.get("collab_sort") or "random").strip().lower()
+	if frequent_sort not in {"random", "most"}:
+		frequent_sort = "random"
 	selected_ids: list[int] = []
 	selected_people: list[dict] = []
 	results: list[dict] = []
 	collaborators_count = 0
 	
 	# Always calculate frequent collaborators so they persist across searches
-	frequent_collaborators = _get_frequent_collaborators(request.user.id)
+	frequent_collaborators = _get_frequent_collaborators(
+		request.user.id,
+		sort_mode=frequent_sort,
+		min_shared_count=2,
+	)
 
 	if request.method == "POST":
 		try:
@@ -327,6 +346,7 @@ def collaboration_finder(request: HttpRequest) -> HttpResponse:
 		"catalog/collaboration.html",
 		{
 			"q": query,
+			"frequent_sort": frequent_sort,
 			"selected_ids": selected_ids,
 			"selected_people": selected_people,
 			"results": results,

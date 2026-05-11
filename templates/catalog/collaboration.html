@@ -105,11 +105,28 @@
     {% if frequent_collaborators %}
       <div class="collab-right-section">
         <div class="collab-frequent-section">
-          <h2>Frequent Collaborators</h2>
+          <div class="collab-frequent-header">
+            <h2>Frequent Collaborators</h2>
+            <button
+              type="button"
+              class="collab-frequent-sort"
+              data-frequent-sort-toggle
+              data-current-sort="{{ frequent_sort }}"
+              aria-pressed="{% if frequent_sort == 'most' %}true{% else %}false{% endif %}"
+              aria-label="Toggle frequent collaborators sorting"
+            >
+              <span class="collab-frequent-sort-icon" aria-hidden="true">⇅</span>
+              <span class="collab-frequent-sort-label" data-frequent-sort-label>
+                {% if frequent_sort == 'most' %}Random{% else %}Most films{% endif %}
+              </span>
+            </button>
+          </div>
           <div class="collab-frequent-list">
             {% for fc in frequent_collaborators %}
               <div
                 class="collab-frequent-pair"
+                data-original-order="{{ forloop.counter0 }}"
+                data-shared-count="{{ fc.shared_count }}"
                 data-pair-ids="{{ fc.pair_ids|join:',' }}"
                 data-pair-names="{{ fc.pair_names|join:'|' }}"
                 data-pair-profiles="{{ fc.pair_profiles|join:'|' }}"
