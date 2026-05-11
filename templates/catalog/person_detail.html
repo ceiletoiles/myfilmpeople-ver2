@@ -123,15 +123,17 @@
                   <div class="film-countdown">{{ it.countdown_text }}</div>
                 {% endif %}
                 <span data-role="all">
-                  {% for role in it.roles_all_parts %}
-                    {{ role }}{% if not forloop.last %},{% endif %}{% if forloop.counter|divisibleby:2 and not forloop.last %}<br />{% else %}{% if not forloop.last %} {% endif %}{% endif %}
+                  {% for role in it.roles_all_primary_parts %}
+                    {{ role }}{% if not forloop.last %}, {% endif %}
                   {% endfor %}
+                  {% if it.roles_all_secondary_parts %}<br />{% for role in it.roles_all_secondary_parts %}{{ role }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
                 </span>
                 {% for r in it.roles_by_filter %}
                   <span data-role="{{ r.key }}">
-                    {% for role in r.parts %}
-                      {{ role }}{% if not forloop.last %},{% endif %}{% if forloop.counter|divisibleby:2 and not forloop.last %}<br />{% else %}{% if not forloop.last %} {% endif %}{% endif %}
+                    {% for role in r.primary_parts %}
+                      {{ role }}{% if not forloop.last %}, {% endif %}
                     {% endfor %}
+                    {% if r.secondary_parts %}<br />{% for role in r.secondary_parts %}{{ role }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
                   </span>
                 {% endfor %}
               </div>

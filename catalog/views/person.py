@@ -99,10 +99,78 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	if isinstance(aka, list):
 		also_known_as = [str(x).strip() for x in aka if str(x).strip()]
 
-	# "Known for": derive from combined credits, ranked by popularity/votes.
+	# "Known for": derive from credits, ranked by popularity/votes.
+	# If followed, prioritize movies where they had the followed role(s).
 	known_for_items: list[dict[str, object]] = []
 	try:
-		items = list((credits.get("cast", []) or [])) + list((credits.get("crew", []) or []))
+		def _normalize_known_for_role(value: str) -> str:
+			value_n = (value or "").strip().lower()
+			if value_n == "acting":
+				return "actor"
+			if value_n == "directing":
+				return "director"
+			if value_n == "writing":
+				return "writer"
+			if value_n == "production":
+				return "producer"
+			return value_n
+
+		def _role_matches_followed_role(movie_role: str, followed_role: str) -> bool:
+			movie_role_n = _normalize_known_for_role(movie_role)
+			followed_role_n = _normalize_known_for_role(followed_role)
+			if not movie_role_n or not followed_role_n:
+				return False
+			return movie_role_n == followed_role_n
+
+		# Build role mapping for each movie
+		movie_roles: dict[int, set[str]] = {}  # movie_id -> set of role names
+		self_credit_movie_ids: set[int] = set()
+		
+		cast_items = [c for c in (credits.get("cast", []) or []) if c.get("media_type") in (None, "movie")]
+		crew_items = [c for c in (credits.get("crew", []) or []) if c.get("media_type") in (None, "movie")]
+		
+		# Map cast to "Acting" role
+		for item in cast_items:
+			mid = item.get("id")
+			if not isinstance(mid, int):
+				continue
+			character = str(item.get("character") or "").strip()
+			if _is_self_character(character):
+				self_credit_movie_ids.add(mid)
+				if hide_self_appearances:
+					continue
+			if mid not in movie_roles:
+				movie_roles[mid] = set()
+			movie_roles[mid].add("Actor")
+		
+		# Map crew to their department/role
+		for item in crew_items:
+			mid = item.get("id")
+			if not isinstance(mid, int):
+				continue
+			dept = str(item.get("department") or "").strip()
+			job = str(item.get("job") or "").strip()
+			if _is_self_character(job) or _is_self_character(dept):
+				self_credit_movie_ids.add(mid)
+				continue
+			if not dept:
+				job_l = job.lower()
+				if job_l == "director":
+					dept = "Directing"
+				elif job_l == "producer":
+					dept = "Production"
+				elif job_l == "writer":
+					dept = "Writing"
+				else:
+					dept = "Crew"
+			if mid not in movie_roles:
+				movie_roles[mid] = set()
+			movie_roles[mid].add(dept)
+			if job:
+				movie_roles[mid].add(job)
+		
+		# Collect all items with scoring
+		items = cast_items + crew_items
 		dedup: dict[int, dict] = {}
 		for it in items:
 			mid = it.get("id")
@@ -114,6 +182,18 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			title = it.get("title") or it.get("name") or ""
 			if not str(title).strip():
 				continue
+			if mid in self_credit_movie_ids:
+				continue
+			
+			# If followed, only include if movie has one of the followed roles
+			if is_followed and mid in movie_roles:
+				if not any(
+					_role_matches_followed_role(movie_role, follow_role)
+					for movie_role in movie_roles[mid]
+					for follow_role in follow_roles_set
+				):
+					continue
+			
 			popularity = it.get("popularity")
 			vote_count = it.get("vote_count")
 			vote_avg = it.get("vote_average")
@@ -166,8 +246,6 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		born_display = str(pob)
 	role_options = _person_role_options_from_credits(credits)
 	role_options_remaining = [r for r in role_options if r not in follow_roles_set]
-	cast_items = [c for c in (credits.get("cast", []) or []) if c.get("media_type") in (None, "movie")]
-	crew_items = [c for c in (credits.get("crew", []) or []) if c.get("media_type") in (None, "movie")]
 
 	# Build unified filmography (one row per movie), with roles grouped by department.
 	today = timezone.now().date()
@@ -281,34 +359,56 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		ordered_keys = keys[:]
 		ordered_keys.sort(key=lambda k: (preferred_rank.get(k, 99), k.lower()))
 
-		# "All" roles: show all credited roles across departments.
-		roles_all_list: list[str] = []
-		for k in ordered_keys:
-			roles_all_list.extend(_roles_list(dept=k, values=roles_by_filter.get(k) or set(), mode="all"))
-		roles_all_parts = [x for x in roles_all_list if x]
+		# "All" roles: show the prioritized role first, then the rest on a second line.
+		roles_all_primary_parts: list[str] = []
+		roles_all_secondary_parts: list[str] = []
+		if ordered_keys:
+			primary_key = ordered_keys[0]
+			roles_all_primary_parts = _roles_list(
+				dept=primary_key,
+				values=roles_by_filter.get(primary_key) or set(),
+				mode="acting" if primary_key == "Acting" else "all",
+			)
+			for k in ordered_keys[1:]:
+				# Do not show Acting character names on crew tabs.
+				if primary_key != "Acting" and k == "Acting":
+					continue
+				roles_all_secondary_parts.extend(
+					_roles_list(dept=k, values=roles_by_filter.get(k) or set(), mode="all")
+				)
+		roles_all_primary_parts = [x for x in roles_all_primary_parts if x]
+		roles_all_secondary_parts = [x for x in roles_all_secondary_parts if x]
+		roles_all_parts = roles_all_primary_parts + roles_all_secondary_parts
 
-		# Per-filter display: prioritize the active dept, but include other roles too.
+		# Per-filter display: prioritize the active dept, then show other roles on the next line.
 		roles_display_by_filter: list[dict[str, object]] = []
 		for active in ordered_keys:
 			active_mode = "acting" if active == "Acting" else "all"
-			parts: list[str] = []
-			parts.extend(
-				_roles_list(
-					dept=active,
-					values=roles_by_filter.get(active) or set(),
-					mode=active_mode,
-				)
+			primary_parts = _roles_list(
+				dept=active,
+				values=roles_by_filter.get(active) or set(),
+				mode=active_mode,
 			)
+			secondary_parts: list[str] = []
 			for k in ordered_keys:
 				if k == active:
 					continue
 				# Do not show Acting character names on crew tabs.
 				if active != "Acting" and k == "Acting":
 					continue
-				parts.extend(_roles_list(dept=k, values=roles_by_filter.get(k) or set(), mode="all"))
-			parts_clean = [x for x in parts if x]
-			if parts_clean:
-				roles_display_by_filter.append({"key": active, "parts": parts_clean})
+				secondary_parts.extend(
+					_roles_list(dept=k, values=roles_by_filter.get(k) or set(), mode="all")
+				)
+			primary_parts = [x for x in primary_parts if x]
+			secondary_parts = [x for x in secondary_parts if x]
+			if primary_parts or secondary_parts:
+				roles_display_by_filter.append(
+					{
+						"key": active,
+						"primary_parts": primary_parts,
+						"secondary_parts": secondary_parts,
+					}
+				)
 
 		filmography_items.append(
 			{
@@ -322,6 +422,8 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				else "",
 				"filters": keys,
 				"roles_all_parts": roles_all_parts,
+				"roles_all_primary_parts": roles_all_primary_parts,
+				"roles_all_secondary_parts": roles_all_secondary_parts,
 				"roles_by_filter": roles_display_by_filter,
 			}
 		)
@@ -448,7 +550,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	# Derived payloads (known-for + filmography) can be expensive; cache them.
 	last_sync = getattr(person, "tmdb_last_sync_at", None)
 	last_sync_key = last_sync.isoformat() if last_sync else "live"
-	derived_cache_key = f"person:derived:v1:{tmdb_id}:{int(hide_self_appearances)}:{last_sync_key}"
+	derived_cache_key = f"person:derived:v2:{tmdb_id}:{int(hide_self_appearances)}:{last_sync_key}"
 	derived = cache.get(derived_cache_key)
 	born_display = ""
 	if bd:
