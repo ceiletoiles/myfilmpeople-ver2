@@ -253,7 +253,7 @@ def search_suggest(request: HttpRequest) -> JsonResponse:
 	# Cache globally (not user-specific).
 	# Short TTL because suggestions should stay fresh.
 	suggest_cache_key = _cache_key(
-		"search:suggest:v4",
+		"search:suggest:v5",
 		{
 			"q": query,
 			"limit": int(limit),
@@ -285,7 +285,9 @@ def search_suggest(request: HttpRequest) -> JsonResponse:
 		try:
 			raw = fetcher(query_id) or {}
 			if isinstance(raw, dict) and int(raw.get("id") or 0) == query_id:
-				bucket.append(builder(raw))
+				result = builder(raw)
+				result["from_direct_lookup"] = True
+				bucket.append(result)
 		except Exception:
 			pass
 		payload = {"q": query, "people": people, "companies": companies, "movies": movies}
@@ -343,7 +345,7 @@ def search(request: HttpRequest) -> HttpResponse:
 	# Cache the search page payload by query (not user-specific).
 	# TMDb results are cached to keep repeat searches responsive.
 	page_cache_key = _cache_key(
-		"search:page:v4",
+		"search:page:v5",
 		{
 			"q": query_norm,
 			"uid": int(getattr(request.user, "id", 0) or 0),
@@ -388,7 +390,9 @@ def search(request: HttpRequest) -> HttpResponse:
 			if query_kind == "p":
 				raw = client.get_person(query_id) or {}
 				if isinstance(raw, dict) and int(raw.get("id") or 0) == query_id:
-					entities["people"] = [_person_result_from_tmdb_raw(raw)]
+					result = _person_result_from_tmdb_raw(raw)
+					result["from_direct_lookup"] = True
+					entities["people"] = [result]
 			elif query_kind == "c":
 				raw = client.get_company(query_id) or {}
 				if isinstance(raw, dict) and int(raw.get("id") or 0) == query_id:
@@ -396,7 +400,9 @@ def search(request: HttpRequest) -> HttpResponse:
 			elif query_kind == "m":
 				raw = client.get_movie(query_id) or {}
 				if isinstance(raw, dict) and int(raw.get("id") or 0) == query_id:
-					entities["movies"] = [_movie_result_from_tmdb_raw(raw)]
+					result = _movie_result_from_tmdb_raw(raw)
+					result["from_direct_lookup"] = True
+					entities["movies"] = [result]
 		else:
 			entities = _tmdb_entity_search(query, limit=10)
 	except Exception:
