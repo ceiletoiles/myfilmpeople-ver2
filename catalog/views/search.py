@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from difflib import SequenceMatcher
 import hashlib
 import json
 
@@ -14,6 +15,26 @@ from django.urls import reverse
 
 from ..models import CompanyFollow, PersonFollow
 from ..tmdb import TMDbClient
+
+
+def _fuzzy_ratio(a: str, b: str) -> float:
+	"""Compute similarity ratio between two strings (0.0 to 1.0)."""
+	return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+
+
+def _matches_fuzzy(query: str, name: str, *, threshold: float = 0.7) -> bool:
+	"""Check if name matches query within fuzzy threshold (typo-tolerant)."""
+	if not query or not name:
+		return False
+	query_norm = query.lower().strip()
+	name_norm = name.lower().strip()
+	
+	# Exact substring match (highest priority)
+	if query_norm in name_norm or name_norm in query_norm:
+		return True
+	
+	# Fuzzy similarity match
+	return _fuzzy_ratio(query_norm, name_norm) >= threshold
 
 
 def _clamp_int(value: str, *, default: int, min_value: int, max_value: int) -> int:
@@ -39,7 +60,7 @@ def _cache_key(prefix: str, payload: dict) -> str:
 def _tmdb_entity_search(
 	query: str,
 	*,
-	limit: int,
+	limit: int | None = None,
 	include_movie_director: bool = False,
 ) -> dict[str, list[dict]]:
 	people: list[dict] = []
@@ -47,20 +68,70 @@ def _tmdb_entity_search(
 	movies: list[dict] = []
 
 	client = TMDbClient.from_settings()
-	with ThreadPoolExecutor(max_workers=3) as ex:
-		people_future = ex.submit(client.search_people, query)
-		companies_future = ex.submit(client.search_companies, query)
-		movies_future = ex.submit(client.search_movies, query)
 
-		tmdb_people = (people_future.result() or {}).get("results") or []
-		tmdb_companies = (companies_future.result() or {}).get("results") or []
-		tmdb_movies = (movies_future.result() or {}).get("results") or []
+	# Fetch first page for each category in parallel, then optionally
+	# paginate further if `limit` is None (i.e. no cap requested).
+	with ThreadPoolExecutor(max_workers=3) as ex:
+		people_future = ex.submit(client.search_people, query, page=1)
+		companies_future = ex.submit(client.search_companies, query, page=1)
+		movies_future = ex.submit(client.search_movies, query, page=1)
+
+		people_payload = people_future.result() or {}
+		companies_payload = companies_future.result() or {}
+		movies_payload = movies_future.result() or {}
+
+	tmdb_people = people_payload.get("results") or []
+	tmdb_companies = companies_payload.get("results") or []
+	tmdb_movies = movies_payload.get("results") or []
+
+	# If no explicit `limit` was requested, fetch additional pages from TMDb
+	# (pagination) to return all available results for each category.
+	if limit is None:
+		# People
+		try:
+			total_pages = int(people_payload.get("total_pages") or 1)
+		except (TypeError, ValueError):
+			total_pages = 1
+		for p in range(2, total_pages + 1):
+			try:
+				extra = client.search_people(query, page=p) or {}
+				tmdb_people.extend(extra.get("results") or [])
+			except Exception:
+				break
+
+		# Companies
+		try:
+			total_pages = int(companies_payload.get("total_pages") or 1)
+		except (TypeError, ValueError):
+			total_pages = 1
+		for p in range(2, total_pages + 1):
+			try:
+				extra = client.search_companies(query, page=p) or {}
+				tmdb_companies.extend(extra.get("results") or [])
+			except Exception:
+				break
+
+		# Movies
+		try:
+			total_pages = int(movies_payload.get("total_pages") or 1)
+		except (TypeError, ValueError):
+			total_pages = 1
+		for p in range(2, total_pages + 1):
+			try:
+				extra = client.search_movies(query, page=p) or {}
+				tmdb_movies.extend(extra.get("results") or [])
+			except Exception:
+				break
 
 	for r in tmdb_people:
-		if len(people) >= limit:
+		if limit is not None and len(people) >= limit:
 			break
 		pid = r.get("id")
 		if not isinstance(pid, int):
+			continue
+		name = str(r.get("name") or str(pid))
+		# Include if fuzzy-matches query (typo-tolerant search)
+		if not _matches_fuzzy(query, name, threshold=0.7):
 			continue
 		known_for_titles: list[str] = []
 		for kf in (r.get("known_for") or []):
@@ -73,7 +144,7 @@ def _tmdb_entity_search(
 		people.append(
 			{
 				"id": pid,
-				"name": r.get("name") or str(pid),
+				"name": name,
 				"profile_path": r.get("profile_path") or "",
 				"known_for_department": str(r.get("known_for_department") or "").strip(),
 				"known_for_titles": known_for_titles,
@@ -82,16 +153,20 @@ def _tmdb_entity_search(
 		)
 
 	for r in tmdb_companies:
-		if len(companies) >= limit:
+		if limit is not None and len(companies) >= limit:
 			break
 		cid = r.get("id")
 		if not isinstance(cid, int):
+			continue
+		name = str(r.get("name") or str(cid))
+		# Include if fuzzy-matches query (typo-tolerant search)
+		if not _matches_fuzzy(query, name, threshold=0.7):
 			continue
 		origin = str(r.get("origin_country") or "").strip()
 		companies.append(
 			{
 				"id": cid,
-				"name": r.get("name") or str(cid),
+				"name": name,
 				"logo_path": r.get("logo_path") or "",
 				"origin": origin,
 				"url": reverse("company_detail", args=[cid]),
@@ -99,15 +174,19 @@ def _tmdb_entity_search(
 		)
 
 	for r in tmdb_movies:
-		if len(movies) >= limit:
+		if limit is not None and len(movies) >= limit:
 			break
 		mid = r.get("id")
 		if not isinstance(mid, int):
 			continue
+		title = str(r.get("title") or str(mid))
+		# Include if fuzzy-matches query (typo-tolerant search)
+		if not _matches_fuzzy(query, title, threshold=0.7):
+			continue
 		movies.append(
 			{
 				"id": mid,
-				"title": r.get("title") or str(mid),
+				"title": title,
 				"poster_path": r.get("poster_path") or "",
 				"release_date": r.get("release_date") or "",
 				"director": "",
@@ -299,7 +378,7 @@ def search_suggest(request: HttpRequest) -> JsonResponse:
 
 	entities: dict[str, list[dict]] = {"people": [], "companies": [], "movies": []}
 	try:
-		entities = _tmdb_entity_search(query, limit=limit, include_movie_director=True)
+			entities = _tmdb_entity_search(query, limit=limit, include_movie_director=True)
 	except Exception:
 		# If TMDb is unavailable, keep suggestions empty.
 		pass
@@ -404,7 +483,7 @@ def search(request: HttpRequest) -> HttpResponse:
 					result["from_direct_lookup"] = True
 					entities["movies"] = [result]
 		else:
-			entities = _tmdb_entity_search(query, limit=10)
+			entities = _tmdb_entity_search(query, limit=None)
 	except Exception:
 		# Keep the page usable if TMDb is unavailable.
 		pass
