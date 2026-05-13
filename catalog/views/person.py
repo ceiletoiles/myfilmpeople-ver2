@@ -86,7 +86,11 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	comeback_info = None
 	if is_followed:
 		role_infos = [
-			get_person_comeback_info(credits, followed_role=role)
+			get_person_comeback_info(
+				credits,
+				followed_role=role,
+				deathday=(person.tmdb_raw or {}).get("deathday"),
+			)
 			for role in follow_roles
 		]
 		role_infos = [info for info in role_infos if info is not None]

@@ -19,6 +19,7 @@ def home(request: HttpRequest) -> HttpResponse:
 			follow.comeback_info = get_person_comeback_info(
 				follow.person.tmdb_credits_raw or {},
 				followed_role=follow.role,
+				deathday=(follow.person.tmdb_raw or {}).get("deathday"),
 			)
 		company_follows = (
 			CompanyFollow.objects.select_related("company")

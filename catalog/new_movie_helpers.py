@@ -170,13 +170,17 @@ def extract_movie_release_dates_from_credits_for_role(credits: dict, followed_ro
 	return by_id
 
 
-def get_person_last_release_date(credits: dict, *, followed_role: str | None = None) -> date | None:
-	"""Return latest past movie release date for a specific followed role."""
+def get_person_last_release_date(credits: dict, *, followed_role: str | None = None, today: date | None = None) -> date | None:
+	"""Return latest past movie release date for a specific followed role.
+
+	`today` may be provided to limit which releases are considered (useful
+	for computing the last release before a given date such as a deathday).
+	"""
 	if followed_role:
 		release_dates = extract_movie_release_dates_from_credits_for_role(credits, followed_role)
 	else:
 		release_dates = extract_movie_release_dates_from_credits(credits)
-	return _latest_release_date_from_dates(release_dates)
+	return _latest_release_date_from_dates(release_dates, today=today)
 
 
 def get_person_comeback_info(
@@ -184,12 +188,56 @@ def get_person_comeback_info(
 	*,
 	gap_years: int | None = None,
 	followed_role: str | None = None,
+	deathday: str | date | None = None,
 ) -> dict | None:
-	"""Return inactivity metadata for a person if their last release is old enough."""
-	last_release_date = get_person_last_release_date(credits, followed_role=followed_role)
+	"""Return inactivity metadata for a person if their last release is old enough.
+
+	If `deathday` is provided (string in ISO format or `date`), treat the person
+	as deceased and always return an inactive record regardless of the normal
+	inactivity threshold. For deceased people the displayed "last_release_date"
+	will still be the latest release (including posthumous releases), but the
+	gap/age label is computed from the deathday (and where possible from the
+	last release before death).
+	"""
+	# Gather per-role release dates so we can compute both the overall last
+	# release and the last release that occurred before death (if applicable).
+	if followed_role:
+		release_dates = extract_movie_release_dates_from_credits_for_role(credits, followed_role)
+	else:
+		release_dates = extract_movie_release_dates_from_credits(credits)
+
+	last_release_date = _latest_release_date_from_dates(release_dates)
 	if last_release_date is None:
 		return None
+
 	today = timezone.now().date()
+
+	# Normalize deathday input to a date object if provided.
+	died_at: date | None = None
+	if deathday:
+		if isinstance(deathday, date):
+			died_at = deathday
+		else:
+			died_at = _parse_iso_date(deathday)
+
+	# If person is deceased, compute gap from the deathday (show inactive from
+	# the day they died). Still include the last release before death for
+	# reference, and the overall `last_release_date` remains the latest release
+	# (including posthumous releases).
+	if died_at is not None:
+		last_release_before_death = _latest_release_date_from_dates(release_dates, today=died_at)
+		gap_days = (today - died_at).days
+
+		return {
+			"last_release_date": last_release_date,
+			"last_release_before_death": last_release_before_death,
+			"died_at": died_at,
+			"gap_days": gap_days,
+			"gap_label": _format_gap_label(gap_days),
+			"threshold_days": 0,
+			"followed_role": (followed_role or "").strip(),
+		}
+
 	# Use inactive threshold for UI/inactivity detection. Support explicit gap_years,
 	# then prefer new INACTIVE setting, then fall back to legacy COMEBACK_GAP for
 	# backward compatibility.
