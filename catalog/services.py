@@ -448,7 +448,28 @@ def get_or_sync_person(tmdb_id: int, *, force: bool = False) -> Person:
     has_credited_roles = isinstance(tmdb_raw.get("credited_roles"), list)
 
     if force or _is_stale(person.tmdb_last_sync_at) or not person.tmdb_raw or not person.tmdb_credits_raw:
-        client = TMDbClient.from_settings()
+        # If forcing a fresh sync, invalidate any cached TMDb HTTP responses
+        # so the client will fetch a fresh payload instead of returning stale cached JSON.
+        if force:
+            try:
+                client = TMDbClient.from_settings()
+                try:
+                    cache.delete(client.cache_key_for(f"/person/{tmdb_id}"))
+                except Exception:
+                    pass
+                try:
+                    cache.delete(client.cache_key_for(f"/person/{tmdb_id}/combined_credits"))
+                except Exception:
+                    pass
+                try:
+                    cache.delete(client.cache_key_for(f"/person/{tmdb_id}/images"))
+                except Exception:
+                    pass
+            except Exception:
+                client = TMDbClient.from_settings()
+        else:
+            client = TMDbClient.from_settings()
+
         raw = client.get_person(tmdb_id)
         credits = client.get_person_credits(tmdb_id)
 
@@ -492,7 +513,18 @@ def get_or_sync_person_images(tmdb_id: int, *, force: bool = False) -> Person:
     tmdb_raw = person.tmdb_raw if isinstance(person.tmdb_raw, dict) else {}
     has_images = isinstance(tmdb_raw.get("images"), dict)
     if force or _is_stale(person.tmdb_last_sync_at) or not has_images:
-        client = TMDbClient.from_settings()
+        # Invalidate person images HTTP cache when forcing refresh.
+        if force:
+            try:
+                client = TMDbClient.from_settings()
+                try:
+                    cache.delete(client.cache_key_for(f"/person/{tmdb_id}/images"))
+                except Exception:
+                    pass
+            except Exception:
+                client = TMDbClient.from_settings()
+        else:
+            client = TMDbClient.from_settings()
         images = client.get_person_images(tmdb_id)
         person.tmdb_raw = {**tmdb_raw, "images": images}
         person.tmdb_last_sync_at = timezone.now()
@@ -513,7 +545,24 @@ def get_or_sync_company(tmdb_id: int, *, force: bool = False) -> Company:
 
     company, _ = Company.objects.get_or_create(tmdb_id=tmdb_id, defaults={"name": str(tmdb_id)})
     if force or _is_stale(company.tmdb_last_sync_at) or not company.tmdb_raw:
-        client = TMDbClient.from_settings()
+        # When forcing a company sync, clear TMDb HTTP cache keys used for
+        # the company details and first page of company movies so we get
+        # fresh data from TMDb.
+        if force:
+            try:
+                client = TMDbClient.from_settings()
+                try:
+                    cache.delete(client.cache_key_for(f"/company/{tmdb_id}"))
+                except Exception:
+                    pass
+                try:
+                    cache.delete(client.cache_key_for(f"/company/{tmdb_id}/movies", params={"page": 1}))
+                except Exception:
+                    pass
+            except Exception:
+                client = TMDbClient.from_settings()
+        else:
+            client = TMDbClient.from_settings()
         raw = client.get_company(tmdb_id)
 
         # Preserve any cached filmography pages unless forcing a refresh.

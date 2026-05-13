@@ -184,6 +184,30 @@ class TMDbClient:
 
         raise TMDbError(f"TMDb request failed via all proxies. Last error: {last_error}")
 
+    def cache_key_for(self, path: str, params: dict[str, Any] | None = None) -> str:
+        """Compute the Django cache key for a given TMDb path and params.
+
+        This replicates the cache key construction used in `_get` so callers
+        can invalidate cached TMDb HTTP responses.
+        """
+        merged_params: dict[str, Any] = {"language": self.language}
+        if params:
+            merged_params.update(params)
+        if self.region:
+            merged_params.setdefault("region", self.region)
+        if self.api_key:
+            merged_params.setdefault("api_key", self.api_key)
+
+        cache_input = {
+            "path": path,
+            "params": merged_params,
+            "auth": "bearer" if bool(self.read_access_token) else "api_key",
+            "auth_fp": hashlib.sha256(((self.read_access_token or self.api_key) or "").encode("utf-8")).hexdigest(),
+        }
+        return "tmdb:http:v1:" + hashlib.sha256(
+            json.dumps(cache_input, sort_keys=True, ensure_ascii=True, default=str).encode("utf-8")
+        ).hexdigest()
+
     # Search
     def search_people(self, query: str, *, page: int = 1) -> dict[str, Any]:
         return self._get("/search/person", params={"query": query, "page": page, "include_adult": False})
