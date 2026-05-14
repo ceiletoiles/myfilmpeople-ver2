@@ -38,20 +38,27 @@ class Company(models.Model):
 
 class Movie(models.Model):
 	tmdb_id = models.PositiveIntegerField(unique=True)
-	title = models.CharField(max_length=255)
-	release_date = models.DateField(null=True, blank=True)
+	title = models.CharField(max_length=255, db_index=True)
+	release_date = models.DateField(null=True, blank=True, db_index=True)
 	poster_path = models.CharField(max_length=255, blank=True)
 	backdrop_path = models.CharField(max_length=255, blank=True)
 
 	tmdb_raw = models.JSONField(default=dict, blank=True)
 	tmdb_credits_raw = models.JSONField(default=dict, blank=True)
-	tmdb_last_sync_at = models.DateTimeField(null=True, blank=True)
+	tmdb_last_sync_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
 
 	def __str__(self) -> str:
 		return f"{self.title} ({self.tmdb_id})"
+
+	class Meta:
+		indexes = [
+			models.Index(fields=["title", "tmdb_id"]),
+			models.Index(fields=["release_date", "tmdb_id"]),
+			models.Index(fields=["tmdb_last_sync_at", "tmdb_id"]),
+		]
 
 
 class PersonFollow(models.Model):

@@ -86,6 +86,39 @@ def _format_money(value: Any) -> str:
 	return f"${amount:,}"
 
 
+def _build_alternative_titles(payload: dict[str, Any]) -> list[dict[str, str]]:
+	titles = payload.get("titles") or []
+	if not isinstance(titles, list):
+		return []
+
+	results: list[dict[str, str]] = []
+	for item in titles:
+		if not isinstance(item, dict):
+			continue
+
+		title = (item.get("title") or "").strip()
+		if not title:
+			continue
+
+		country_code = (item.get("iso_3166_1") or "").strip()
+		results.append(
+			{
+				"title": title,
+				"country_code": country_code,
+				"country_name": _get_country_name(country_code) if country_code else "",
+			}
+		)
+
+	def _sort_key(entry: dict[str, str]) -> tuple[str, str, str]:
+		country_code = entry.get("country_code") or ""
+		country_name = entry.get("country_name") or ""
+		title = entry.get("title") or ""
+		return (country_code.lower(), country_name.lower(), title.lower())
+
+	results.sort(key=_sort_key)
+	return results
+
+
 def _build_crew_groups(credits: dict[str, Any]) -> list[dict[str, Any]]:
 	crew = credits.get("crew") or []
 	if not isinstance(crew, list):
@@ -348,17 +381,25 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	cast = []
 	crew_groups = []
 	release_groups = []
+	alternative_titles = []
 	credits = movie.tmdb_credits_raw or {}
-	movie_year_runtime = _format_year_runtime(movie.tmdb_raw or {})
+	movie_raw = movie.tmdb_raw or {}
+	movie_year_runtime = _format_year_runtime(movie_raw)
 	movie_director = _get_director_name(credits)
-	movie_rating_text = _format_tmdb_rating(movie.tmdb_raw or {})
-	movie_budget_text = _format_money((movie.tmdb_raw or {}).get("budget"))
-	movie_box_office_text = _format_money((movie.tmdb_raw or {}).get("revenue"))
+	movie_rating_text = _format_tmdb_rating(movie_raw)
+	movie_budget_text = _format_money(movie_raw.get("budget"))
+	movie_box_office_text = _format_money(movie_raw.get("revenue"))
 	if include_credits:
 		cast = credits.get("cast", []) or []
 		crew_groups = _build_crew_groups(credits)
 
-	release_groups = _build_release_groups(movie.tmdb_raw or {})
+	release_groups = _build_release_groups(movie_raw)
+	client = TMDbClient.from_settings()
+	try:
+		alt_titles_payload = client.get_movie_alternative_titles(tmdb_id)
+	except TMDbError:
+		alt_titles_payload = {}
+	alternative_titles = _build_alternative_titles(alt_titles_payload)
 
 	# Similar/Related movies are lazy-loaded via JSON endpoints.
 
@@ -371,6 +412,7 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"cast": cast,
 			"crew_groups": crew_groups,
 			"release_groups": release_groups,
+			"alternative_titles": alternative_titles,
 			"movie_year_runtime": movie_year_runtime,
 			"movie_director": movie_director,
 			"movie_rating_text": movie_rating_text,
@@ -408,22 +450,21 @@ def _movie_card_payload(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 @login_required
 def movie_similar(request: HttpRequest, tmdb_id: int) -> JsonResponse:
-	movie = get_or_sync_movie(
-		tmdb_id,
-		include_similar=True,
-		similar_page=1,
-	)
+	# Fetch similar movies on-demand from TMDb (do not persist into DB).
+	page = int(request.GET.get("page") or 1)
+	client = TMDbClient.from_settings()
+	try:
+		payload = client.get_movie_similar(tmdb_id, page=page) or {}
+	except TMDbError:
+		payload = {}
 
-	tmdb_raw = movie.tmdb_raw if isinstance(movie.tmdb_raw, dict) else {}
-	sim_pages = tmdb_raw.get("similar_pages")
 	results: list[dict[str, Any]] = []
-	if isinstance(sim_pages, dict):
-		page_1 = sim_pages.get("1")
-		if isinstance(page_1, dict) and isinstance(page_1.get("results"), list):
-			results = [r for r in page_1["results"] if isinstance(r, dict)]
+	if isinstance(payload, dict) and isinstance(payload.get("results"), list):
+		results = [r for r in payload.get("results") if isinstance(r, dict)]
 
 	seen: set[int] = set()
 	filtered: list[dict[str, Any]] = []
+	movie = get_or_sync_movie(tmdb_id)
 	for item in results:
 		mid = item.get("id")
 		if not isinstance(mid, int):

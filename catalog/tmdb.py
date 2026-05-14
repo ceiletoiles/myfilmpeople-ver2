@@ -246,6 +246,9 @@ class TMDbClient:
     def get_movie_release_dates(self, movie_id: int) -> dict[str, Any]:
         return self._get(f"/movie/{movie_id}/release_dates")
 
+    def get_movie_alternative_titles(self, movie_id: int) -> dict[str, Any]:
+        return self._get(f"/movie/{movie_id}/alternative_titles")
+
     def get_movie_images(self, movie_id: int) -> dict[str, Any]:
         return self._get(f"/movie/{movie_id}/images")
 

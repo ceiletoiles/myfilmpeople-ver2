@@ -191,6 +191,26 @@
               </div>
 
               <div class="detail-category">
+                <h3 class="detail-category-title">Alternative Titles</h3>
+                <div class="detail-items">
+                  {% if alternative_titles %}
+                    {% for alt in alternative_titles %}
+                      <div class="detail-content-item detail-content-item-stack">
+                        <span class="detail-name">{{ alt.title }}</span>
+                        {% if alt.country_name %}
+                          <span class="detail-subtitle">{{ alt.country_name }}{% if alt.country_code %} ({{ alt.country_code }}){% endif %}</span>
+                        {% elif alt.country_code %}
+                          <span class="detail-subtitle">{{ alt.country_code }}</span>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                  {% else %}
+                    <p class="no-data">No alternative titles available.</p>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="detail-category">
                 <h3 class="detail-category-title">Technical Details</h3>
                 <div class="detail-items">
                   <div class="tech-spec-item">Budget: {{ movie_budget_text }}</div>

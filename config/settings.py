@@ -122,6 +122,9 @@ else:
             "PORT": os.getenv("DB_PORT", "3306"),
             "OPTIONS": {
                 "charset": "utf8mb4",
+                # Increase session sort buffer to avoid MySQL "Out of sort memory" errors
+                # for large ORDER BY operations in local dev. Value is bytes (8MB).
+                "init_command": "SET SESSION sort_buffer_size=8388608",
             },
         }
     }

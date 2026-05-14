@@ -189,34 +189,51 @@ main {
 .movie-tabs {
   margin-top: 1.2rem;
   display: flex;
-  gap: 0;
+  justify-content: center;
+  gap: 0.5rem;
   flex-wrap: wrap;
-  border-bottom: 1px solid #cbd5e1;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0;
 }
 
 .movie-tab-btn {
   border: 0;
   background: transparent;
-  color: #475569;
+  color: #64748b;
   font-weight: 600;
-  padding: 0.7rem 1.1rem;
-  border-bottom: 3px solid transparent;
+  padding: 0.55rem 0.9rem 0.55rem 0.9rem;
   cursor: pointer;
 }
 
 .movie-tab-btn:hover {
   color: #0f172a;
-  background: #e2e8f0;
 }
 
 .movie-tab-btn.active {
   color: #0f172a;
-  border-bottom-color: #0f172a;
-  background: #e2e8f0;
+  border-bottom: 2px solid #0f172a;
+  margin-bottom: -1px;
+  border-radius: 0;
 }
 
 .credits-tabs {
   margin-bottom: 0.8rem;
+}
+
+.detail-content-item-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.detail-name {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.detail-subtitle {
+  font-size: 13px;
+  color: #64748b;
 }
 
 .credits-content {

@@ -781,9 +781,9 @@ def _get_or_sync_movie_internal(
     has_rec_page = isinstance(rec_pages, dict) and str(rec_page) in rec_pages
     needs_rec = include_recommendations and (force or _is_stale(movie.tmdb_last_sync_at) or not has_rec_page)
 
-    sim_pages = (movie.tmdb_raw or {}).get("similar_pages") if isinstance(movie.tmdb_raw, dict) else None
-    has_sim_page = isinstance(sim_pages, dict) and str(sim_page) in sim_pages
-    needs_sim = include_similar and (force or _is_stale(movie.tmdb_last_sync_at) or not has_sim_page)
+    # Do not persist similar-pages into the Movie.tmdb_raw blob.
+    # Similar movies are fetched on-demand by views and are not stored in the DB.
+    needs_sim = False
 
     raw = movie.tmdb_raw
     credits = movie.tmdb_credits_raw
@@ -828,16 +828,8 @@ def _get_or_sync_movie_internal(
         )
         did_fetch = True
 
-    if needs_sim:
-        sims = client.get_movie_similar(tmdb_id, page=sim_page)
-        raw = _ensure_paged_cache(
-            raw if isinstance(raw, dict) else {},
-            pages_key="similar_pages",
-            meta_key="similar_meta",
-            page=sim_page,
-            payload=sims,
-        )
-        did_fetch = True
+    # similar pages intentionally not merged into `raw` or saved.
+    # Views that need similar movies should call TMDb directly.
 
     if needs_credits:
         credits = client.get_movie_credits(tmdb_id)
