@@ -41,6 +41,18 @@ def _is_self_character(character: str) -> bool:
 	return False
 
 
+def _calculate_age(birthday: date | None, deathday: date | None = None) -> int | None:
+	"""Calculate age from birthday to today (or to deathday if provided)."""
+	if not birthday:
+		return None
+	end_date = deathday if deathday else timezone.now().date()
+	age = end_date.year - birthday.year
+	# Adjust if birthday hasn't occurred yet this year
+	if (end_date.month, end_date.day) < (birthday.month, birthday.day):
+		age -= 1
+	return age if age >= 0 else None
+
+
 @login_required
 def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	hide_self_appearances = _get_session_bool(
@@ -239,11 +251,16 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	born_display = ""
 	if bd:
 		parsed = _parse_iso_date(str(bd))
+		dd = raw.get("deathday")
+		deathday_parsed = _parse_iso_date(str(dd)) if dd else None
 		if parsed is not None:
 			# Windows-friendly day formatting (avoid %-d).
 			born_display = parsed.strftime("%B %d, %Y").replace(" 0", " ")
 			if pob:
 				born_display = f"{born_display} in {pob}"
+			age = _calculate_age(parsed, deathday_parsed)
+			if age is not None:
+				born_display = f"{born_display} | Age: {age}"
 		else:
 			born_display = str(bd)
 			if pob:
@@ -564,11 +581,16 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	born_display = ""
 	if bd:
 		parsed = _parse_iso_date(str(bd))
+		dd = raw.get("deathday")
+		deathday_parsed = _parse_iso_date(str(dd)) if dd else None
 		if parsed is not None:
 			# Windows-friendly day formatting (avoid %-d).
 			born_display = parsed.strftime("%B %d, %Y").replace(" 0", " ")
 			if pob:
 				born_display = f"{born_display} in {pob}"
+			age = _calculate_age(parsed, deathday_parsed)
+			if age is not None:
+				born_display = f"{born_display} | Age: {age}"
 		else:
 			born_display = str(bd)
 			if pob:
