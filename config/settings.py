@@ -215,6 +215,10 @@ CACHES = {
     }
 }
 
+# Use Redis for session storage (survives deployments & restarts)
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "default"
+
 
 def _split_csv_env(value: str) -> list[str]:
     return [x.strip() for x in (value or "").split(",") if x.strip()]
