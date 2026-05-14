@@ -118,6 +118,7 @@ main {
   flex-wrap: wrap;
   gap: 8px;
   align-items: baseline;
+  font-size: 1rem;
   padding: 10px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 12px;
@@ -177,6 +178,7 @@ main {
   color: #0f172a;
   cursor: pointer;
   text-decoration: underline;
+  font-size: 1rem;
 }
 
 .kebab-menu {
@@ -390,12 +392,92 @@ main {
   flex-wrap: wrap;
 }
 
+.person-meta-row .muted {
+  font-size: 1rem;
+}
+
 .person-filmography {
   margin-top: 8px;
 }
 
 .person-filmography-title {
   margin: 0;
+}
+
+/* Mobile: reduce font sizes for compact person profile and filmography tags */
+@media (max-width: 700px) {
+  .person-profile {
+    width: 160px;
+    height: 240px;
+  }
+
+  .person-header {
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .person-header-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto auto auto auto;
+    min-height: auto;
+  }
+
+  .person-title {
+    font-size: 1.25rem;
+  }
+
+  .person-born,
+  .person-bio-text,
+  .person-aka-list,
+  .person-known-for-grid {
+    font-size: 13px;
+  }
+
+  .person-bio-text {
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+  }
+
+  .person-bio-toggle {
+    font-size: 13px;
+  }
+
+  .person-known-for-grid {
+    gap: 8px 12px;
+  }
+
+  .person-extras {
+    gap: 10px;
+  }
+
+  .person-comeback-note {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .person-meta-row .muted {
+    font-size: 13px;
+  }
+
+  /* Tighten filmography filter and grid spacing on mobile */
+  .filmography-filters {
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .filmography-filters .filter-btn {
+    padding: 4px 6px;
+    font-size: 12px;
+    line-height: 1;
+  }
+
+  .filmography-grid {
+    gap: 10px 8px;
+  }
+
+  .filmography-item {
+    gap: 6px;
+  }
 }
 
 .filmography-filters {
@@ -406,12 +488,14 @@ main {
 }
 
 .filter-btn {
-  padding: 0;
+  padding: 6px 8px;
   border: none;
   background: transparent;
   color: #0f172a;
   font-weight: 400;
   cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
 }
 
 .filter-btn:focus,
