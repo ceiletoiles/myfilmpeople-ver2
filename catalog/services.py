@@ -783,7 +783,6 @@ def _get_or_sync_movie_internal(
 
     # Do not persist similar-pages into the Movie.tmdb_raw blob.
     # Similar movies are fetched on-demand by views and are not stored in the DB.
-    needs_sim = False
 
     raw = movie.tmdb_raw
     credits = movie.tmdb_credits_raw
