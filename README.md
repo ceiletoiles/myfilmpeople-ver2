@@ -1,4 +1,4 @@
-# MyFilmPeople — People‑first Film Discovery (Updated)
+# MyFilmPeople - People‑first Film Discovery
 
 MyFilmPeople is a server-rendered Django application that centers discovery around film people (actors, directors, crew) and production companies instead of only movie titles. Follow people and companies to surface their filmographies, collaborations, upcoming releases, and change/arrival notifications.
 
@@ -158,12 +158,3 @@ Contributing
 License & contact
 - This repository does not include an explicit license file. Add one if you intend to publish or share externally.
 - For questions, open an issue or contact the repository owner.
-
----
-
-If you'd like, I can also:
-- add a `.env.example` file to the repo with the variables above
-- add short usage examples for the most common management commands
-- run the test suite here (it may require DB + Redis available locally)
-
-Updated README written and saved to the repository root.
