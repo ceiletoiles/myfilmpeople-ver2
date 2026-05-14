@@ -119,6 +119,50 @@ def _build_alternative_titles(payload: dict[str, Any]) -> list[dict[str, str]]:
 	return results
 
 
+def _build_trailer(payload: dict[str, Any]) -> dict[str, str]:
+	results = payload.get("results") or []
+	if not isinstance(results, list):
+		return {}
+
+	def _score(item: dict[str, Any]) -> tuple[int, int, int]:
+		name = (item.get("name") or "").strip().lower()
+		video_type = (item.get("type") or "").strip().lower()
+		site = (item.get("site") or "").strip().lower()
+		official = 0 if item.get("official") else 1
+		trailer_rank = 0 if video_type == "trailer" else 1
+		youtube_rank = 0 if site == "youtube" else 1
+		name_rank = 0 if "trailer" in name else 1
+		return (official, trailer_rank, youtube_rank + name_rank)
+
+	filtered: list[dict[str, Any]] = []
+	for item in results:
+		if not isinstance(item, dict):
+			continue
+		if (item.get("site") or "").strip().lower() != "youtube":
+			continue
+		key = (item.get("key") or "").strip()
+		if not key:
+			continue
+		filtered.append(item)
+
+	if not filtered:
+		return {}
+
+	filtered.sort(key=_score)
+	best = filtered[0]
+	key = (best.get("key") or "").strip()
+	if not key:
+		return {}
+
+	name = (best.get("name") or "Trailer").strip() or "Trailer"
+	return {
+		"name": name,
+		"key": key,
+		"youtube_url": f"https://www.youtube.com/watch?v={key}",
+		"embed_url": f"https://www.youtube.com/embed/{key}",
+	}
+
+
 def _build_crew_groups(credits: dict[str, Any]) -> list[dict[str, Any]]:
 	crew = credits.get("crew") or []
 	if not isinstance(crew, list):
@@ -400,6 +444,11 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	except TMDbError:
 		alt_titles_payload = {}
 	alternative_titles = _build_alternative_titles(alt_titles_payload)
+	try:
+		trailer_payload = client.get_movie_videos(tmdb_id)
+	except TMDbError:
+		trailer_payload = {}
+	movie_trailer = _build_trailer(trailer_payload)
 
 	# Similar/Related movies are lazy-loaded via JSON endpoints.
 
@@ -413,6 +462,7 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"crew_groups": crew_groups,
 			"release_groups": release_groups,
 			"alternative_titles": alternative_titles,
+			"movie_trailer": movie_trailer,
 			"movie_year_runtime": movie_year_runtime,
 			"movie_director": movie_director,
 			"movie_rating_text": movie_rating_text,

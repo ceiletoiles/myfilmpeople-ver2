@@ -37,6 +37,14 @@
           <div class="movie-ratings" id="movieRatings">
             <span class="rating-tmdb" id="tmdbRating">{{ movie_rating_text }}</span>
           </div>
+
+          {% if movie_trailer.embed_url %}
+            <div class="movie-trailer-section">
+              <a class="rating-tmdb movie-trailer-link" href="{{ movie_trailer.youtube_url }}" target="_blank" rel="noopener noreferrer">
+                Trailer
+              </a>
+            </div>
+          {% endif %}
         </div>
       </div>
 
