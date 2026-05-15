@@ -73,13 +73,6 @@ def profile(request: HttpRequest) -> HttpResponse:
 		except Exception:
 			f.status = ""
 
-	# Attach a computed status label to each follow for UI display
-	for f in directors + actors + crew:
-		try:
-			f.status = get_person_status_label(f.person, followed_role=f.role)
-		except Exception:
-			f.status = ""
-
 	return render(
 		request,
 		"accounts/profile.html",
@@ -112,6 +105,12 @@ def user_following(request: HttpRequest, username: str) -> HttpResponse:
 	directors = [f for f in person_follows if _role_category(f.role) == "director"]
 	actors = [f for f in person_follows if _role_category(f.role) == "actor"]
 	crew = [f for f in person_follows if _role_category(f.role) == "crew"]
+
+	for f in directors + actors + crew:
+		try:
+			f.status = get_person_status_label(f.person, followed_role=f.role)
+		except Exception:
+			f.status = ""
 
 	return render(
 		request,
