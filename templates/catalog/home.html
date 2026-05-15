@@ -24,12 +24,20 @@
         <h1>Home</h1>
         <p class="page-tagline">Your followed people and studios</p>
       </div>
-      <button type="button" class="nav-icon-btn" data-search-open aria-label="Search" title="Search">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M10.5 18.5C14.9183 18.5 18.5 14.9183 18.5 10.5C18.5 6.08172 14.9183 2.5 10.5 2.5C6.08172 2.5 2.5 6.08172 2.5 10.5C2.5 14.9183 6.08172 18.5 10.5 18.5Z" stroke="currentColor" stroke-width="2" />
-          <path d="M21.5 21.5L16.9 16.9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-        </svg>
-      </button>
+      <div class="page-header-actions">
+        {% if new_arrivals_count > 0 %}
+          <a href="{% url 'new_arrivals' %}" class="nav-icon-btn new-indicator" aria-label="New arrivals">
+            <img src="{% static 'img/notification.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
+            <span class="new-badge">{{ new_arrivals_count }}</span>
+          </a>
+        {% endif %}
+        <button type="button" class="nav-icon-btn" data-search-open aria-label="Search" title="Search">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M10.5 18.5C14.9183 18.5 18.5 14.9183 18.5 10.5C18.5 6.08172 14.9183 2.5 10.5 2.5C6.08172 2.5 2.5 6.08172 2.5 10.5C2.5 14.9183 6.08172 18.5 10.5 18.5Z" stroke="currentColor" stroke-width="2" />
+            <path d="M21.5 21.5L16.9 16.9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
     </div>
   {% else %}
     <div class="page-header">
@@ -38,12 +46,14 @@
         <h1>MyFilmPeople</h1>
         <p class="page-tagline">Track film people & studios you care about</p>
       </div>
-      <button type="button" class="nav-icon-btn" data-search-open aria-label="Search" title="Search">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M10.5 18.5C14.9183 18.5 18.5 14.9183 18.5 10.5C18.5 6.08172 14.9183 2.5 10.5 2.5C6.08172 2.5 2.5 6.08172 2.5 10.5C2.5 14.9183 6.08172 18.5 10.5 18.5Z" stroke="currentColor" stroke-width="2" />
-          <path d="M21.5 21.5L16.9 16.9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-        </svg>
-      </button>
+      <div class="page-header-actions">
+        <button type="button" class="nav-icon-btn" data-search-open aria-label="Search" title="Search">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M10.5 18.5C14.9183 18.5 18.5 14.9183 18.5 10.5C18.5 6.08172 14.9183 2.5 10.5 2.5C6.08172 2.5 2.5 6.08172 2.5 10.5C2.5 14.9183 6.08172 18.5 10.5 18.5Z" stroke="currentColor" stroke-width="2" />
+            <path d="M21.5 21.5L16.9 16.9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
     </div>
   {% endif %}
 {% endblock %}

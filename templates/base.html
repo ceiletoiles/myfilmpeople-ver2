@@ -71,17 +71,6 @@
       </form>
     </div>
 
-    {% if user.is_authenticated %}
-      {% if new_arrivals_count > 0 %}
-        <div class="header-actions">
-          <a href="{% url 'new_arrivals' %}" class="nav-icon-btn new-indicator" aria-label="New arrivals">
-            <img src="{% static 'img/notification.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
-            <span class="new-badge">{{ new_arrivals_count }}</span>
-          </a>
-        </div>
-      {% endif %}
-    {% endif %}
-
     <main>
       <div class="sync-progress" data-sync-progress hidden>
         <div class="sync-progress-text" data-sync-progress-text>Starting…</div>
