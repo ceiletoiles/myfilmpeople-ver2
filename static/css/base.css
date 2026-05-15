@@ -527,7 +527,6 @@ nav .brand * {
 }
 
 .is-deceased {
-	filter: grayscale(100%) contrast(0.95) brightness(0.98);
 	-webkit-filter: grayscale(100%) contrast(0.95) brightness(0.98);
-}
+    filter: grayscale(100%) contrast(0.95) brightness(0.98);
 }
