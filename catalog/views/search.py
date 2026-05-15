@@ -17,6 +17,9 @@ from ..models import CompanyFollow, PersonFollow
 from ..tmdb import TMDbClient
 
 
+MAX_SEARCH_RESULTS = 50
+
+
 def _fuzzy_ratio(a: str, b: str) -> float:
 	"""Compute similarity ratio between two strings (0.0 to 1.0)."""
 	return SequenceMatcher(None, a.lower(), b.lower()).ratio()
@@ -276,6 +279,19 @@ def _tmdb_prefixed_query(query: str) -> tuple[str, int] | None:
 	return (prefix, value) if value > 0 else None
 
 
+def _user_prefixed_query(query: str) -> str | None:
+	query = (query or "").strip()
+	if ":" not in query:
+		return None
+	prefix, raw_username = query.split(":", 1)
+	if prefix.strip().lower() != "u":
+		return None
+	username = raw_username.strip()
+	if username.startswith("@"):
+		username = username[1:].strip()
+	return username or None
+
+
 def _person_result_from_tmdb_raw(raw: dict[str, object]) -> dict:
 	known_for_titles: list[str] = []
 	for kf in (raw.get("known_for") or []):
@@ -348,6 +364,10 @@ def search_suggest(request: HttpRequest) -> JsonResponse:
 	if len(query) < 2:
 		return JsonResponse({"q": query, "people": [], "companies": [], "movies": []})
 
+	user_query = _user_prefixed_query(query)
+	if user_query is not None:
+		return JsonResponse({"q": query, "people": [], "companies": [], "movies": []})
+
 	prefixed_query = _tmdb_prefixed_query(query)
 	if prefixed_query is not None:
 		query_kind, query_id = prefixed_query
@@ -395,6 +415,7 @@ def search_suggest(request: HttpRequest) -> JsonResponse:
 def search(request: HttpRequest) -> HttpResponse:
 	query = (request.GET.get("q") or "").strip()
 	query_norm = " ".join(query.split()).strip()
+	user_query = _user_prefixed_query(query_norm)
 	prefixed_query = _tmdb_prefixed_query(query_norm)
 	people_results: list[dict] = []
 	company_results: list[dict] = []
@@ -452,10 +473,11 @@ def search(request: HttpRequest) -> HttpResponse:
 		pass
 
 	User = get_user_model()
+	user_search_term = user_query or query
 	user_results = [
 		{"username": u.username}
 		for u in (
-		User.objects.filter(username__icontains=query)
+		User.objects.filter(username__icontains=user_search_term)
 		.only("username")
 		.order_by("username")[:10]
 		)
@@ -463,7 +485,9 @@ def search(request: HttpRequest) -> HttpResponse:
 
 	entities: dict[str, list[dict]] = {"people": [], "companies": [], "movies": []}
 	try:
-		if prefixed_query is not None:
+		if user_query is not None:
+			pass
+		elif prefixed_query is not None:
 			query_kind, query_id = prefixed_query
 			client = TMDbClient.from_settings()
 			if query_kind == "p":
@@ -483,7 +507,7 @@ def search(request: HttpRequest) -> HttpResponse:
 					result["from_direct_lookup"] = True
 					entities["movies"] = [result]
 		else:
-			entities = _tmdb_entity_search(query, limit=None)
+			entities = _tmdb_entity_search(query, limit=MAX_SEARCH_RESULTS)
 	except Exception:
 		# Keep the page usable if TMDb is unavailable.
 		pass

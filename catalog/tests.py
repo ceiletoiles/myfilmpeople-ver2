@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
@@ -251,3 +252,40 @@ class NewArrivalsSeenHistoryTests(TestCase):
 		self.assertIsNotNone(seen)
 		assert seen is not None
 		self.assertIsNotNone(seen.seen_at)
+
+
+class SearchPrefixTests(TestCase):
+	def setUp(self) -> None:
+		self.User = get_user_model()
+		self.viewer = self.User.objects.create_user(username="viewer", password="pw")
+		self.target = self.User.objects.create_user(username="alice", password="pw")
+
+	@patch("catalog.views.search.TMDbClient.from_settings")
+	def test_user_prefixed_search_uses_local_users_only(self, mock_tmdb) -> None:
+		mock_tmdb.side_effect = AssertionError("TMDb should not be used for user-prefixed search")
+
+		client = self.client
+		client.force_login(self.viewer)
+		response = client.get(reverse("search"), {"q": "u:@alice"})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.context["user_results"], [{"username": "alice"}])
+		self.assertEqual(response.context["people_results"], [])
+		self.assertEqual(response.context["company_results"], [])
+		self.assertEqual(response.context["movie_results"], [])
+		mock_tmdb.assert_not_called()
+
+	@patch("catalog.views.search.TMDbClient.from_settings")
+	def test_user_prefixed_search_suggest_skips_tmdb(self, mock_tmdb) -> None:
+		mock_tmdb.side_effect = AssertionError("TMDb should not be used for user-prefixed suggestions")
+
+		client = self.client
+		client.force_login(self.viewer)
+		response = client.get(reverse("search_suggest"), {"q": "u:@alice"})
+
+		self.assertEqual(response.status_code, 200)
+		data = response.json()
+		self.assertEqual(data["people"], [])
+		self.assertEqual(data["companies"], [])
+		self.assertEqual(data["movies"], [])
+		mock_tmdb.assert_not_called()
