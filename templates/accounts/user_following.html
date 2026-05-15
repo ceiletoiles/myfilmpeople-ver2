@@ -56,6 +56,9 @@
                   <img class="person-thumb" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
                 {% endif %}
                 <span class="entity-name">{{ f.person.name }}</span>
+                {% if f.status %}
+                  <span class="entity-status muted">{{ f.status }}</span>
+                {% endif %}
               </a>
             {% endfor %}
           {% else %}
@@ -73,6 +76,9 @@
                   <img class="person-thumb" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
                 {% endif %}
                 <span class="entity-name">{{ f.person.name }}</span>
+                {% if f.status %}
+                  <span class="entity-status muted">{{ f.status }}</span>
+                {% endif %}
               </a>
             {% endfor %}
           {% else %}
@@ -93,6 +99,9 @@
                   <span class="entity-name">{{ f.person.name }}</span>
                   <span class="entity-meta">{{ f.role }}</span>
                 </span>
+                {% if f.status %}
+                  <span class="entity-status muted">{{ f.status }}</span>
+                {% endif %}
               </a>
             {% endfor %}
           {% else %}

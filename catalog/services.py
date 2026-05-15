@@ -9,6 +9,11 @@ from django.utils import timezone
 
 from .models import Company, Movie, Person
 from .tmdb import TMDbClient
+from .new_movie_helpers import (
+    extract_movie_release_dates_from_credits,
+    extract_movie_release_dates_from_credits_for_role,
+    get_person_comeback_info,
+)
 
 
 # Use release_date (not primary_release_date) for better completeness.
@@ -94,6 +99,56 @@ def get_or_sync_company_tba_movies(
     }
     company.save(update_fields=["tmdb_raw", "updated_at"])
     return tba_movies
+
+
+def get_person_status_label(person: Person, *, followed_role: str | None = None) -> str:
+    """Return a clean single-word status label for a person.
+
+    Labels: Deceased, Upcoming, TBA, Inactive, Idle
+    Priority: Deceased > Upcoming > TBA > Inactive > Idle
+    """
+    credits = person.tmdb_credits_raw or {}
+
+    # Deceased check (TMDb 'deathday')
+    deathday = "" if not isinstance(person.tmdb_raw, dict) else (person.tmdb_raw.get("deathday") or "")
+    if isinstance(deathday, str) and deathday.strip():
+        return "Deceased"
+
+    # Release date map (respect followed_role when provided)
+    if followed_role:
+        rd_map = extract_movie_release_dates_from_credits_for_role(credits, followed_role)
+    else:
+        rd_map = extract_movie_release_dates_from_credits(credits)
+
+    from datetime import date
+    from django.utils import timezone
+
+    today = timezone.now().date()
+    has_tba = False
+
+    for rd in rd_map.values():
+        if not isinstance(rd, str):
+            continue
+        rd_s = rd.strip()
+        if not rd_s:
+            has_tba = True
+            continue
+        try:
+            parsed = date.fromisoformat(rd_s)
+        except Exception:
+            continue
+        if parsed > today:
+            return "Upcoming"
+
+    if has_tba:
+        return "TBA"
+
+    # Inactive (use existing comeback detection which respects thresholds)
+    comeback = get_person_comeback_info(credits, followed_role=followed_role)
+    if comeback:
+        return "Inactive"
+
+    return "Idle"
 
 
 def extract_person_credited_roles(credits: dict) -> list[str]:

@@ -112,18 +112,47 @@
 .entity-name {
 	color: #0f172a;
 	font-weight: 600;
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .entity-copy {
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+/* Ensure the name (or name+meta) grows so the status can pin to the right */
+.following-row > .entity-name,
+.following-row > .entity-copy {
+	flex: 1 1 auto;
 	min-width: 0;
 }
 
 .entity-meta {
 	color: #475569;
 	font-size: 13px;
+}
+
+/* Right-aligned single-word status badge for followed people */
+.entity-status {
+	margin-left: auto;
+	color: #334155;
+	font-weight: 600;
+	font-size: 13px;
+	padding-left: 12px;
+	white-space: nowrap;
+	align-self: center;
+}
+
+/* Slight visual mute when .muted is present */
+.entity-status.muted {
+	color: #64748b;
+	font-weight: 600;
 }
 
 @media (max-width: 640px) {
@@ -140,6 +169,23 @@
 	.studio-logo-wrap {
 		width: 64px;
 		flex-basis: 64px;
+	}
+
+	/* Mobile: keep status compact and aligned to right */
+	.entity-status {
+		font-size: 12px;
+		padding-left: 8px;
+		align-self: center;
+		flex: 0 0 auto;
+		max-width: 72px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		text-align: right;
+	}
+
+	.entity-copy {
+		flex: 1 1 auto;
 	}
 }
 

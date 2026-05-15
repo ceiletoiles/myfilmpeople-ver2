@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from catalog.models import CompanyFollow, PersonFollow
+from catalog.services import get_person_status_label
 
 from .forms import SignupForm
 
@@ -64,6 +65,20 @@ def profile(request: HttpRequest) -> HttpResponse:
 	directors = [f for f in person_follows if _role_category(f.role) == "director"]
 	actors = [f for f in person_follows if _role_category(f.role) == "actor"]
 	crew = [f for f in person_follows if _role_category(f.role) == "crew"]
+
+	# Attach a computed status label to each follow for UI display
+	for f in directors + actors + crew:
+		try:
+			f.status = get_person_status_label(f.person, followed_role=f.role)
+		except Exception:
+			f.status = ""
+
+	# Attach a computed status label to each follow for UI display
+	for f in directors + actors + crew:
+		try:
+			f.status = get_person_status_label(f.person, followed_role=f.role)
+		except Exception:
+			f.status = ""
 
 	return render(
 		request,
