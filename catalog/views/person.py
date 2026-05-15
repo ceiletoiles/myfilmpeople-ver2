@@ -12,7 +12,7 @@ from django.utils import timezone
 from django.core.cache import cache
 
 from ..models import PersonFollow
-from ..new_movie_helpers import get_person_comeback_info
+from ..new_movie_helpers import get_person_active_info, get_person_comeback_info
 from ..services import get_or_sync_person
 from ..tmdb import TMDbClient
 from ._shared import (
@@ -96,6 +96,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 
 	credits = person.tmdb_credits_raw or {}
 	comeback_info = None
+	active_info = None
 	if is_followed:
 		role_infos = [
 			get_person_comeback_info(
@@ -108,6 +109,17 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		role_infos = [info for info in role_infos if info is not None]
 		if role_infos:
 			comeback_info = max(role_infos, key=lambda info: int(info.get("gap_days") or 0))
+		else:
+			active_role_infos = [
+				get_person_active_info(
+					credits,
+					followed_role=role,
+				)
+				for role in follow_roles
+			]
+			active_role_infos = [info for info in active_role_infos if info is not None]
+			if active_role_infos:
+				active_info = max(active_role_infos, key=lambda info: int(info.get("active_days") or 0))
 	raw = person.tmdb_raw or {}
 	bd = raw.get("birthday") if isinstance(raw, dict) else None
 	pob = raw.get("place_of_birth") if isinstance(raw, dict) else None
@@ -537,6 +549,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"known_for_items": known_for_items,
 			"filmography_items": filmography_items,
 			"comeback_info": comeback_info,
+			"active_info": active_info,
 			"filmography_filters": filmography_filters,
 			"default_filmography_filter": default_filmography_filter,
 			"hide_self_appearances": hide_self_appearances,

@@ -49,6 +49,13 @@
           </strong>
           <span class="muted">Last release: {{ comeback_info.last_release_date|iso_date_long }}</span>
         </div>
+      {% elif active_info %}
+        <div class="person-comeback-note">
+          <strong>
+            Active {{ active_info.years_active_label }}{% if active_info.followed_role %} as {{ active_info.followed_role }}{% endif %}
+          </strong>
+          <span class="muted">First release: {{ active_info.first_release_date|iso_date_long }}</span>
+        </div>
       {% endif %}
 
       <div class="person-bio" data-bio data-expanded="0">

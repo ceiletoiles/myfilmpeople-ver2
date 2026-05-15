@@ -13,7 +13,9 @@ from .models import Movie, NewMovieArrival, NewsletterIssue, NewsletterItem, New
 from .newsletter import parse_issue, publish_issue, split_newsletter_items, upsert_issue_from_raw_text
 from .new_movie_helpers import (
 	build_person_comeback_event_meta,
+	get_person_active_info,
 	get_person_comeback_info,
+	get_person_first_release_date,
 	get_person_last_release_date,
 	record_new_movie_arrivals,
 )
@@ -33,6 +35,20 @@ class PersonComebackHelperTests(TestCase):
 		}
 
 		self.assertEqual(get_person_last_release_date(credits), date(2018, 5, 1))
+
+	@override_settings(TMDB_PERSON_COMEBACK_GAP_YEARS=3)
+	def test_get_person_first_release_date_ignores_future_titles(self) -> None:
+		credits = {
+			"cast": [
+				{"id": 1, "release_date": "2016-01-01", "media_type": "movie"},
+				{"id": 2, "release_date": "2030-01-01", "media_type": "movie"},
+			],
+			"crew": [
+				{"id": 3, "release_date": "2018-05-01", "media_type": "movie"},
+			],
+		}
+
+		self.assertEqual(get_person_first_release_date(credits), date(2016, 1, 1))
 
 	@override_settings(TMDB_PERSON_COMEBACK_GAP_YEARS=3)
 	def test_get_person_comeback_info_flags_long_gap(self) -> None:
@@ -88,6 +104,27 @@ class PersonComebackHelperTests(TestCase):
 		assert writer_info is not None
 		self.assertEqual(actor_info["last_release_date"], date(2012, 1, 1))
 		self.assertEqual(writer_info["last_release_date"], date(2012, 1, 1))
+
+	@override_settings(TMDB_PERSON_COMEBACK_GAP_YEARS=3)
+	def test_get_person_active_info_is_followed_role_specific(self) -> None:
+		credits = {
+			"cast": [
+				{"id": 1, "release_date": "2010-01-01", "media_type": "movie", "character": "Lead"},
+			],
+			"crew": [
+				{"id": 2, "release_date": "2020-01-01", "media_type": "movie", "job": "Director"},
+			],
+		}
+
+		actor_info = get_person_active_info(credits, followed_role="Actor")
+		director_info = get_person_active_info(credits, followed_role="Director")
+
+		self.assertIsNotNone(actor_info)
+		self.assertIsNotNone(director_info)
+		assert actor_info is not None
+		assert director_info is not None
+		self.assertEqual(actor_info["first_release_date"], date(2010, 1, 1))
+		self.assertEqual(director_info["first_release_date"], date(2020, 1, 1))
 
 	@override_settings(TMDB_PERSON_COMEBACK_GAP_YEARS=3)
 	def test_build_person_comeback_event_meta_returns_meta_for_returning_movie(self) -> None:

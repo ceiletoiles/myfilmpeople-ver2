@@ -89,6 +89,18 @@ def _latest_release_date_from_dates(release_dates: dict[int, str], *, today: dat
 	return latest
 
 
+def _earliest_release_date_from_dates(release_dates: dict[int, str], *, today: date | None = None) -> date | None:
+	today = today or timezone.now().date()
+	earliest: date | None = None
+	for raw_value in release_dates.values():
+		parsed = _parse_iso_date(raw_value)
+		if parsed is None or parsed > today:
+			continue
+		if earliest is None or parsed < earliest:
+			earliest = parsed
+	return earliest
+
+
 def _credit_matches_follow_role(credit: dict, *, followed_role: str) -> bool:
 	if not isinstance(credit, dict):
 		return False
@@ -181,6 +193,36 @@ def get_person_last_release_date(credits: dict, *, followed_role: str | None = N
 	else:
 		release_dates = extract_movie_release_dates_from_credits(credits)
 	return _latest_release_date_from_dates(release_dates, today=today)
+
+
+def get_person_first_release_date(credits: dict, *, followed_role: str | None = None, today: date | None = None) -> date | None:
+	"""Return earliest past movie release date for a specific followed role."""
+	if followed_role:
+		release_dates = extract_movie_release_dates_from_credits_for_role(credits, followed_role)
+	else:
+		release_dates = extract_movie_release_dates_from_credits(credits)
+	return _earliest_release_date_from_dates(release_dates, today=today)
+
+
+def get_person_active_info(
+	credits: dict,
+	*,
+	followed_role: str | None = None,
+) -> dict | None:
+	"""Return active-career metadata for a person if they have at least one past release."""
+	first_release_date = get_person_first_release_date(credits, followed_role=followed_role)
+	if first_release_date is None:
+		return None
+
+	today = timezone.now().date()
+	active_days = (today - first_release_date).days
+	active_years = max(active_days // 365, 0)
+	return {
+		"first_release_date": first_release_date,
+		"active_days": active_days,
+		"years_active_label": f"{active_years} year" if active_years == 1 else f"{active_years} years",
+		"followed_role": (followed_role or "").strip(),
+	}
 
 
 def get_person_comeback_info(
