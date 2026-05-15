@@ -15,12 +15,12 @@
   <div class="person-header">
     {% if person.profile_path %}
       <img
-        class="person-profile"
+        class="person-profile{% if person.tmdb_raw.deathday %} is-deceased{% endif %}"
         src="https://image.tmdb.org/t/p/w342{{ person.profile_path }}"
         alt=""
       />
     {% else %}
-      <img class="person-profile" src="{% static 'img/placeholder-person.svg' %}" alt="" />
+      <img class="person-profile{% if person.tmdb_raw.deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="" />
     {% endif %}
 
     <div class="person-header-body">

@@ -71,9 +71,9 @@
                 <a class="home-person" href="{% url 'person_detail' f.person.tmdb_id %}">
                   <span class="home-person-media">
                     {% if f.person.profile_path %}
-                      <img class="home-person-img" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      <img class="home-person-img{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
                     {% else %}
-                      <img class="home-person-img" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      <img class="home-person-img{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
                     {% endif %}
                     {% if f.comeback_info %}
                       <span class="home-person-badge">Inactive {{ f.comeback_info.gap_label }}</span>
@@ -95,9 +95,9 @@
                 <a class="home-person" href="{% url 'person_detail' f.person.tmdb_id %}">
                   <span class="home-person-media">
                     {% if f.person.profile_path %}
-                      <img class="home-person-img" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      <img class="home-person-img{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
                     {% else %}
-                      <img class="home-person-img" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      <img class="home-person-img{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
                     {% endif %}
                     {% if f.comeback_info %}
                       <span class="home-person-badge">Inactive {{ f.comeback_info.gap_label }}</span>
@@ -119,9 +119,9 @@
                 <a class="home-person" href="{% url 'person_detail' f.person.tmdb_id %}">
                   <span class="home-person-media">
                     {% if f.person.profile_path %}
-                      <img class="home-person-img" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      <img class="home-person-img{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
                     {% else %}
-                      <img class="home-person-img" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      <img class="home-person-img{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
                     {% endif %}
                     {% if f.comeback_info %}
                       <span class="home-person-badge">Inactive {{ f.comeback_info.gap_label }}</span>

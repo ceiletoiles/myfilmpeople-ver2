@@ -525,3 +525,9 @@ nav .brand * {
     font-size: 11px;
     font-weight: 600;
 }
+
+.is-deceased {
+	filter: grayscale(100%) contrast(0.95) brightness(0.98);
+	-webkit-filter: grayscale(100%) contrast(0.95) brightness(0.98);
+}
+}
