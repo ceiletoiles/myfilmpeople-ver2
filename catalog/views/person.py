@@ -109,17 +109,20 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		role_infos = [info for info in role_infos if info is not None]
 		if role_infos:
 			comeback_info = max(role_infos, key=lambda info: int(info.get("gap_days") or 0))
-		else:
-			active_role_infos = [
-				get_person_active_info(
-					credits,
-					followed_role=role,
-				)
-				for role in follow_roles
-			]
-			active_role_infos = [info for info in active_role_infos if info is not None]
-			if active_role_infos:
-				active_info = max(active_role_infos, key=lambda info: int(info.get("active_days") or 0))
+
+		# Also compute active info for the followed roles so we can display
+		# a historical "Was Active ..." line (useful for deceased profiles).
+		active_role_infos = [
+			get_person_active_info(
+				credits,
+				followed_role=role,
+				deathday=(person.tmdb_raw or {}).get("deathday"),
+			)
+			for role in follow_roles
+		]
+		active_role_infos = [info for info in active_role_infos if info is not None]
+		if active_role_infos:
+			active_info = max(active_role_infos, key=lambda info: int(info.get("active_days") or 0))
 	raw = person.tmdb_raw or {}
 	bd = raw.get("birthday") if isinstance(raw, dict) else None
 	pob = raw.get("place_of_birth") if isinstance(raw, dict) else None

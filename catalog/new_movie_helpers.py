@@ -208,14 +208,23 @@ def get_person_active_info(
 	credits: dict,
 	*,
 	followed_role: str | None = None,
+	deathday: str | date | None = None,
 ) -> dict | None:
 	"""Return active-career metadata for a person if they have at least one past release."""
 	first_release_date = get_person_first_release_date(credits, followed_role=followed_role)
 	if first_release_date is None:
 		return None
 
-	today = timezone.now().date()
-	active_days = (today - first_release_date).days
+	# If a deathday is provided, compute active period up to death; otherwise use today.
+	end_date = None
+	if deathday:
+		if isinstance(deathday, date):
+			end_date = deathday
+		else:
+			end_date = _parse_iso_date(deathday)
+	if end_date is None:
+		end_date = timezone.now().date()
+	active_days = (end_date - first_release_date).days
 	active_years = max(active_days // 365, 0)
 	return {
 		"first_release_date": first_release_date,
