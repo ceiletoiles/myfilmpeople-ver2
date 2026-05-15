@@ -7,6 +7,10 @@
   <link rel="stylesheet" href="{% static 'css/pages/profile.css' %}" />
 {% endblock %}
 
+{% block extra_js %}
+  <script src="{% static 'js/pages/profile.js' %}"></script>
+{% endblock %}
+
 {% block page_header %}
   <div class="page-header">
     <button type="button" class="nav-icon-btn" data-menu-toggle aria-controls="site-drawer" aria-expanded="false">
@@ -39,11 +43,33 @@
       <input type="radio" name="following-tab" id="tab-crew" />
       <input type="radio" name="following-tab" id="tab-studio" />
 
-      <div class="tab-list" role="tablist" aria-label="Following tabs">
-        <label for="tab-director" class="tab-label" role="tab">Director</label>
-        <label for="tab-actor" class="tab-label" role="tab">Actor</label>
-        <label for="tab-crew" class="tab-label" role="tab">Crew</label>
-        <label for="tab-studio" class="tab-label" role="tab">Studios</label>
+      <div class="tab-row">
+        <div class="tab-list" role="tablist" aria-label="Following tabs">
+          <label for="tab-director" class="tab-label" role="tab">Director</label>
+          <label for="tab-actor" class="tab-label" role="tab">Actor</label>
+          <label for="tab-crew" class="tab-label" role="tab">Crew</label>
+          <label for="tab-studio" class="tab-label" role="tab">Studios</label>
+        </div>
+
+        <details class="status-filter-menu">
+          <summary class="status-filter-trigger" aria-label="Filter by status">
+            <span class="status-filter-trigger-label">{{ selected_status_label }}</span>
+            <span class="status-filter-caret" aria-hidden="true"></span>
+          </summary>
+
+          <div class="status-filter-options" role="menu" aria-label="Filter by status options">
+            {% for filter in status_filters %}
+              <a
+                class="status-filter-option{% if filter.active %} active{% endif %}"
+                href="{{ filter.url }}"
+                role="menuitem{% if filter.active %}radio{% endif %}"
+                {% if filter.active %}aria-current="page"{% endif %}
+              >
+                <span>{{ filter.label }}</span>
+              </a>
+            {% endfor %}
+          </div>
+        </details>
       </div>
 
       <div class="tab-panels">
@@ -63,7 +89,7 @@
               </a>
             {% endfor %}
           {% else %}
-            <p class="muted">No followed directors yet.</p>
+            <p class="muted">No followed directors{% if selected_status != 'all' %} with {{ selected_status_label|lower }} status{% endif %} yet.</p>
           {% endif %}
         </section>
 
@@ -83,7 +109,7 @@
               </a>
             {% endfor %}
           {% else %}
-            <p class="muted">No followed actors yet.</p>
+            <p class="muted">No followed actors{% if selected_status != 'all' %} with {{ selected_status_label|lower }} status{% endif %} yet.</p>
           {% endif %}
         </section>
 
@@ -106,7 +132,7 @@
               </a>
             {% endfor %}
           {% else %}
-            <p class="muted">No followed crew yet.</p>
+            <p class="muted">No followed crew{% if selected_status != 'all' %} with {{ selected_status_label|lower }} status{% endif %} yet.</p>
           {% endif %}
         </section>
 
@@ -128,7 +154,7 @@
             <p class="muted">No followed studios yet.</p>
           {% endif %}
         </section>
-      </div>
+        </div>
     </div>
   </div>
 {% endblock %}

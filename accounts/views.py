@@ -8,9 +8,10 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
+from urllib.parse import urlencode
 
 from catalog.models import CompanyFollow, PersonFollow
-from catalog.services import get_person_status_label
+from catalog.services import get_person_status_key, get_person_status_label
 
 from .forms import SignupForm
 
@@ -49,8 +50,47 @@ def _role_category(role: str) -> str:
 	return "crew"
 
 
+def _build_status_filters(base_path: str, selected_status: str) -> list[dict[str, object]]:
+	options = [
+		("all", "Status"),
+		("inactive", "Inactive"),
+		("deceased", "Deceased"),
+		("tba", "TBA"),
+		("upcoming", "Upcoming"),
+		("idle", "Idle"),
+	]
+	status_filters: list[dict[str, object]] = []
+	for key, label in options:
+		query = {} if key == "all" else {"status": key}
+		url = base_path if not query else f"{base_path}?{urlencode(query)}"
+		status_filters.append(
+			{
+				"key": key,
+				"label": label,
+				"url": url,
+				"active": key == selected_status,
+			}
+		)
+	return status_filters
+
+
+def _normalize_status_key(value: str | None) -> str:
+	status = (value or "").strip().lower()
+	return status if status in {"inactive", "deceased", "tba", "upcoming", "idle"} else "all"
+
+
+def _annotate_status(follow) -> None:
+	try:
+		follow.status = get_person_status_label(follow.person, followed_role=follow.role)
+		follow.status_key = get_person_status_key(follow.person, followed_role=follow.role)
+	except Exception:
+		follow.status = ""
+		follow.status_key = ""
+
+
 @login_required
 def profile(request: HttpRequest) -> HttpResponse:
+	selected_status = _normalize_status_key(request.GET.get("status"))
 	person_follows = (
 		PersonFollow.objects.select_related("person")
 		.filter(user=request.user)
@@ -66,17 +106,24 @@ def profile(request: HttpRequest) -> HttpResponse:
 	actors = [f for f in person_follows if _role_category(f.role) == "actor"]
 	crew = [f for f in person_follows if _role_category(f.role) == "crew"]
 
-	# Attach a computed status label to each follow for UI display
 	for f in directors + actors + crew:
-		try:
-			f.status = get_person_status_label(f.person, followed_role=f.role)
-		except Exception:
-			f.status = ""
+		_annotate_status(f)
+
+	if selected_status != "all":
+		directors = [f for f in directors if f.status_key == selected_status]
+		actors = [f for f in actors if f.status_key == selected_status]
+		crew = [f for f in crew if f.status_key == selected_status]
+
+	status_filters = _build_status_filters(request.path, selected_status)
+	selected_status_label = next((f["label"] for f in status_filters if f["key"] == selected_status), "Status")
 
 	return render(
 		request,
 		"accounts/profile.html",
 		{
+			"status_filters": status_filters,
+			"selected_status": selected_status,
+			"selected_status_label": selected_status_label,
 			"directors": directors,
 			"actors": actors,
 			"crew": crew,
@@ -90,6 +137,7 @@ def profile(request: HttpRequest) -> HttpResponse:
 def user_following(request: HttpRequest, username: str) -> HttpResponse:
 	User = get_user_model()
 	target_user = get_object_or_404(User, username__iexact=(username or "").strip())
+	selected_status = _normalize_status_key(request.GET.get("status"))
 
 	person_follows = (
 		PersonFollow.objects.select_related("person")
@@ -107,10 +155,15 @@ def user_following(request: HttpRequest, username: str) -> HttpResponse:
 	crew = [f for f in person_follows if _role_category(f.role) == "crew"]
 
 	for f in directors + actors + crew:
-		try:
-			f.status = get_person_status_label(f.person, followed_role=f.role)
-		except Exception:
-			f.status = ""
+		_annotate_status(f)
+
+	if selected_status != "all":
+		directors = [f for f in directors if f.status_key == selected_status]
+		actors = [f for f in actors if f.status_key == selected_status]
+		crew = [f for f in crew if f.status_key == selected_status]
+
+	status_filters = _build_status_filters(request.path, selected_status)
+	selected_status_label = next((f["label"] for f in status_filters if f["key"] == selected_status), "Status")
 
 	return render(
 		request,
@@ -118,6 +171,9 @@ def user_following(request: HttpRequest, username: str) -> HttpResponse:
 		{
 			"target_user": target_user,
 			"is_self": target_user.pk == request.user.pk,
+			"status_filters": status_filters,
+			"selected_status": selected_status,
+			"selected_status_label": selected_status_label,
 			"directors": directors,
 			"actors": actors,
 			"crew": crew,

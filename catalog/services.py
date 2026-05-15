@@ -151,6 +151,10 @@ def get_person_status_label(person: Person, *, followed_role: str | None = None)
     return "Idle"
 
 
+def get_person_status_key(person: Person, *, followed_role: str | None = None) -> str:
+    return get_person_status_label(person, followed_role=followed_role).strip().lower()
+
+
 def extract_person_credited_roles(credits: dict) -> list[str]:
     roles: set[str] = set()
     cast_items = credits.get("cast", []) or []
