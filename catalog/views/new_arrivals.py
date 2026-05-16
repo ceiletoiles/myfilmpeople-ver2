@@ -39,6 +39,19 @@ def _event_note(arrival: NewMovieArrival) -> str:
 				return f"Updated release date: {old_label} -> {pretty}"
 			return f"Updated release date: {old_label} -> {new_label}"
 		return "Updated on TMDb"
+
+	# If TMDb edit timestamp is present, show the edit date (YYYY-MM-DD).
+	if isinstance(meta, dict):
+		ted = meta.get("tmdb_edited_at")
+		if isinstance(ted, str) and ted:
+			try:
+				from datetime import datetime
+				parsed = datetime.fromisoformat(ted)
+				edited_date = parsed.date().isoformat()
+			except Exception:
+				edited_date = ted.split("T", 1)[0] if "T" in ted else ted
+			if edited_date:
+				return f"Edited on {edited_date}"
 	if isinstance(meta, dict) and meta.get("kind") == "comeback":
 		gap_label = meta.get("gap_label")
 		if isinstance(gap_label, str) and gap_label.strip():
@@ -51,15 +64,57 @@ def _movie_entry(arrival: NewMovieArrival) -> dict:
 	movie = arrival.movie
 	# Use seen_at if available, otherwise use created_at for history grouping
 	display_date = arrival.seen_at or arrival.created_at
+	credits = []
+	meta = arrival.event_meta or {}
+	if arrival.source_name:
+		# Prefer the exact credit job from TMDb change metadata when available.
+		role_label = ""
+		if isinstance(meta, dict):
+			r = meta.get("credit_job")
+			if isinstance(r, str) and r.strip():
+				role_label = r.strip()
+		if not role_label:
+			role_label = (arrival.role or "").strip()
+
+		char = ""
+		if isinstance(meta, dict):
+			c = meta.get("character")
+			if isinstance(c, str) and c.strip():
+				char = c.strip()
+
+		if role_label and char:
+			credits = [f"{arrival.source_name} - {role_label} (as {char})"]
+		elif role_label:
+			credits = [f"{arrival.source_name} - {role_label}"]
+		else:
+			credits = [arrival.source_name]
+
+	event_note = _event_note(arrival)
+	# Append TMDb edit date if present in metadata
+	if isinstance(meta, dict):
+		ted = meta.get("tmdb_edited_at")
+		if isinstance(ted, str) and ted:
+			try:
+				from datetime import datetime
+				parsed = datetime.fromisoformat(ted)
+				edited_date = parsed.date().isoformat()
+			except Exception:
+				edited_date = ted.split("T", 1)[0] if "T" in ted else ted
+			if edited_date:
+				if event_note:
+					event_note = f"{event_note} — Edited on {edited_date}"
+				else:
+					event_note = f"Edited on {edited_date}"
+
 	return {
 		"movie_id": movie.tmdb_id,
 		"title": movie.title,
 		"release_date": movie.release_date,
 		"release_dt": movie.release_date,
 		"poster_path": movie.poster_path,
-		"event_note": _event_note(arrival),
+		"event_note": event_note,
 		"seen_at": display_date,
-		"credits": [f"{arrival.source_name} - {arrival.role}"] if arrival.source_name and arrival.role else [arrival.source_name] if arrival.source_name else [],
+		"credits": credits,
 	}
 
 

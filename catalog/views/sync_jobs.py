@@ -148,6 +148,30 @@ def _run_sync_all_followed_job(
 							new_release_dates=new_role_release_dates,
 							new_movie_ids=new_role_movie_ids,
 						)
+						# Augment event meta with character names from the new credits (when available).
+						if isinstance(new_credits, dict):
+							for credit in (new_credits.get("cast") or []):
+								if not isinstance(credit, dict):
+									continue
+								mid = credit.get("id")
+								char = credit.get("character") or ""
+								if isinstance(mid, int) and isinstance(char, str) and char.strip():
+									meta = (new_event_meta_by_movie.setdefault(mid, {}) if isinstance(new_event_meta_by_movie, dict) else {})
+									if isinstance(meta, dict) and "character" not in meta:
+										meta["character"] = char.strip()
+									# For cast entries, set the exact credit job to 'Actor' (preserve case/title).
+									if isinstance(meta, dict) and "credit_job" not in meta:
+										meta["credit_job"] = "Actor"
+
+							for credit in (new_credits.get("crew") or []):
+								if not isinstance(credit, dict):
+									continue
+								mid = credit.get("id")
+								job = credit.get("job") or ""
+								if isinstance(mid, int) and isinstance(job, str) and job.strip():
+									meta = (new_event_meta_by_movie.setdefault(mid, {}) if isinstance(new_event_meta_by_movie, dict) else {})
+									if isinstance(meta, dict) and "credit_job" not in meta:
+										meta["credit_job"] = job.strip()
 						notifications_created += record_new_movie_arrivals(
 							user=user,
 							source_type="person",
@@ -159,6 +183,7 @@ def _run_sync_all_followed_job(
 							old_release_dates=old_role_release_dates,
 							new_release_dates=new_role_release_dates,
 							new_event_meta_by_movie=new_event_meta_by_movie,
+							source_last_sync_at=getattr(person, "tmdb_last_sync_at", None),
 						)
 
 				synced_people += 1

@@ -264,6 +264,18 @@ class TMDbClient:
     def get_movie_similar(self, movie_id: int, *, page: int = 1) -> dict[str, Any]:
         return self._get(f"/movie/{movie_id}/similar", params={"page": page})
 
+    def get_movie_changes(self, movie_id: int, *, start_date: str | None = None, end_date: str | None = None, page: int = 1) -> dict[str, Any]:
+        """Return TMDb change history for a movie (wraps /movie/{movie_id}/changes).
+
+        Optional `start_date`/`end_date` may be provided as YYYY-MM-DD to limit results.
+        """
+        params: dict[str, Any] = {"page": int(page or 1)}
+        if start_date:
+            params["start_date"] = start_date
+        if end_date:
+            params["end_date"] = end_date
+        return self._get(f"/movie/{movie_id}/changes", params=params)
+
     # Discovery
     def discover_movies_by_company(
         self,

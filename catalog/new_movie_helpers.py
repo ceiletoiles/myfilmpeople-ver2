@@ -458,6 +458,7 @@ def record_new_movie_arrivals(
 	old_release_dates: dict[int, str] | None = None,
 	new_release_dates: dict[int, str] | None = None,
 	new_event_meta_by_movie: dict[int, dict] | None = None,
+	source_last_sync_at: "datetime.datetime" | None = None,
 ) -> int:
 	"""
 	Record newly discovered movies.
@@ -491,6 +492,99 @@ def record_new_movie_arrivals(
 	from .models import Movie
 
 	all_target_ids = set(newly_arrived) | set(updated.keys())
+
+	# If a source sync time is provided, consult TMDb movie change history to
+	# ensure the change is recent and actually recorded on TMDb for that movie.
+	# This helps avoid surfacing old metadata differences that didn't originate
+	# from a fresh edit on TMDb at sync time.
+	if source_last_sync_at is not None and all_target_ids:
+		from datetime import timedelta
+		from .tmdb import TMDbClient
+		client = TMDbClient.from_settings()
+		allow_after = source_last_sync_at - timedelta(minutes=10)
+		allowed_ids: set[int] = set()
+		# Map of tmdb movie id -> latest relevant change datetime (aware or naive)
+		recent_change_time_by_mid: dict[int, "datetime.datetime"] = {}
+		for mid in list(all_target_ids):
+			try:
+				payload = client.get_movie_changes(mid)
+			except Exception:
+				# If TMDb fails, fall back to allowing the id so we don't drop
+				# legitimate notifications due to transient network issues.
+				allowed_ids.add(mid)
+				continue
+			# TMDb returns change groups in 'changes' or 'results'. Be flexible.
+			groups = payload.get("changes") or payload.get("results") or []
+			latest_time = None
+			for g in groups:
+				if not isinstance(g, dict):
+					continue
+				key = (g.get("key") or "")
+				items = g.get("items") or g.get("changes") or []
+				for it in items:
+					if not isinstance(it, dict):
+						continue
+					# item time may be ISO-like or space-separated. Try parsing.
+					time_str = it.get("time") or it.get("value") or ""
+					if not isinstance(time_str, str) or not time_str:
+						continue
+					# Try common time parse formats.
+					from datetime import datetime
+					parsed = None
+					try:
+						parsed = datetime.fromisoformat(time_str)
+					except Exception:
+						try:
+							parsed = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
+						except Exception:
+							parsed = None
+					if parsed is None:
+						continue
+					# Record latest time for relevant change keys
+					k = key.lower()
+					if any(substr in k for substr in ("credit", "cast", "crew", "production", "release", "title", "credits")):
+						if latest_time is None or parsed > latest_time:
+							latest_time = parsed
+			# If we found a recent relevant change, allow this movie id.
+			if latest_time is None:
+				# No relevant change info found — allow to avoid false negatives.
+				allowed_ids.add(mid)
+			else:
+				from django.utils import timezone as _tz
+				# Ensure naive/aware datetimes are comparable.
+				if latest_time.tzinfo is None:
+					try:
+						latest_time = _tz.make_aware(latest_time)
+					except Exception:
+						pass
+				if latest_time >= allow_after:
+					allowed_ids.add(mid)
+					# Record the latest change time for this movie id so we can attach
+					# it to the NewMovieArrival.event_meta when creating notifications.
+					recent_change_time_by_mid[mid] = latest_time
+		# Limit targets to those allowed by TMDb change history.
+		all_target_ids &= allowed_ids
+		newly_arrived &= allowed_ids
+		updated = {m: meta for m, meta in updated.items() if m in allowed_ids}
+
+		# Attach TMDb change time into event_meta for allowed targets where available.
+		if recent_change_time_by_mid:
+			for mid, dt in list(recent_change_time_by_mid.items()):
+				iso = None
+				try:
+					iso = dt.isoformat()
+				except Exception:
+					iso = None
+				if iso is None:
+					continue
+				# Attach to new_event_meta_by_movie when present
+				if isinstance(new_event_meta_by_movie, dict):
+					meta = new_event_meta_by_movie.setdefault(mid, {})
+					if isinstance(meta, dict) and "tmdb_edited_at" not in meta:
+						meta["tmdb_edited_at"] = iso
+				# Also attach to updated metadata entries
+				if mid in updated and isinstance(updated.get(mid), dict) and "tmdb_edited_at" not in updated[mid]:
+					updated[mid]["tmdb_edited_at"] = iso
 
 	# For "new" events: seen = done across all sources.
 	seen_new_tmdb_ids: set[int] = set()

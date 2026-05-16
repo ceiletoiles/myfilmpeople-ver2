@@ -312,6 +312,29 @@ def person_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				new_release_dates=new_role_release_dates,
 				new_movie_ids=new_role_movie_ids,
 			)
+			# Augment event meta with characters from the new credits (when available).
+			if isinstance(new_credits, dict):
+				for credit in (new_credits.get("cast") or []):
+					if not isinstance(credit, dict):
+						continue
+					mid = credit.get("id")
+					char = credit.get("character") or ""
+					if isinstance(mid, int) and isinstance(char, str) and char.strip():
+						meta = (new_event_meta_by_movie.setdefault(mid, {}) if isinstance(new_event_meta_by_movie, dict) else {})
+						if isinstance(meta, dict) and "character" not in meta:
+							meta["character"] = char.strip()
+						# Also set credit_job for cast as 'Actor' when not already present.
+						if isinstance(meta, dict) and "credit_job" not in meta:
+							meta["credit_job"] = "Actor"
+				for credit in (new_credits.get("crew") or []):
+					if not isinstance(credit, dict):
+						continue
+					mid = credit.get("id")
+					job = credit.get("job") or ""
+					if isinstance(mid, int) and isinstance(job, str) and job.strip():
+						meta = (new_event_meta_by_movie.setdefault(mid, {}) if isinstance(new_event_meta_by_movie, dict) else {})
+						if isinstance(meta, dict) and "credit_job" not in meta:
+							meta["credit_job"] = job.strip()
 			notifications_created += record_new_movie_arrivals(
 				user=request.user,
 				source_type="person",
@@ -323,6 +346,7 @@ def person_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				old_release_dates=old_role_release_dates,
 				new_release_dates=new_role_release_dates,
 				new_event_meta_by_movie=new_event_meta_by_movie,
+				source_last_sync_at=getattr(person, "tmdb_last_sync_at", None),
 			)
 
 	messages.success(
@@ -400,6 +424,24 @@ def company_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	# Record new arrivals (only if a baseline existed pre-sync).
 	# This avoids treating the first successful filmography prefetch as "new".
 	if old_baseline_present:
+		# For companies, attempt to mark the credit job as 'Production Company' when possible
+		# so the UI shows the specific company role instead of a placeholder.
+		company_event_meta: dict[int, dict] = {}
+		if isinstance(new_tmdb_raw, dict):
+			pages = new_tmdb_raw.get("discover_movies_pages") or {}
+			for payload in pages.values():
+				if not isinstance(payload, dict):
+					continue
+				for movie in payload.get("results", []) or []:
+					if not isinstance(movie, dict):
+						continue
+					mid = movie.get("id")
+					if not isinstance(mid, int):
+						continue
+					# Discover payload doesn't include explicit company role; use a sensible
+					# default label that matches TMDb movie page context.
+					company_event_meta.setdefault(mid, {})["credit_job"] = "Production Company"
+
 		notifications_created = record_new_movie_arrivals(
 			user=request.user,
 			source_type="company",
@@ -410,6 +452,8 @@ def company_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			role="studio",
 			old_release_dates=old_release_dates,
 			new_release_dates=new_release_dates,
+			new_event_meta_by_movie=company_event_meta,
+			source_last_sync_at=getattr(company, "tmdb_last_sync_at", None),
 		)
 
 	CompanyFollow.objects.filter(user=request.user, company__tmdb_id=tmdb_id).update(name=company.name)
@@ -504,6 +548,29 @@ def sync_all_followed(request: HttpRequest) -> HttpResponse:
 						new_release_dates=new_role_release_dates,
 						new_movie_ids=new_role_movie_ids,
 					)
+					# Add character names and credit jobs from new_credits where present.
+					if isinstance(new_credits, dict):
+						for credit in (new_credits.get("cast") or []):
+							if not isinstance(credit, dict):
+								continue
+							mid = credit.get("id")
+							char = credit.get("character") or ""
+							if isinstance(mid, int) and isinstance(char, str) and char.strip():
+								meta = (new_event_meta_by_movie.setdefault(mid, {}) if isinstance(new_event_meta_by_movie, dict) else {})
+								if isinstance(meta, dict) and "character" not in meta:
+									meta["character"] = char.strip()
+								if isinstance(meta, dict) and "credit_job" not in meta:
+									meta["credit_job"] = "Actor"
+						for credit in (new_credits.get("crew") or []):
+							if not isinstance(credit, dict):
+								continue
+							mid = credit.get("id")
+							job = credit.get("job") or ""
+							if isinstance(mid, int) and isinstance(job, str) and job.strip():
+								meta = (new_event_meta_by_movie.setdefault(mid, {}) if isinstance(new_event_meta_by_movie, dict) else {})
+								if isinstance(meta, dict) and "credit_job" not in meta:
+									meta["credit_job"] = job.strip()
+
 					notifications_created += record_new_movie_arrivals(
 						user=request.user,
 						source_type="person",
@@ -515,6 +582,7 @@ def sync_all_followed(request: HttpRequest) -> HttpResponse:
 						old_release_dates=old_role_release_dates,
 						new_release_dates=new_role_release_dates,
 						new_event_meta_by_movie=new_event_meta_by_movie,
+						source_last_sync_at=getattr(person, "tmdb_last_sync_at", None),
 					)
 
 			synced_people += 1
