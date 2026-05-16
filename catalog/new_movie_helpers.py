@@ -1,6 +1,7 @@
 """Helpers for tracking new movie arrivals."""
 from __future__ import annotations
 
+import datetime
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -68,7 +69,7 @@ def _value_matches_source(value: object, *, source_type: str, source_id: int, so
 	dicts/lists looking for an exact match on id/name and, for people, the role/job.
 	"""
 	role_n = _norm_role(role)
-	name_n = source_name.strip().casefold()
+	source_name.strip().casefold()
 
 	if isinstance(value, dict):
 		for key in ("id", "person_id", "company_id"):
@@ -592,13 +593,13 @@ def record_new_movie_arrivals(
 					if not isinstance(time_str, str) or not time_str:
 						continue
 					# Try common time parse formats.
-					from datetime import datetime
+					from datetime import datetime as _dt
 					parsed = None
 					try:
-						parsed = datetime.fromisoformat(time_str)
+						parsed = _dt.fromisoformat(time_str)
 					except Exception:
 						try:
-							parsed = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
+							parsed = _dt.strptime(time_str, "%Y-%m-%d %H:%M:%S")
 						except Exception:
 							parsed = None
 					if parsed is None:
