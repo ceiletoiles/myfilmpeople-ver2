@@ -4,11 +4,11 @@
 {% block title %}Following - {{ target_user.username }}{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'css/pages/profile.css' %}" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/profile.css" />
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{% static 'js/pages/profile.js' %}"></script>
+  <script src="{{ STATIC_PREFIX }}js/pages/profile.js"></script>
 {% endblock %}
 
 {% block page_header %}

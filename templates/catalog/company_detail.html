@@ -4,11 +4,11 @@
 {% block title %}{{ company.name }}{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'css/pages/company_detail.css' %}?v=20260510c" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/company_detail.css?v=20260510c" />
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{% static 'js/pages/company_detail.js' %}"></script>
+  <script src="{{ STATIC_PREFIX }}js/pages/company_detail.js"></script>
 {% endblock %}
 
 {% block content %}

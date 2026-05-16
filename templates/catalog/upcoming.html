@@ -4,7 +4,7 @@
 {% block title %}Upcoming Films{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'css/pages/upcoming.css' %}?v=20260509a" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/upcoming.css?v=20260509a" />
 {% endblock %}
 
 {% block page_header %}
@@ -247,5 +247,5 @@
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{% static 'js/pages/upcoming.js' %}"></script>
+  <script src="{{ STATIC_PREFIX }}js/pages/upcoming.js"></script>
 {% endblock %}

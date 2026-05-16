@@ -4,7 +4,7 @@
 {% block title %}Collaboration Finder{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'css/pages/collaboration.css' %}" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/collaboration.css" />
 {% endblock %}
 
 {% block page_header %}
@@ -164,5 +164,5 @@
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{% static 'js/pages/collaboration.js' %}"></script>
+  <script src="{{ STATIC_PREFIX }}js/pages/collaboration.js"></script>
 {% endblock %}

@@ -4,7 +4,7 @@
 {% block title %}New Arrivals{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'css/pages/new_arrivals.css' %}?v=20260509a" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/new_arrivals.css?v=20260509a" />
 {% endblock %}
 
 {% block page_header %}
@@ -466,5 +466,5 @@
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{% static 'js/pages/new_arrivals.js' %}"></script>
+  <script src="{{ STATIC_PREFIX }}js/pages/new_arrivals.js"></script>
 {% endblock %}

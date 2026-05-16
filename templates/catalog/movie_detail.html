@@ -4,7 +4,7 @@
 {% block title %}{{ movie.title }}{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'css/pages/movie_detail.css' %}" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/movie_detail.css" />
   {% if movie.tmdb_raw.backdrop_path %}
     <style>
       .movie-backdrop.has-image {
@@ -265,5 +265,5 @@
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{% static 'js/pages/movie_detail.js' %}"></script>
+  <script src="{{ STATIC_PREFIX }}js/pages/movie_detail.js"></script>
 {% endblock %}

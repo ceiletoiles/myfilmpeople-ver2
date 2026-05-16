@@ -4,7 +4,7 @@
 {% block title %}Search{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'css/pages/search.css' %}?v=20260509b" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/search.css?v=20260509b" />
 {% endblock %}
 
 {% block page_header %}
@@ -258,5 +258,5 @@
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{% static 'js/pages/search.js' %}"></script>
+  <script src="{{ STATIC_PREFIX }}js/pages/search.js"></script>
 {% endblock %}

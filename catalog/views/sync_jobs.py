@@ -251,6 +251,9 @@ def _run_sync_all_followed_job(
 						role="studio",
 						old_release_dates=old_release_dates,
 						new_release_dates=new_release_dates,
+						# Use the current company sync timestamp so older TMDb edits
+						# do not surface as fresh arrivals.
+						source_last_sync_at=getattr(company, "tmdb_last_sync_at", None),
 					)
 
 				CompanyFollow.objects.filter(user=user, company__tmdb_id=cid).update(name=company.name)

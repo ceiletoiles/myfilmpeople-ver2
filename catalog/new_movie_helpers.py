@@ -55,6 +55,70 @@ def _is_passive_crew_job(value: object) -> bool:
 	return any(marker in job for marker in passive_markers)
 
 
+def _string_eq(left: object, right: str) -> bool:
+	if not isinstance(left, str):
+		return False
+	return left.strip().casefold() == right.strip().casefold()
+
+
+def _value_matches_source(value: object, *, source_type: str, source_id: int, source_name: str, role: str) -> bool:
+	"""Best-effort exact match against a TMDb change item value.
+
+	TMDb change payloads nest identifiers in `value` objects. We recurse through
+	dicts/lists looking for an exact match on id/name and, for people, the role/job.
+	"""
+	role_n = _norm_role(role)
+	name_n = source_name.strip().casefold()
+
+	if isinstance(value, dict):
+		for key in ("id", "person_id", "company_id"):
+			item_id = value.get(key)
+			if isinstance(item_id, int) and item_id == source_id:
+				return True
+
+		for key in ("name", "original_name", "title"):
+			item_name = value.get(key)
+			if _string_eq(item_name, source_name):
+				return True
+
+		if source_type == "person":
+			# Actor and crew credit changes typically expose a `job` or `character`.
+			item_job = value.get("job")
+			if role_n and isinstance(item_job, str) and item_job.strip():
+				if role_n == "actor" and _string_eq(item_job, "actor"):
+					return True
+				if role_n != "actor" and _string_eq(item_job, role):
+					return True
+
+			item_character = value.get("character")
+			if role_n == "actor" and isinstance(item_character, str) and item_character.strip():
+				# Character alone is not enough; continue recursion so we still need the
+				# person id/name match somewhere in the payload.
+				pass
+
+		for nested in value.values():
+			if _value_matches_source(nested, source_type=source_type, source_id=source_id, source_name=source_name, role=role):
+				return True
+		return False
+
+	if isinstance(value, list):
+		return any(
+			_value_matches_source(item, source_type=source_type, source_id=source_id, source_name=source_name, role=role)
+			for item in value
+		)
+
+	return False
+
+
+def _change_key_matches_source(group_key: str, *, source_type: str) -> bool:
+	key_n = _norm_role(group_key)
+	if not key_n:
+		return False
+	if source_type == "company":
+		return any(token in key_n for token in ("production", "company", "companies"))
+	return any(token in key_n for token in ("cast", "crew", "credits", "credit"))
+
+
 def _parse_iso_date(value: object) -> date | None:
 	if not isinstance(value, str):
 		return None
@@ -509,9 +573,6 @@ def record_new_movie_arrivals(
 			try:
 				payload = client.get_movie_changes(mid)
 			except Exception:
-				# If TMDb fails, fall back to allowing the id so we don't drop
-				# legitimate notifications due to transient network issues.
-				allowed_ids.add(mid)
 				continue
 			# TMDb returns change groups in 'changes' or 'results'. Be flexible.
 			groups = payload.get("changes") or payload.get("results") or []
@@ -520,6 +581,8 @@ def record_new_movie_arrivals(
 				if not isinstance(g, dict):
 					continue
 				key = (g.get("key") or "")
+				if not _change_key_matches_source(key, source_type=source_type):
+					continue
 				items = g.get("items") or g.get("changes") or []
 				for it in items:
 					if not isinstance(it, dict):
@@ -540,16 +603,12 @@ def record_new_movie_arrivals(
 							parsed = None
 					if parsed is None:
 						continue
-					# Record latest time for relevant change keys
-					k = key.lower()
-					if any(substr in k for substr in ("credit", "cast", "crew", "production", "release", "title", "credits")):
-						if latest_time is None or parsed > latest_time:
-							latest_time = parsed
+					if not _value_matches_source(it.get("value"), source_type=source_type, source_id=source_id, source_name=source_name, role=role):
+						continue
+					if latest_time is None or parsed > latest_time:
+						latest_time = parsed
 			# If we found a recent relevant change, allow this movie id.
-			if latest_time is None:
-				# No relevant change info found — allow to avoid false negatives.
-				allowed_ids.add(mid)
-			else:
+			if latest_time is not None:
 				from django.utils import timezone as _tz
 				# Ensure naive/aware datetimes are comparable.
 				if latest_time.tzinfo is None:
@@ -562,6 +621,8 @@ def record_new_movie_arrivals(
 					# Record the latest change time for this movie id so we can attach
 					# it to the NewMovieArrival.event_meta when creating notifications.
 					recent_change_time_by_mid[mid] = latest_time
+			# If no recent relevant TMDb edit is visible, do not promote the row.
+			# This keeps both people and companies strict about not surfacing old data.
 		# Limit targets to those allowed by TMDb change history.
 		all_target_ids &= allowed_ids
 		newly_arrived &= allowed_ids
