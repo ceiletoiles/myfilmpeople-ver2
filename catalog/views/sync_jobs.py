@@ -31,6 +31,11 @@ from ..services import (
 
 SYNC_JOB_TTL_SECONDS = 60 * 60
 
+SYNC_SCOPE_ALL = "all"
+SYNC_SCOPE_PEOPLE = "people"
+SYNC_SCOPE_STUDIOS = "studios"
+SYNC_SCOPE_VALUES = {SYNC_SCOPE_ALL, SYNC_SCOPE_PEOPLE, SYNC_SCOPE_STUDIOS}
+
 
 def _sync_job_key(job_id: UUID) -> str:
 	return f"syncjob:v1:{str(job_id)}"
@@ -63,6 +68,52 @@ def _sync_job_patch(job_id: UUID, **updates) -> dict | None:
 	return data
 
 
+
+def _sync_job_cancel_url(job_id: UUID) -> str:
+	return reverse("sync_job_cancel", kwargs={"job_id": str(job_id)})
+
+
+def _sync_job_is_cancel_requested(job_id: UUID) -> bool:
+	data = _sync_job_get(job_id)
+	return bool(data and data.get("cancel_requested"))
+
+
+def _sync_job_request_cancel(job_id: UUID) -> dict | None:
+	return _sync_job_patch(
+		job_id,
+		status="cancel_requested",
+		cancel_requested=True,
+		current_label="Cancel requested…",
+	)
+
+
+def _sync_job_mark_canceled(job_id: UUID) -> dict | None:
+	data = _sync_job_get(job_id) or {}
+	return _sync_job_patch(
+		job_id,
+		status="canceled",
+		finished_at=timezone.now().isoformat(),
+		cancel_requested=True,
+		current_label="Canceled",
+		current_sub_done=int(data.get("current_sub_done") or 0),
+		current_sub_total=int(data.get("current_sub_total") or 0),
+	)
+
+
+def _sync_job_abort_if_cancel_requested(job_id: UUID) -> bool:
+	if not _sync_job_is_cancel_requested(job_id):
+		return False
+	_sync_job_mark_canceled(job_id)
+	return True
+
+
+def _sync_scope_title(sync_scope: str) -> str:
+	return {
+		SYNC_SCOPE_PEOPLE: "people",
+		SYNC_SCOPE_STUDIOS: "studios",
+	}.get(sync_scope, "all data")
+
+
 def _run_sync_all_followed_job(
 	*,
 	job_id: UUID,
@@ -70,6 +121,7 @@ def _run_sync_all_followed_job(
 	person_ids: list[int],
 	company_ids: list[int],
 	max_company_pages: int | None,
+	sync_scope: str,
 ) -> None:
 	"""Background thread job that syncs all followed people/companies and updates cache progress."""
 	close_old_connections()
@@ -88,6 +140,7 @@ def _run_sync_all_followed_job(
 		fail_people = 0
 		fail_companies = 0
 		notifications_created = 0
+		scope_title = _sync_scope_title(sync_scope)
 
 		# Reset current sub-progress
 		_sync_job_patch(
@@ -102,20 +155,24 @@ def _run_sync_all_followed_job(
 			fail_people=0,
 			fail_companies=0,
 			notifications_created=0,
-			current_label="Starting…",
+			current_label=f"Starting {scope_title} sync…",
 			current_sub_done=0,
 			current_sub_total=0,
 		)
 
 		for i, pid in enumerate(person_ids, start=1):
+			if _sync_job_abort_if_cancel_requested(job_id):
+				return
 			_sync_job_patch(
 				job_id,
-				current_label=f"People {i}/{total_people}",
+				current_label=f"Loading person {i}/{total_people}…",
 				current_sub_done=0,
 				current_sub_total=0,
 			)
 			try:
 				person = get_or_sync_person(pid, force=False)
+				if _sync_job_abort_if_cancel_requested(job_id):
+					return
 				try:
 					person.refresh_from_db(fields=["tmdb_credits_raw", "tmdb_last_sync_at"])
 				except Exception:
@@ -128,6 +185,10 @@ def _run_sync_all_followed_job(
 				)
 
 				person = get_or_sync_person(pid, force=True)
+				person_label = person.name or f"Person {pid}"
+				_sync_job_patch(job_id, current_label=f"Syncing person {person_label}…")
+				if _sync_job_abort_if_cancel_requested(job_id):
+					return
 				PersonFollow.objects.filter(user=user, person__tmdb_id=pid).update(name=person.name)
 
 				new_credits = person.tmdb_credits_raw or {}
@@ -176,7 +237,7 @@ def _run_sync_all_followed_job(
 							user=user,
 							source_type="person",
 							source_id=pid,
-							source_name=person.name,
+							source_name=person_label,
 							old_movie_ids=old_role_movie_ids,
 							new_movie_ids=new_role_movie_ids,
 							role=follow.role or "",
@@ -187,6 +248,8 @@ def _run_sync_all_followed_job(
 						)
 
 				synced_people += 1
+				if _sync_job_abort_if_cancel_requested(job_id):
+					return
 			except Exception:
 				fail_people += 1
 			finally:
@@ -198,14 +261,18 @@ def _run_sync_all_followed_job(
 				)
 
 		for i, cid in enumerate(company_ids, start=1):
+			if _sync_job_abort_if_cancel_requested(job_id):
+				return
 			_sync_job_patch(
 				job_id,
-				current_label=f"Companies {i}/{total_companies}",
+				current_label=f"Loading studio {i}/{total_companies}…",
 				current_sub_done=0,
 				current_sub_total=0,
 			)
 			try:
 				company = get_or_sync_company(cid, force=False)
+				if _sync_job_abort_if_cancel_requested(job_id):
+					return
 				try:
 					company.refresh_from_db(fields=["tmdb_raw", "tmdb_last_sync_at"])
 				except Exception:
@@ -217,11 +284,17 @@ def _run_sync_all_followed_job(
 				old_release_dates = extract_movie_release_dates_from_filmography(old_tmdb_raw)
 
 				company = get_or_sync_company(cid, force=True)
+				company_label = company.name or f"Studio {cid}"
+				_sync_job_patch(job_id, current_label=f"Syncing studio {company_label}…")
+				if _sync_job_abort_if_cancel_requested(job_id):
+					return
 
 				def _on_pages_progress(done: int, total: int) -> None:
+					if _sync_job_is_cancel_requested(job_id):
+						return
 					_sync_job_patch(
 						job_id,
-						current_label=f"{company.name or 'Company'}: pages {done}/{total}",
+						current_label=f"{company_label}: pages {done}/{total}",
 						current_sub_done=int(done or 0),
 						current_sub_total=int(total or 0),
 					)
@@ -232,9 +305,13 @@ def _run_sync_all_followed_job(
 						force=True,
 						max_pages=max_company_pages,
 						progress_cb=_on_pages_progress,
+						should_stop_cb=lambda: _sync_job_is_cancel_requested(job_id),
 					)
 				except Exception:
 					pass
+
+				if _sync_job_abort_if_cancel_requested(job_id):
+					return
 
 				new_tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
 				new_movie_ids = extract_movie_ids_from_filmography(new_tmdb_raw)
@@ -245,7 +322,7 @@ def _run_sync_all_followed_job(
 						user=user,
 						source_type="company",
 						source_id=cid,
-						source_name=company.name,
+						source_name=company_label,
 						old_movie_ids=old_movie_ids,
 						new_movie_ids=new_movie_ids,
 						role="studio",
@@ -258,6 +335,8 @@ def _run_sync_all_followed_job(
 
 				CompanyFollow.objects.filter(user=user, company__tmdb_id=cid).update(name=company.name)
 				synced_companies += 1
+				if _sync_job_abort_if_cancel_requested(job_id):
+					return
 			except Exception:
 				fail_companies += 1
 			finally:
@@ -307,10 +386,13 @@ def _run_person_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int) -> None:
 			fail_people=0,
 			fail_companies=0,
 			notifications_created=0,
-			current_label="Person sync…",
+			current_label="Starting person sync…",
 			current_sub_done=5,
 			current_sub_total=100,
 		)
+
+		if _sync_job_abort_if_cancel_requested(job_id):
+			return
 
 		if not PersonFollow.objects.filter(user=user, person__tmdb_id=tmdb_id).exists():
 			_sync_job_patch(
@@ -324,6 +406,8 @@ def _run_person_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int) -> None:
 			return
 
 		person = get_or_sync_person(tmdb_id, force=False)
+		if _sync_job_abort_if_cancel_requested(job_id):
+			return
 		try:
 			person.refresh_from_db(fields=["tmdb_credits_raw", "tmdb_last_sync_at"])
 		except Exception:
@@ -331,8 +415,13 @@ def _run_person_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int) -> None:
 		old_credits = person.tmdb_credits_raw or {}
 		old_baseline_present = isinstance(old_credits.get("cast"), list) or isinstance(old_credits.get("crew"), list)
 
-		_sync_job_patch(job_id, current_label=f"Syncing {person.name or 'person'}…", current_sub_done=35)
+		person_label = person.name or f"Person {tmdb_id}"
+		_sync_job_patch(job_id, current_label=f"Syncing person {person_label}…", current_sub_done=35)
+		if _sync_job_abort_if_cancel_requested(job_id):
+			return
 		person = get_or_sync_person(tmdb_id, force=True)
+		if _sync_job_abort_if_cancel_requested(job_id):
+			return
 		PersonFollow.objects.filter(user=user, person__tmdb_id=tmdb_id).update(name=person.name)
 		new_credits = person.tmdb_credits_raw or {}
 
@@ -356,7 +445,7 @@ def _run_person_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int) -> None:
 					user=user,
 					source_type="person",
 					source_id=tmdb_id,
-					source_name=person.name,
+					source_name=person_label,
 					old_movie_ids=old_role_movie_ids,
 					new_movie_ids=new_role_movie_ids,
 					role=follow.role or "",
@@ -364,6 +453,9 @@ def _run_person_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int) -> None:
 					new_release_dates=new_role_release_dates,
 					new_event_meta_by_movie=new_event_meta_by_movie,
 				)
+
+		if _sync_job_abort_if_cancel_requested(job_id):
+			return
 
 		_sync_job_patch(
 			job_id,
@@ -375,6 +467,8 @@ def _run_person_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int) -> None:
 			current_sub_done=100,
 		)
 	except Exception:
+		if _sync_job_abort_if_cancel_requested(job_id):
+			return
 		_sync_job_patch(
 			job_id,
 			status="done_with_errors",
@@ -411,10 +505,13 @@ def _run_company_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int, max_compa
 			fail_people=0,
 			fail_companies=0,
 			notifications_created=0,
-			current_label="Company sync…",
+			current_label="Starting studio sync…",
 			current_sub_done=0,
 			current_sub_total=0,
 		)
+
+		if _sync_job_abort_if_cancel_requested(job_id):
+			return
 
 		if not CompanyFollow.objects.filter(user=user, company__tmdb_id=tmdb_id).exists():
 			_sync_job_patch(
@@ -427,6 +524,8 @@ def _run_company_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int, max_compa
 			return
 
 		company = get_or_sync_company(tmdb_id, force=False)
+		if _sync_job_abort_if_cancel_requested(job_id):
+			return
 		try:
 			company.refresh_from_db(fields=["tmdb_raw", "tmdb_last_sync_at"])
 		except Exception:
@@ -438,11 +537,17 @@ def _run_company_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int, max_compa
 		old_release_dates = extract_movie_release_dates_from_filmography(old_tmdb_raw)
 
 		company = get_or_sync_company(tmdb_id, force=True)
+		if _sync_job_abort_if_cancel_requested(job_id):
+			return
+		company_label = company.name or f"Studio {tmdb_id}"
+		_sync_job_patch(job_id, current_label=f"Syncing studio {company_label}…")
 
 		def _on_pages_progress(done: int, total: int) -> None:
+			if _sync_job_is_cancel_requested(job_id):
+				return
 			_sync_job_patch(
 				job_id,
-				current_label=f"{company.name or 'Company'}: pages {done}/{total}",
+				current_label=f"{company_label}: pages {done}/{total}",
 				current_sub_done=int(done or 0),
 				current_sub_total=int(total or 0),
 			)
@@ -453,9 +558,13 @@ def _run_company_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int, max_compa
 				force=True,
 				max_pages=max_company_pages,
 				progress_cb=_on_pages_progress,
+				should_stop_cb=lambda: _sync_job_is_cancel_requested(job_id),
 			)
 		except Exception:
 			pass
+
+		if _sync_job_abort_if_cancel_requested(job_id):
+			return
 
 		new_tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
 		new_movie_ids = extract_movie_ids_from_filmography(new_tmdb_raw)
@@ -467,7 +576,7 @@ def _run_company_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int, max_compa
 				user=user,
 				source_type="company",
 				source_id=tmdb_id,
-				source_name=company.name,
+				source_name=company_label,
 				old_movie_ids=old_movie_ids,
 				new_movie_ids=new_movie_ids,
 				role="studio",
@@ -476,6 +585,8 @@ def _run_company_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int, max_compa
 			)
 
 		CompanyFollow.objects.filter(user=user, company__tmdb_id=tmdb_id).update(name=company.name)
+		if _sync_job_abort_if_cancel_requested(job_id):
+			return
 		_sync_job_patch(
 			job_id,
 			status="done",
@@ -494,6 +605,8 @@ def _run_company_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int, max_compa
 			fail_companies=1,
 			current_label="Failed",
 		)
+		if _sync_job_abort_if_cancel_requested(job_id):
+			return
 	finally:
 		try:
 			cache.delete(_sync_job_active_key_scoped(user_id, f"company:{int(tmdb_id)}"))
@@ -522,6 +635,7 @@ def person_sync_start(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 					"status": "running",
 					"job_id": str(active_uuid),
 					"progress_url": reverse("person_sync_progress", kwargs={"job_id": str(active_uuid)}),
+					"cancel_url": _sync_job_cancel_url(active_uuid),
 				}
 			)
 
@@ -546,6 +660,7 @@ def person_sync_start(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"current_label": "Queued…",
 			"current_sub_done": 0,
 			"current_sub_total": 100,
+			"cancel_url": _sync_job_cancel_url(job_id),
 		},
 	)
 
@@ -562,6 +677,7 @@ def person_sync_start(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"status": "running",
 			"job_id": str(job_id),
 			"progress_url": reverse("person_sync_progress", kwargs={"job_id": str(job_id)}),
+			"cancel_url": _sync_job_cancel_url(job_id),
 		}
 	)
 
@@ -586,6 +702,7 @@ def company_sync_start(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 					"status": "running",
 					"job_id": str(active_uuid),
 					"progress_url": reverse("company_sync_progress", kwargs={"job_id": str(active_uuid)}),
+					"cancel_url": _sync_job_cancel_url(active_uuid),
 				}
 			)
 
@@ -610,6 +727,7 @@ def company_sync_start(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"current_label": "Queued…",
 			"current_sub_done": 0,
 			"current_sub_total": 0,
+			"cancel_url": _sync_job_cancel_url(job_id),
 		},
 	)
 
@@ -638,6 +756,7 @@ def company_sync_start(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"status": "running",
 			"job_id": str(job_id),
 			"progress_url": reverse("company_sync_progress", kwargs={"job_id": str(job_id)}),
+			"cancel_url": _sync_job_cancel_url(job_id),
 		}
 	)
 
@@ -676,29 +795,45 @@ def sync_all_followed_start(request: HttpRequest) -> HttpResponse:
 	if request.method != "POST":
 		return JsonResponse({"ok": False, "error": "POST required."}, status=405)
 
+	sync_scope = (request.POST.get("sync_scope") or SYNC_SCOPE_ALL).strip().lower()
+	if sync_scope not in SYNC_SCOPE_VALUES:
+		sync_scope = SYNC_SCOPE_ALL
+
 	next_url = (request.POST.get("next") or "").strip()
 	if not next_url:
 		next_url = (request.META.get("HTTP_REFERER") or "").strip()
 	if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
 		next_url = ""
 
-	person_ids = list(
-		PersonFollow.objects.filter(user=request.user)
-		.values_list("person__tmdb_id", flat=True)
-		.distinct()
-	)
-	company_ids = list(
-		CompanyFollow.objects.filter(user=request.user)
-		.values_list("company__tmdb_id", flat=True)
-		.distinct()
-	)
+	person_ids: list[int] = []
+	company_ids: list[int] = []
+	if sync_scope in {SYNC_SCOPE_ALL, SYNC_SCOPE_PEOPLE}:
+		person_ids = list(
+			PersonFollow.objects.filter(user=request.user)
+			.values_list("person__tmdb_id", flat=True)
+			.distinct()
+		)
+	if sync_scope in {SYNC_SCOPE_ALL, SYNC_SCOPE_STUDIOS}:
+		company_ids = list(
+			CompanyFollow.objects.filter(user=request.user)
+			.values_list("company__tmdb_id", flat=True)
+			.distinct()
+		)
 
 	if not person_ids and not company_ids:
+		if sync_scope == SYNC_SCOPE_PEOPLE:
+			message = "Nothing to sync yet."
+			if not PersonFollow.objects.filter(user=request.user).exists():
+				message = "You are not following any people yet."
+		elif sync_scope == SYNC_SCOPE_STUDIOS:
+			message = "You are not following any studios yet."
+		else:
+			message = "Nothing to sync yet."
 		payload = {
 			"ok": True,
 			"status": "done",
 			"job_id": None,
-			"message": "Nothing to sync yet.",
+			"message": message,
 			"total_people": 0,
 			"total_companies": 0,
 			"total_entities": 0,
@@ -720,6 +855,7 @@ def sync_all_followed_start(request: HttpRequest) -> HttpResponse:
 					"status": "running",
 					"job_id": str(active_uuid),
 					"progress_url": reverse("sync_all_followed_progress", kwargs={"job_id": str(active_uuid)}),
+					"cancel_url": _sync_job_cancel_url(active_uuid),
 					"total_people": int(existing.get("total_people") or 0),
 					"total_companies": int(existing.get("total_companies") or 0),
 					"total_entities": int(existing.get("total_entities") or 0),
@@ -744,10 +880,12 @@ def sync_all_followed_start(request: HttpRequest) -> HttpResponse:
 			"fail_people": 0,
 			"fail_companies": 0,
 			"notifications_created": 0,
-			"current_label": "Queued…",
+			"current_label": f"Queued {_sync_scope_title(sync_scope)} sync…",
 			"current_sub_done": 0,
 			"current_sub_total": 0,
 			"next_url": next_url,
+			"sync_scope": sync_scope,
+			"cancel_url": _sync_job_cancel_url(job_id),
 		},
 	)
 
@@ -766,6 +904,7 @@ def sync_all_followed_start(request: HttpRequest) -> HttpResponse:
 			"person_ids": person_ids,
 			"company_ids": company_ids,
 			"max_company_pages": max_company_pages,
+			"sync_scope": sync_scope,
 		},
 		daemon=True,
 	)
@@ -777,9 +916,42 @@ def sync_all_followed_start(request: HttpRequest) -> HttpResponse:
 			"status": "running",
 			"job_id": str(job_id),
 			"progress_url": reverse("sync_all_followed_progress", kwargs={"job_id": str(job_id)}),
+			"cancel_url": _sync_job_cancel_url(job_id),
 			"total_people": len(person_ids),
 			"total_companies": len(company_ids),
 			"total_entities": len(person_ids) + len(company_ids),
+		}
+	)
+
+
+@login_required
+def sync_job_cancel(request: HttpRequest, job_id: str) -> HttpResponse:
+	if request.method != "POST":
+		return JsonResponse({"ok": False, "error": "POST required."}, status=405)
+
+	try:
+		jid = UUID(str(job_id))
+	except Exception:
+		return JsonResponse({"ok": False, "error": "Invalid job id."}, status=400)
+
+	data = _sync_job_get(jid)
+	if not data:
+		return JsonResponse({"ok": False, "error": "Job not found."}, status=404)
+	if int(data.get("user_id") or 0) != int(request.user.id):
+		return JsonResponse({"ok": False, "error": "Not allowed."}, status=403)
+
+	status = str(data.get("status") or "")
+	if status in {"done", "done_with_errors", "canceled"}:
+		return JsonResponse({"ok": True, "status": status, "job_id": str(jid), "message": "Job already finished."})
+
+	_sync_job_request_cancel(jid)
+	return JsonResponse(
+		{
+			"ok": True,
+			"status": "cancel_requested",
+			"job_id": str(jid),
+			"message": "Cancel requested.",
+			"progress_url": data.get("progress_url"),
 		}
 	)
 

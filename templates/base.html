@@ -30,18 +30,7 @@
           <a href="{% url 'upcoming' %}" data-menu-close>Upcoming</a>
           <a href="{% url 'recent' %}" data-menu-close>Recent</a>
           <a href="{% url 'new_arrivals' %}" data-menu-close>New arrivals</a>
-
-          <form
-            method="post"
-            action="{% url 'sync_all_followed' %}"
-            class="menu-action"
-            data-sync-all-form
-            data-sync-all-start-url="{% url 'sync_all_followed_start' %}"
-          >
-            {% csrf_token %}
-            <input type="hidden" name="next" value="{{ request.get_full_path }}" />
-            <button type="submit" class="menu-link-btn" data-menu-close>Sync data</button>
-          </form>
+          <button type="button" class="menu-link-btn" data-menu-close data-open-sync-dialog="#sync-data-dialog">Sync data</button>
         </div>
 
         <div class="menu-bottom">
@@ -53,6 +42,41 @@
         </div>
       </aside>
     {% endif %}
+
+    <dialog id="sync-data-dialog" class="sync-dialog" aria-labelledby="sync-data-dialog-title">
+      <div class="sync-dialog-header">
+        <div>
+          <strong id="sync-data-dialog-title">Sync data</strong>
+          <p class="muted sync-dialog-copy">Choose whether to sync everything, just people or just studios.</p>
+        </div>
+        <form method="dialog" class="inline">
+          <button type="submit" class="secondary dialog-close" aria-label="Close sync dialog">&times;</button>
+        </form>
+      </div>
+
+      <div class="sync-dialog-actions">
+        <form method="post" action="{% url 'sync_all_followed_start' %}" class="sync-dialog-form" data-sync-scope-form data-sync-start-url="{% url 'sync_all_followed_start' %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+          <input type="hidden" name="sync_scope" value="all" />
+          <button type="submit" class="primary">Sync all</button>
+        </form>
+
+        <form method="post" action="{% url 'sync_all_followed_start' %}" class="sync-dialog-form" data-sync-scope-form data-sync-start-url="{% url 'sync_all_followed_start' %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+          <input type="hidden" name="sync_scope" value="people" />
+          <button type="submit" class="secondary">Sync people</button>
+        </form>
+
+        <form method="post" action="{% url 'sync_all_followed_start' %}" class="sync-dialog-form" data-sync-scope-form data-sync-start-url="{% url 'sync_all_followed_start' %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+          <input type="hidden" name="sync_scope" value="studios" />
+          <button type="submit" class="secondary">Sync studios</button>
+        </form>
+      </div>
+    </dialog>
 
     <div class="search-overlay" data-search-overlay hidden></div>
     <div class="search-prompt" data-search-prompt hidden role="dialog" aria-modal="true" aria-labelledby="search-prompt-title">
@@ -74,7 +98,10 @@
 
     <main>
       <div class="sync-progress" data-sync-progress hidden>
-        <div class="sync-progress-text" data-sync-progress-text>Starting…</div>
+        <div class="sync-progress-row">
+          <div class="sync-progress-text" data-sync-progress-text>Starting…</div>
+          <button type="button" class="secondary sync-progress-cancel" data-sync-cancel hidden>Cancel</button>
+        </div>
         <div class="sync-progress-bar" data-sync-progress-bar role="progressbar" aria-label="Sync progress" aria-valuemin="0" aria-valuemax="100">
           <div class="sync-progress-bar-fill" data-sync-progress-fill></div>
         </div>

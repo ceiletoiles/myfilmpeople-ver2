@@ -14,6 +14,7 @@ urlpatterns = [
         views.sync_all_followed_progress,
         name="sync_all_followed_progress",
     ),
+    path("sync/jobs/<uuid:job_id>/cancel/", views.sync_job_cancel, name="sync_job_cancel"),
     path("collaboration/", views.collaboration_finder, name="collaboration_finder"),
     path("collaboration/suggest/", views.collaboration_suggest, name="collaboration_suggest"),
     path("upcoming/", views.upcoming, name="upcoming"),

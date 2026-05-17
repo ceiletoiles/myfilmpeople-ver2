@@ -5,15 +5,25 @@
     const textEl = document.querySelector('[data-sync-progress-text]');
     const barRoot = document.querySelector('[data-sync-progress-bar]');
     const barFill = document.querySelector('[data-sync-progress-fill]');
+    const cancelBtn = document.querySelector('[data-sync-cancel]');
 
     if (!progressWrap || !textEl || !barRoot || !barFill) return;
 
     let pollTimer = null;
     let activeProgressUrl = null;
     let activeButton = null;
+    let activeCancelUrl = null;
+    let cancelRequestPending = false;
 
     function setHidden(hidden) {
       progressWrap.hidden = !!hidden;
+    }
+
+    function getCookie(name) {
+      const cookieValue = '; ' + document.cookie;
+      const parts = cookieValue.split('; ' + name + '=');
+      if (parts.length !== 2) return '';
+      return decodeURIComponent(parts.pop().split(';').shift() || '');
     }
 
     function setText(msg) {
@@ -29,6 +39,20 @@
     function setRunning(running) {
       if (running) barRoot.classList.add('is-running');
       else barRoot.classList.remove('is-running');
+    }
+
+    function setCancelVisible(visible) {
+      if (!cancelBtn) return;
+      cancelBtn.hidden = !visible;
+      cancelBtn.disabled = !visible || cancelRequestPending;
+    }
+
+    function resetActiveJob() {
+      activeProgressUrl = null;
+      activeCancelUrl = null;
+      cancelRequestPending = false;
+      if (cancelBtn) cancelBtn.textContent = 'Cancel';
+      setCancelVisible(false);
     }
 
     function clearPolling() {
@@ -100,6 +124,45 @@
       return parts.join(' • ');
     }
 
+    async function requestCancel() {
+      if (!activeCancelUrl || cancelRequestPending) return;
+
+      cancelRequestPending = true;
+      setCancelVisible(true);
+      if (cancelBtn) cancelBtn.textContent = 'Canceling…';
+      setText('Cancel requested…');
+
+      try {
+        const resp = await fetch(activeCancelUrl, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': getCookie('csrftoken')
+          }
+        });
+        const data = await resp.json().catch(() => null);
+        if (!resp.ok || !data || data.ok === false) {
+          setText((data && (data.error || data.message)) || ('Cancel failed (' + resp.status + ')'));
+          return;
+        }
+
+        if (data.progress_url) {
+          activeProgressUrl = data.progress_url;
+        }
+        if (data.cancel_url) {
+          activeCancelUrl = data.cancel_url;
+        }
+      } catch (_) {
+        setText('Network error while canceling.');
+      } finally {
+        cancelRequestPending = false;
+        if (cancelBtn) cancelBtn.textContent = 'Cancel';
+        setCancelVisible(!!activeCancelUrl);
+      }
+    }
+
     async function pollOnce() {
       if (!activeProgressUrl) return;
       try {
@@ -124,11 +187,22 @@
         setText(formatLine(data));
 
         const status = String(data.status || '');
-        if (status === 'done' || status === 'done_with_errors') {
-          setPercent(100);
+        activeCancelUrl = data.cancel_url || activeCancelUrl;
+
+        if (status === 'cancel_requested') {
+          setCancelVisible(!!activeCancelUrl);
+          return;
+        }
+
+        if (status === 'done' || status === 'done_with_errors' || status === 'canceled') {
+          if (status === 'done' || status === 'done_with_errors') {
+            setPercent(100);
+          }
           setRunning(false);
           clearPolling();
           if (activeButton) activeButton.disabled = false;
+          setCancelVisible(false);
+          resetActiveJob();
           // Auto-hide shortly after completion.
           window.setTimeout(function () {
             setHidden(true);
@@ -143,11 +217,24 @@
     }
 
     async function startJob(form) {
-      const startUrl = form.getAttribute('data-sync-job-start-url') || form.getAttribute('data-sync-all-start-url') || '';
+      const startUrl = form.getAttribute('data-sync-start-url') || form.getAttribute('data-sync-job-start-url') || form.getAttribute('data-sync-all-start-url') || '';
       if (!startUrl) return;
+
+      const dialog = form.closest('dialog');
+      if (dialog && typeof dialog.close === 'function') {
+        try {
+          dialog.close();
+        } catch (_) {
+          // ignore if already closed
+        }
+      }
 
       const btn = form.querySelector('button[type="submit"], button:not([type])');
       activeButton = btn;
+
+      activeCancelUrl = null;
+      cancelRequestPending = false;
+      setCancelVisible(false);
 
       clearPolling();
       setHidden(false);
@@ -170,14 +257,19 @@
         if (!resp.ok || !data || data.ok === false) {
           if (activeButton) activeButton.disabled = false;
           setText((data && (data.error || data.message)) || ('Sync failed (' + resp.status + ')'));
+          resetActiveJob();
           return;
         }
+
+        activeCancelUrl = data.cancel_url || null;
+        setCancelVisible(!!activeCancelUrl);
 
         if (data.status === 'done') {
           setPercent(100);
           setRunning(false);
           setText(data.message || 'Nothing to sync.');
           if (activeButton) activeButton.disabled = false;
+          resetActiveJob();
           window.setTimeout(function () {
             setHidden(true);
           }, 1200);
@@ -189,6 +281,7 @@
           if (activeButton) activeButton.disabled = false;
           setRunning(false);
           setText('Could not start sync progress.');
+          resetActiveJob();
           return;
         }
 
@@ -198,13 +291,20 @@
         if (activeButton) activeButton.disabled = false;
         setRunning(false);
         setText('Network error.');
+        resetActiveJob();
       }
+    }
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function () {
+        requestCancel();
+      });
     }
 
     document.addEventListener('submit', function (e) {
       const form = e.target;
       if (!(form instanceof HTMLFormElement)) return;
-      if (!(form.matches('form[data-sync-all-form]') || form.matches('form[data-sync-job-form]'))) return;
+      if (!(form.matches('form[data-sync-all-form]') || form.matches('form[data-sync-job-form]') || form.matches('form[data-sync-scope-form]'))) return;
       e.preventDefault();
       startJob(form);
     });
@@ -307,6 +407,28 @@
       if (e.key === 'Escape' && isOpen()) {
         e.preventDefault();
         closeMenu();
+      }
+    });
+  }
+
+  function initSyncChooserDialog() {
+    document.addEventListener('click', function (e) {
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+
+      const openBtn = target.closest('[data-open-sync-dialog]');
+      if (!openBtn) return;
+
+      const selector = openBtn.getAttribute('data-open-sync-dialog');
+      if (!selector) return;
+
+      const dialog = document.querySelector(selector);
+      if (dialog && typeof dialog.showModal === 'function') {
+        try {
+          dialog.showModal();
+        } catch (_) {
+          // ignore if already open
+        }
       }
     });
   }
@@ -519,6 +641,7 @@
   });
 
   initHamburgerMenu();
+  initSyncChooserDialog();
   initSearchPrompt();
   initMessageToasts();
   initSyncProgress();

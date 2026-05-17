@@ -256,6 +256,7 @@ def prefetch_company_filmography(
     force: bool = False,
     max_pages: int | None = None,
     progress_cb: Callable[[int, int], None] | None = None,
+    should_stop_cb: Callable[[], bool] | None = None,
 ) -> int:
     """Prefetch and cache full company filmography into Company.tmdb_raw.
 
@@ -266,6 +267,12 @@ def prefetch_company_filmography(
 
     Safety: pass max_pages to cap the number of pages fetched in one call.
     """
+    def should_stop() -> bool:
+        try:
+            return bool(should_stop_cb and should_stop_cb())
+        except Exception:
+            return False
+
     tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
     pages = tmdb_raw.get("discover_movies_pages")
     if not isinstance(pages, dict):
@@ -292,6 +299,9 @@ def prefetch_company_filmography(
     ):
         return 0
 
+    if should_stop():
+        return 0
+
     client = TMDbClient.from_settings()
     first = client.discover_movies_by_company(
         company.tmdb_id,
@@ -312,7 +322,23 @@ def prefetch_company_filmography(
     except Exception:
         pass
 
+    if should_stop():
+        meta["total_pages"] = total_pages
+        meta["total_results"] = int(first.get("total_results") or meta.get("total_results") or 0)
+        meta["sort_by"] = COMPANY_FILMOGRAPHY_SORT_BY
+        meta["release_date_gte"] = COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE
+        company.tmdb_raw = {**tmdb_raw, "discover_movies_pages": pages, "discover_movies_meta": meta}
+        company.tmdb_last_sync_at = timezone.now()
+        company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "updated_at"])
+        try:
+            cache.set(f"db:company:v1:{int(company.tmdb_id)}", company, timeout=5 * 60)
+        except Exception:
+            pass
+        return fetched
+
     for p in range(2, pages_to_fetch + 1):
+        if should_stop():
+            break
         key = str(p)
         if not force and key in pages and not _is_stale(company.tmdb_last_sync_at):
             continue
@@ -329,6 +355,8 @@ def prefetch_company_filmography(
                 progress_cb(fetched, pages_to_fetch)
         except Exception:
             pass
+        if should_stop():
+            break
 
     meta["total_pages"] = total_pages
     meta["total_results"] = int(first.get("total_results") or meta.get("total_results") or 0)

@@ -111,11 +111,91 @@ body.menu-open {
     background: white;
 }
 
+.sync-progress-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
 .sync-progress-text {
     font-size: 13px;
     color: #334155;
-    margin-bottom: 8px;
+    margin-bottom: 0;
     line-height: 1.2;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.sync-progress-cancel {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 7px 12px;
+    height: 32px;
+    border-color: #cbd5e1;
+}
+
+.sync-dialog {
+    width: min(460px, 92vw);
+    padding: 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    background: white;
+    box-shadow: 0 24px 56px rgba(15, 23, 42, 0.28);
+    overflow: hidden;
+    outline: none;
+}
+
+.sync-dialog:not([open]) {
+    display: none;
+}
+
+.sync-dialog[open] {
+    display: flex;
+    flex-direction: column;
+}
+
+.sync-dialog::backdrop {
+    background: rgba(15, 23, 42, 0.72);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+}
+
+.sync-dialog-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 18px 14px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.sync-dialog-header strong {
+    display: block;
+    font-size: 1.05rem;
+    letter-spacing: -0.01em;
+}
+
+.sync-dialog-copy {
+    margin: 6px 0 0;
+    color: #64748b;
+    font-size: 0.95rem;
+    line-height: 1.35;
+}
+
+.sync-dialog-actions {
+    display: grid;
+    gap: 10px;
+    padding: 16px 18px 18px;
+}
+
+.sync-dialog-form {
+    margin: 0;
+}
+
+.sync-dialog-form button {
+    width: 100%;
 }
 
 .sync-progress-bar {

@@ -28,6 +28,7 @@ from .sync_jobs import (
 	company_sync_start,
 	person_sync_progress,
 	person_sync_start,
+	sync_job_cancel,
 	sync_all_followed_progress,
 	sync_all_followed_start,
 )
@@ -60,6 +61,7 @@ __all__ = [
 	"recent",
 	"search",
 	"search_suggest",
+	"sync_job_cancel",
 	"sync_all_followed",
 	"sync_all_followed_progress",
 	"sync_all_followed_start",
