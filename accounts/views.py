@@ -12,6 +12,9 @@ from urllib.parse import urlencode
 
 from catalog.models import CompanyFollow, PersonFollow
 from catalog.services import get_person_status_key, get_person_status_label
+from django.utils import timezone
+from datetime import date
+from catalog.views._shared import _parse_iso_date, _add_years_safe
 
 from .forms import SignupForm
 
@@ -88,6 +91,54 @@ def _annotate_status(follow) -> None:
 		follow.status_key = ""
 
 
+def _annotate_company_status(follow) -> None:
+	"""Annotate a CompanyFollow with `status` and `status_key`.
+	Keys: upcoming, tba, inactive, idle
+	"""
+	try:
+		company = follow.company
+		today = timezone.now().date()
+		ten_years_ago = _add_years_safe(today, -10)
+		tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+		pages = tmdb_raw.get("discover_movies_pages") or {}
+
+		upcoming_with_date = 0
+		upcoming_no_date = 0
+		latest_past_release: date | None = None
+
+		for payload in (pages.values() or []):
+			if not isinstance(payload, dict):
+				continue
+			for m in (payload.get("results") or []):
+				if not isinstance(m, dict):
+					continue
+				release_date_str = (m.get("release_date") or "").strip()
+				release_dt = _parse_iso_date(release_date_str)
+				if release_dt is not None and release_dt > today:
+					upcoming_with_date += 1
+				elif not release_date_str:
+					upcoming_no_date += 1
+				elif release_dt is not None and release_dt <= today:
+					if latest_past_release is None or release_dt > latest_past_release:
+						latest_past_release = release_dt
+
+		if upcoming_with_date > 0:
+			follow.status_key = "upcoming"
+			follow.status = "Upcoming"
+		elif upcoming_no_date > 0:
+			follow.status_key = "tba"
+			follow.status = "TBA"
+		elif latest_past_release is not None and latest_past_release < ten_years_ago:
+			follow.status_key = "inactive"
+			follow.status = "Inactive"
+		else:
+			follow.status_key = "idle"
+			follow.status = "Idle"
+	except Exception:
+		follow.status = ""
+		follow.status_key = ""
+
+
 @login_required
 def profile(request: HttpRequest) -> HttpResponse:
 	selected_status = _normalize_status_key(request.GET.get("status"))
@@ -109,10 +160,15 @@ def profile(request: HttpRequest) -> HttpResponse:
 	for f in directors + actors + crew:
 		_annotate_status(f)
 
+	# Annotate company follows with status
+	for c in company_follows:
+		_annotate_company_status(c)
+
 	if selected_status != "all":
 		directors = [f for f in directors if f.status_key == selected_status]
 		actors = [f for f in actors if f.status_key == selected_status]
 		crew = [f for f in crew if f.status_key == selected_status]
+		company_follows = [c for c in company_follows if getattr(c, "status_key", "") == selected_status]
 
 	status_filters = _build_status_filters(request.path, selected_status)
 	selected_status_label = next((f["label"] for f in status_filters if f["key"] == selected_status), "Status")
@@ -157,10 +213,15 @@ def user_following(request: HttpRequest, username: str) -> HttpResponse:
 	for f in directors + actors + crew:
 		_annotate_status(f)
 
+	# Annotate company follows with status
+	for c in company_follows:
+		_annotate_company_status(c)
+
 	if selected_status != "all":
 		directors = [f for f in directors if f.status_key == selected_status]
 		actors = [f for f in actors if f.status_key == selected_status]
 		crew = [f for f in crew if f.status_key == selected_status]
+		company_follows = [c for c in company_follows if getattr(c, "status_key", "") == selected_status]
 
 	status_filters = _build_status_filters(request.path, selected_status)
 	selected_status_label = next((f["label"] for f in status_filters if f["key"] == selected_status), "Status")

@@ -147,6 +147,9 @@
                   {% endif %}
                 </span>
                 <span class="entity-name">{{ f.company.name }}</span>
+                {% if f.status %}
+                  <span class="entity-status muted">{{ f.status }}</span>
+                {% endif %}
               </a>
             {% endfor %}
           {% else %}

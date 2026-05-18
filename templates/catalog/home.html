@@ -158,6 +158,9 @@
                     {% else %}
                       <img class="home-studio-logo" src="{% static 'img/placeholder-company.svg' %}" alt="{{ f.company.name }}" loading="lazy" width="300" height="120" />
                     {% endif %}
+                    {% if f.studio_status == 'inactive' %}
+                      <span class="home-studio-badge">Inactive</span>
+                    {% endif %}
                   </span>
                   <span class="home-studio-name">{{ f.company.name }}</span>
                 </a>
