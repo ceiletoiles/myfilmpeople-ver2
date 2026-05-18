@@ -244,10 +244,56 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			has_next = len(tba_movies) > end or (
 				discover_total_pages is None or scan_page < discover_total_pages
 			)
+	# Determine whether the company has any TBA (upcoming-without-date) titles.
+	# Default to True (optimistic) so we don't accidentally hide Upcoming when state is uncertain.
+	has_tba = True
+	if filmography_mode == "upcoming":
+		try:
+			# If we're already in the upcoming branch we computed tba_count above.
+			if 'tba_count' in locals() and isinstance(tba_count, int):
+				has_tba = tba_count > 0
+			else:
+				# Unknown — keep optimistic
+				has_tba = True
+		except Exception:
+			has_tba = True
+	else:
+		# Not in upcoming mode: for followed companies check cached tba_movies or tba_scan_meta;
+		# only set False when a completed scan shows zero results. For not-followed keep optimistic.
+		if isinstance(getattr(company, "tmdb_raw", None), dict):
+			tmdb_raw = company.tmdb_raw or {}
+			tba_movies_raw = tmdb_raw.get("tba_movies")
+			if isinstance(tba_movies_raw, list):
+				# If list exists and is empty -> definite false, otherwise true if non-empty
+				has_tba = any(isinstance(m, dict) for m in tba_movies_raw)
+			else:
+				# Check scan metadata: if scan_complete and discovered count is 0 -> False
+				tba_scan_meta = tmdb_raw.get("tba_scan_meta")
+				if isinstance(tba_scan_meta, dict):
+					scan_page = int(tba_scan_meta.get("scan_page") or 0)
+					discover_total_pages = tba_scan_meta.get("discover_total_pages")
+					try:
+						discover_total_pages_int = (
+							int(discover_total_pages) if discover_total_pages is not None else None
+						)
+					except (TypeError, ValueError):
+						discover_total_pages_int = None
+					if discover_total_pages_int is not None and scan_page >= discover_total_pages_int:
+						# Scan complete — if tba_movies not present, assume zero
+						has_tba = False
+					else:
+						has_tba = True
+				else:
+					has_tba = True
+		else:
+			# Not followed and no cached data: optimistic true to avoid hiding Upcoming
+			has_tba = True
+
 	return render(
 		request,
 		"catalog/company_detail.html",
 		{
+			"has_tba": has_tba,
 			"company": company,
 			"filmography_mode": filmography_mode,
 			"filmography_items": filmography_items,

@@ -45,17 +45,20 @@
       {% if comeback_info %}
         <div class="person-comeback-note">
           {% if person.tmdb_raw.deathday and active_info %}
-            <strong>
-              Was Active {{ active_info.years_active_label }}{% if active_info.followed_role %} as {{ active_info.followed_role }}{% endif %}
-            </strong>
-            <span class="muted">First release: {{ active_info.first_release_date|iso_date_long }}</span>
-            <br />
+            <div class="person-active-line">
+              <strong>
+                Was Active {{ active_info.years_active_label }}{% if active_info.followed_role %} as {{ active_info.followed_role }}{% endif %}
+              </strong>
+              <div class="muted">First release: {{ active_info.first_release_date|iso_date_long }}</div>
+            </div>
           {% endif %}
 
-          <strong>
-            Inactive {{ comeback_info.gap_label }}{% if comeback_info.followed_role %} as {{ comeback_info.followed_role }}{% endif %}
-          </strong>
-          <span class="muted">Last release: {{ comeback_info.last_release_date|iso_date_long }}</span>
+          <div class="person-inactive-line">
+            <strong>
+              Inactive {{ comeback_info.gap_label }}{% if comeback_info.followed_role %} as {{ comeback_info.followed_role }}{% endif %}
+            </strong>
+            <div class="muted">Last release: {{ comeback_info.last_release_date|iso_date_long }}</div>
+          </div>
         </div>
 
       {% elif active_info %}

@@ -114,15 +114,27 @@ main {
 .person-comeback-note {
   grid-column: 1;
   grid-row: 5;
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: baseline;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
   font-size: 1rem;
   padding: 10px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 12px;
   background: #f8fafc;
+}
+
+/* Layout helpers for the two-line comeback display */
+.person-active-line,
+.person-inactive-line {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: nowrap; /* keep date and label on same line when possible */
+  overflow: hidden;
 }
 
 .person-bio {
@@ -693,6 +705,38 @@ main {
     grid-column: 1 / -1;
     grid-row: 7;
     margin-top: 2px;
+  }
+
+  .person-inactive-line {
+    margin-top: 6px;
+  }
+
+  /* Visually place the muted date before the label on wide screens while keeping DOM order logical. */
+  .person-active-line .muted,
+  .person-inactive-line .muted {
+    order: -1;
+    opacity: 0.85;
+    white-space: nowrap;
+  }
+
+  /* Ensure the label text doesn't break apart from following role text. */
+  .person-active-line strong,
+  .person-inactive-line strong {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @media (max-width: 420px) {
+    .person-active-line,
+    .person-inactive-line {
+      flex-wrap: wrap; /* allow wrap on very narrow screens */
+    }
+    .person-active-line .muted,
+    .person-inactive-line .muted {
+      order: 0; /* keep natural order on very small screens */
+      white-space: normal;
+    }
   }
 
   .person-bio {

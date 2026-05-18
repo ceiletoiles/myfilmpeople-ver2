@@ -89,7 +89,9 @@
           {% if filmography_mode == 'upcoming' %}
             <a class="muted" href="{% url 'company_detail' company.tmdb_id %}?page=1">Filmography</a>
           {% else %}
-            <a class="muted" href="{% url 'company_detail' company.tmdb_id %}?mode=upcoming&page=1">Upcoming</a>
+            {% if has_tba %}
+              <a class="muted" href="{% url 'company_detail' company.tmdb_id %}?mode=upcoming&page=1">Upcoming</a>
+            {% endif %}
           {% endif %}
         </div>
 
