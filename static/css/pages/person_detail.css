@@ -123,6 +123,7 @@ main {
   border: 1px solid #cbd5e1;
   border-radius: 12px;
   background: #f8fafc;
+  overflow-x: auto;
 }
 
 /* Layout helpers for the two-line comeback display */
@@ -133,8 +134,8 @@ main {
   align-items: baseline;
   gap: 8px;
   min-width: 0;
-  flex-wrap: nowrap; /* keep date and label on same line when possible */
-  overflow: hidden;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .person-bio {
@@ -723,19 +724,19 @@ main {
   .person-active-line strong,
   .person-inactive-line strong {
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
+    text-overflow: unset;
   }
 
   @media (max-width: 420px) {
     .person-active-line,
     .person-inactive-line {
-      flex-wrap: wrap; /* allow wrap on very narrow screens */
+      flex-wrap: nowrap;
     }
     .person-active-line .muted,
     .person-inactive-line .muted {
-      order: 0; /* keep natural order on very small screens */
-      white-space: normal;
+      order: -1;
+      white-space: nowrap;
     }
   }
 
