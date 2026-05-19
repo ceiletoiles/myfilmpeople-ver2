@@ -48,6 +48,7 @@
 .upcoming-item {
 	display: flex;
 	gap: 12px;
+	align-items: stretch;
 	color: inherit;
 	text-decoration: none;
 	padding: 9px;
@@ -79,6 +80,10 @@
 	gap: 2px;
 	flex: 1;
 	min-width: 0;
+	max-height: 255px;
+	overflow-y: auto;
+	padding-right: 4px;
+	scrollbar-width: thin;
 }
 
 .upcoming-title {
@@ -242,6 +247,7 @@
 
 	.upcoming-info {
 		gap: 1px;
+		max-height: 228px;
 	}
 
 	.upcoming-studio-logo-slot {
