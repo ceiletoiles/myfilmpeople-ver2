@@ -12,7 +12,14 @@ from django.utils import timezone
 from django.core.cache import cache
 
 from ..models import PersonFollow
-from ..new_movie_helpers import get_person_active_info, get_person_comeback_info
+from ..new_movie_helpers import (
+	build_person_comeback_event_meta,
+	extract_movie_ids_from_credits_for_role,
+	extract_movie_release_dates_from_credits_for_role,
+	get_person_active_info,
+	get_person_comeback_info,
+	record_new_movie_arrivals,
+)
 from ..services import get_or_sync_person
 from ..tmdb import TMDbClient
 from ._shared import (
@@ -75,7 +82,78 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 
 	if is_followed:
 		# Followed => store + serve from DB (refresh if stale).
+		# If the TTL refresh updates cached credits, record any new arrivals for this user.
+		old_person = follows_qs.first().person if follows_qs.exists() else None
+		old_last_sync_at = getattr(old_person, "tmdb_last_sync_at", None) if old_person else None
+		old_credits = getattr(old_person, "tmdb_credits_raw", None) or {}
+		old_baseline_present = isinstance(old_credits.get("cast"), list) or isinstance(old_credits.get("crew"), list)
+
 		person = get_or_sync_person(tmdb_id)
+		# Keep denormalized follow snapshot fresh.
+		PersonFollow.objects.filter(user=request.user, person__tmdb_id=tmdb_id).update(name=person.name)
+
+		new_last_sync_at = getattr(person, "tmdb_last_sync_at", None)
+		source = (getattr(person, "tmdb_last_sync_source", "") or "").strip().lower()
+		new_credits = person.tmdb_credits_raw or {}
+
+		# Only treat TTL refreshes as background updates. Avoid notifying on first baseline cache fill.
+		if (
+			old_baseline_present
+			and old_last_sync_at is not None
+			and new_last_sync_at is not None
+			and new_last_sync_at != old_last_sync_at
+			and source == "ttl"
+		):
+			follows = PersonFollow.objects.filter(user=request.user, person__tmdb_id=tmdb_id)
+			for follow in follows:
+				role = follow.role or ""
+				old_role_movie_ids = extract_movie_ids_from_credits_for_role(old_credits, role)
+				new_role_movie_ids = extract_movie_ids_from_credits_for_role(new_credits, role)
+				if not old_role_movie_ids:
+					continue
+				old_role_release_dates = extract_movie_release_dates_from_credits_for_role(old_credits, role)
+				new_role_release_dates = extract_movie_release_dates_from_credits_for_role(new_credits, role)
+				new_event_meta_by_movie = build_person_comeback_event_meta(
+					old_release_dates=old_role_release_dates,
+					new_release_dates=new_role_release_dates,
+					new_movie_ids=new_role_movie_ids,
+				)
+				# Add character names and credit jobs from new credits when available.
+				if isinstance(new_credits, dict):
+					for credit in (new_credits.get("cast") or []):
+						if not isinstance(credit, dict):
+							continue
+						mid = credit.get("id")
+						char = credit.get("character") or ""
+						if isinstance(mid, int) and isinstance(char, str) and char.strip():
+							meta = new_event_meta_by_movie.setdefault(mid, {}) if isinstance(new_event_meta_by_movie, dict) else {}
+							if isinstance(meta, dict) and "character" not in meta:
+								meta["character"] = char.strip()
+							if isinstance(meta, dict) and "credit_job" not in meta:
+								meta["credit_job"] = "Actor"
+					for credit in (new_credits.get("crew") or []):
+						if not isinstance(credit, dict):
+							continue
+						mid = credit.get("id")
+						job = credit.get("job") or ""
+						if isinstance(mid, int) and isinstance(job, str) and job.strip():
+							meta = new_event_meta_by_movie.setdefault(mid, {}) if isinstance(new_event_meta_by_movie, dict) else {}
+							if isinstance(meta, dict) and "credit_job" not in meta:
+								meta["credit_job"] = job.strip()
+
+				record_new_movie_arrivals(
+					user=request.user,
+					source_type="person",
+					source_id=tmdb_id,
+					source_name=person.name,
+					old_movie_ids=old_role_movie_ids,
+					new_movie_ids=new_role_movie_ids,
+					role=role,
+					old_release_dates=old_role_release_dates,
+					new_release_dates=new_role_release_dates,
+					new_event_meta_by_movie=new_event_meta_by_movie,
+					source_last_sync_at=getattr(person, "tmdb_last_sync_at", None),
+				)
 	else:
 		# Not followed => live fetch only (do not store in DB).
 		client = TMDbClient.from_settings()

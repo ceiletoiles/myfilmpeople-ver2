@@ -13,6 +13,8 @@ class Person(models.Model):
 	tmdb_raw = models.JSONField(default=dict, blank=True)
 	tmdb_credits_raw = models.JSONField(default=dict, blank=True)
 	tmdb_last_sync_at = models.DateTimeField(null=True, blank=True)
+	# How the last TMDb snapshot was refreshed: 'sync' (explicit) or 'ttl' (stale refresh).
+	tmdb_last_sync_source = models.CharField(max_length=20, blank=True, default="")
 
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
@@ -28,6 +30,8 @@ class Company(models.Model):
 
 	tmdb_raw = models.JSONField(default=dict, blank=True)
 	tmdb_last_sync_at = models.DateTimeField(null=True, blank=True)
+	# How the last TMDb snapshot was refreshed: 'sync' (explicit) or 'ttl' (stale refresh).
+	tmdb_last_sync_source = models.CharField(max_length=20, blank=True, default="")
 
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)

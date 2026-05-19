@@ -18,13 +18,13 @@ from .newsletter import parse_issue, publish_issue
 @admin.register(Person)
 class PersonAdmin(admin.ModelAdmin):
 	search_fields = ("name", "tmdb_id")
-	list_display = ("tmdb_id", "name", "tmdb_last_sync_at")
+	list_display = ("tmdb_id", "name", "tmdb_last_sync_at", "tmdb_last_sync_source")
 
 
 @admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
 	search_fields = ("name", "tmdb_id")
-	list_display = ("tmdb_id", "name", "tmdb_last_sync_at")
+	list_display = ("tmdb_id", "name", "tmdb_last_sync_at", "tmdb_last_sync_source")
 
 
 @admin.register(Movie)

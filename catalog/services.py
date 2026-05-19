@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Callable
 
 from django.conf import settings
@@ -218,11 +218,26 @@ def get_or_sync_company_filmography_page(
         or meta.get("release_date_gte") != COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE
     ):
         pages = {}
-        meta = {k: v for k, v in meta.items() if k not in {"total_pages", "total_results"}}
+        meta = {k: v for k, v in meta.items() if k not in {"total_pages", "total_results", "synced_at"}}
 
     key = str(page)
     cached = pages.get(key)
-    if isinstance(cached, dict) and not force and not _is_stale(company.tmdb_last_sync_at):
+    filmography_synced_at = None
+    synced_at_raw = meta.get("synced_at")
+    if isinstance(synced_at_raw, str) and synced_at_raw.strip():
+        try:
+            filmography_synced_at = datetime.fromisoformat(synced_at_raw.strip())
+            if filmography_synced_at.tzinfo is None:
+                filmography_synced_at = timezone.make_aware(filmography_synced_at)
+        except Exception:
+            filmography_synced_at = None
+
+    if (
+        isinstance(cached, dict)
+        and not force
+        and filmography_synced_at is not None
+        and not _is_stale(filmography_synced_at)
+    ):
         return cached
 
     client = TMDbClient.from_settings()
@@ -238,10 +253,12 @@ def get_or_sync_company_filmography_page(
     meta["total_results"] = int(payload.get("total_results") or meta.get("total_results") or 0)
     meta["sort_by"] = COMPANY_FILMOGRAPHY_SORT_BY
     meta["release_date_gte"] = COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE
+    meta["synced_at"] = timezone.now().isoformat()
 
     company.tmdb_raw = {**tmdb_raw, "discover_movies_pages": pages, "discover_movies_meta": meta}
     company.tmdb_last_sync_at = timezone.now()
-    company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "updated_at"])
+    company.tmdb_last_sync_source = "sync" if force else "ttl"
+    company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
     # Keep the short-lived cache consistent with DB writes.
     try:
         cache.set(f"db:company:v1:{int(company.tmdb_id)}", company, timeout=5 * 60)
@@ -288,11 +305,21 @@ def prefetch_company_filmography(
         or meta.get("release_date_gte") != COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE
     ):
         pages = {}
-        meta = {k: v for k, v in meta.items() if k not in {"total_pages", "total_results"}}
+        meta = {k: v for k, v in meta.items() if k not in {"total_pages", "total_results", "synced_at"}}
     cached_total_pages = meta.get("total_pages")
+    filmography_synced_at = None
+    synced_at_raw = meta.get("synced_at")
+    if isinstance(synced_at_raw, str) and synced_at_raw.strip():
+        try:
+            filmography_synced_at = datetime.fromisoformat(synced_at_raw.strip())
+            if filmography_synced_at.tzinfo is None:
+                filmography_synced_at = timezone.make_aware(filmography_synced_at)
+        except Exception:
+            filmography_synced_at = None
     if (
         not force
-        and not _is_stale(company.tmdb_last_sync_at)
+        and filmography_synced_at is not None
+        and not _is_stale(filmography_synced_at)
         and isinstance(cached_total_pages, int)
         and cached_total_pages > 0
         and len(pages) >= cached_total_pages
@@ -327,9 +354,11 @@ def prefetch_company_filmography(
         meta["total_results"] = int(first.get("total_results") or meta.get("total_results") or 0)
         meta["sort_by"] = COMPANY_FILMOGRAPHY_SORT_BY
         meta["release_date_gte"] = COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE
+        meta["synced_at"] = timezone.now().isoformat()
         company.tmdb_raw = {**tmdb_raw, "discover_movies_pages": pages, "discover_movies_meta": meta}
         company.tmdb_last_sync_at = timezone.now()
-        company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "updated_at"])
+        company.tmdb_last_sync_source = "sync" if force else "ttl"
+        company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
         try:
             cache.set(f"db:company:v1:{int(company.tmdb_id)}", company, timeout=5 * 60)
         except Exception:
@@ -362,10 +391,12 @@ def prefetch_company_filmography(
     meta["total_results"] = int(first.get("total_results") or meta.get("total_results") or 0)
     meta["sort_by"] = COMPANY_FILMOGRAPHY_SORT_BY
     meta["release_date_gte"] = COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE
+    meta["synced_at"] = timezone.now().isoformat()
 
     company.tmdb_raw = {**tmdb_raw, "discover_movies_pages": pages, "discover_movies_meta": meta}
     company.tmdb_last_sync_at = timezone.now()
-    company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "updated_at"])
+    company.tmdb_last_sync_source = "sync" if force else "ttl"
+    company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
     # Keep the short-lived cache consistent with DB writes.
     try:
         cache.set(f"db:company:v1:{int(company.tmdb_id)}", company, timeout=5 * 60)
@@ -497,7 +528,8 @@ def get_or_sync_company_tba_movies_page(
         },
     }
     company.tmdb_last_sync_at = timezone.now()
-    company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "updated_at"])
+    company.tmdb_last_sync_source = "sync" if force else "ttl"
+    company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
 
     start = (page - 1) * page_size
     end = start + page_size
@@ -571,12 +603,14 @@ def get_or_sync_person(tmdb_id: int, *, force: bool = False) -> Person:
         person.tmdb_raw = raw
         person.tmdb_credits_raw = credits
         person.tmdb_last_sync_at = timezone.now()
+        person.tmdb_last_sync_source = "sync" if force else "ttl"
         person.save(update_fields=[
             "name",
             "profile_path",
             "tmdb_raw",
             "tmdb_credits_raw",
             "tmdb_last_sync_at",
+            "tmdb_last_sync_source",
             "updated_at",
         ])
     elif person.tmdb_credits_raw and not has_credited_roles:
@@ -615,7 +649,8 @@ def get_or_sync_person_images(tmdb_id: int, *, force: bool = False) -> Person:
         images = client.get_person_images(tmdb_id)
         person.tmdb_raw = {**tmdb_raw, "images": images}
         person.tmdb_last_sync_at = timezone.now()
-        person.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "updated_at"])
+        person.tmdb_last_sync_source = "sync" if force else "ttl"
+        person.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
     return person
 
 
@@ -706,11 +741,13 @@ def get_or_sync_company(tmdb_id: int, *, force: bool = False) -> Company:
         company.logo_path = merged.get("logo_path") or ""
         company.tmdb_raw = merged
         company.tmdb_last_sync_at = timezone.now()
+        company.tmdb_last_sync_source = "sync" if force else "ttl"
         company.save(update_fields=[
             "name",
             "logo_path",
             "tmdb_raw",
             "tmdb_last_sync_at",
+            "tmdb_last_sync_source",
             "updated_at",
         ])
     try:
@@ -752,7 +789,8 @@ def get_or_sync_company_movies_page(
         payload=payload,
     )
     company.tmdb_last_sync_at = timezone.now()
-    company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "updated_at"])
+    company.tmdb_last_sync_source = "sync" if force else "ttl"
+    company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
     return payload
 
 

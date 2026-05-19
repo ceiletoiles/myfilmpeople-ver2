@@ -152,6 +152,9 @@
     <div class="muted">
       {% if company.tmdb_last_sync_at %}
         Last synced (IST): {{ company.tmdb_last_sync_at|localtime|date:"F j, Y H:i" }}
+        {% if company.tmdb_last_sync_source %}
+          {% if company.tmdb_last_sync_source == 'sync' %}(via Sync){% elif company.tmdb_last_sync_source == 'ttl' %}(via TTL){% else %}(via {{ company.tmdb_last_sync_source }}){% endif %}
+        {% endif %}
       {% else %}
         Last synced: not cached (live TMDb)
       {% endif %}

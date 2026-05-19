@@ -10,6 +10,11 @@ from django.utils import timezone
 from django.conf import settings
 
 from ..models import CompanyFollow
+from ..new_movie_helpers import (
+	extract_movie_ids_from_filmography,
+	extract_movie_release_dates_from_filmography,
+	record_new_movie_arrivals,
+)
 from ..services import (
 	COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE,
 	COMPANY_FILMOGRAPHY_SORT_BY,
@@ -43,11 +48,64 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	if follow:
 		# Followed => store + serve from DB (refresh if stale).
 		company = get_or_sync_company(tmdb_id)
+		# Keep denormalized follow snapshot fresh.
+		CompanyFollow.objects.filter(user=request.user, company__tmdb_id=tmdb_id).update(name=company.name)
+
+		old_last_sync_at = getattr(company, "tmdb_last_sync_at", None)
+		old_tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+		old_movie_ids = extract_movie_ids_from_filmography(old_tmdb_raw)
+		old_release_dates = extract_movie_release_dates_from_filmography(old_tmdb_raw)
+		old_pages = old_tmdb_raw.get("discover_movies_pages")
+		old_baseline_present = isinstance(old_pages, dict) and len(old_pages) > 0
+
 		discover_page = (
 			get_or_sync_company_filmography_page(company, page=page)
 			if filmography_mode == "filmography"
 			else {}
 		)
+
+		# If this request refreshed cached filmography via TTL, record any new arrivals.
+		new_last_sync_at = getattr(company, "tmdb_last_sync_at", None)
+		source = (getattr(company, "tmdb_last_sync_source", "") or "").strip().lower()
+		if (
+			filmography_mode == "filmography"
+			and old_baseline_present
+			and old_last_sync_at is not None
+			and new_last_sync_at is not None
+			and new_last_sync_at != old_last_sync_at
+			and source == "ttl"
+		):
+			new_tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+			new_movie_ids = extract_movie_ids_from_filmography(new_tmdb_raw)
+			new_release_dates = extract_movie_release_dates_from_filmography(new_tmdb_raw)
+			# Add a sensible default credit label for company arrivals.
+			company_event_meta: dict[int, dict] = {}
+			pages = new_tmdb_raw.get("discover_movies_pages") or {}
+			if isinstance(pages, dict):
+				for payload in pages.values():
+					if not isinstance(payload, dict):
+						continue
+					for movie in payload.get("results", []) or []:
+						if not isinstance(movie, dict):
+							continue
+						mid = movie.get("id")
+						if not isinstance(mid, int):
+							continue
+						company_event_meta.setdefault(mid, {})["credit_job"] = "Production Company"
+
+			record_new_movie_arrivals(
+				user=request.user,
+				source_type="company",
+				source_id=tmdb_id,
+				source_name=company.name,
+				old_movie_ids=old_movie_ids,
+				new_movie_ids=new_movie_ids,
+				role="studio",
+				old_release_dates=old_release_dates,
+				new_release_dates=new_release_dates,
+				new_event_meta_by_movie=company_event_meta,
+				source_last_sync_at=getattr(company, "tmdb_last_sync_at", None),
+			)
 	else:
 		# Not followed => live fetch only (do not store in DB).
 		client = TMDbClient.from_settings()

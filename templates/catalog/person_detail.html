@@ -175,6 +175,9 @@
     <div class="muted">
       {% if person.tmdb_last_sync_at %}
         Last synced (IST): {{ person.tmdb_last_sync_at|localtime|date:"F j, Y H:i" }}
+        {% if person.tmdb_last_sync_source %}
+          {% if person.tmdb_last_sync_source == 'sync' %}(via Sync){% elif person.tmdb_last_sync_source == 'ttl' %}(via TTL){% else %}(via {{ person.tmdb_last_sync_source }}){% endif %}
+        {% endif %}
       {% else %}
         Last synced: not cached (live TMDb)
       {% endif %}
