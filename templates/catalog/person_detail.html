@@ -4,7 +4,7 @@
 {% block title %}{{ person.name }}{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/person_detail.css?v=20260509b" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/person_detail.css?v=20260519a" />
 {% endblock %}
 
 {% block extra_js %}
@@ -63,10 +63,12 @@
 
       {% elif active_info %}
         <div class="person-comeback-note">
-          <strong>
-            Active {{ active_info.years_active_label }}{% if active_info.followed_role %} as {{ active_info.followed_role }}{% endif %}
-          </strong>
-          <span class="muted">First release: {{ active_info.first_release_date|iso_date_long }}</span>
+          <div class="person-active-line">
+            <strong>
+              Active {{ active_info.years_active_label }}{% if active_info.followed_role %} as {{ active_info.followed_role }}{% endif %}
+            </strong>
+            <div class="muted">First release: {{ active_info.first_release_date|iso_date_long }}</div>
+          </div>
         </div>
       {% endif %}
 

@@ -593,7 +593,7 @@
 	}
 
 	.search-panel[data-panel="people"] .search-result-card,
-	.search-panel[data-panel="following"] .search-result-card {
+	.search-panel[data-panel="following"] .search-result-card:not(.search-company-card) {
 		grid-template-columns: 100px minmax(0, 1fr);
 		grid-template-rows: auto auto;
 		align-items: start;
@@ -602,21 +602,57 @@
 	}
 
 	.search-panel[data-panel="people"] .search-result-card .search-result-media,
-	.search-panel[data-panel="following"] .search-result-card .search-result-media {
+	.search-panel[data-panel="following"] .search-result-card:not(.search-company-card) .search-result-media {
 		grid-column: 1;
 		grid-row: 1;
 		width: 100px;
 		height: 100px;
 	}
 
+	/* Match company-tab company cards in the following panel on mobile */
+	.search-panel[data-panel="following"] .search-company-card {
+		display: block;
+	}
+
+	.search-panel[data-panel="following"] .search-company-card .search-result-right {
+		width: 100%;
+		display: grid;
+		grid-template-columns: minmax(120px, 220px) minmax(0, 1fr);
+		align-items: center;
+		gap: 12px;
+	}
+
+	.search-panel[data-panel="following"] .search-company-card .search-result-media {
+		width: auto;
+		height: auto;
+		max-height: 120px;
+		max-width: 220px;
+	}
+
+	.search-panel[data-panel="following"] .search-company-card .search-result-card-main {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		min-width: 0;
+	}
+
+	.search-panel[data-panel="following"] .search-company-card .search-result-title-row-stack {
+		gap: 4px;
+	}
+
+	.search-panel[data-panel="following"] .search-company-card .search-result-title-row strong {
+		white-space: normal;
+		overflow: visible;
+	}
+
 	.search-panel[data-panel="people"] .search-result-card .search-result-card-main,
-	.search-panel[data-panel="following"] .search-result-card .search-result-card-main {
+	.search-panel[data-panel="following"] .search-result-card:not(.search-company-card) .search-result-card-main {
 		grid-column: 2;
 		grid-row: 1;
 	}
 
 	.search-panel[data-panel="people"] .search-result-card .search-result-knownfor,
-	.search-panel[data-panel="following"] .search-result-card .search-result-knownfor {
+	.search-panel[data-panel="following"] .search-result-card:not(.search-company-card) .search-result-knownfor {
 		grid-column: 2;
 		grid-row: 2;
 		max-width: none;
@@ -626,24 +662,28 @@
 	}
 
 	.search-panel[data-panel="people"] .search-result-card .search-result-card-main,
-	.search-panel[data-panel="following"] .search-result-card .search-result-card-main {
+	.search-panel[data-panel="following"] .search-result-card:not(.search-company-card) .search-result-card-main {
 		min-width: 0;
 	}
 
 	.search-panel[data-panel="people"] .search-result-card .search-result-title-row strong,
-	.search-panel[data-panel="following"] .search-result-card .search-result-title-row strong {
+	.search-panel[data-panel="following"] .search-result-card:not(.search-company-card) .search-result-title-row strong {
 		white-space: normal;
 	}
 
 	.search-panel[data-panel="people"] .search-result-card .search-result-left-value.small,
-	.search-panel[data-panel="following"] .search-result-card .search-result-left-value.small {
+	.search-panel[data-panel="following"] .search-result-card:not(.search-company-card) .search-result-left-value.small {
 		white-space: normal;
 	}
 
 	.search-panel[data-panel="people"] .search-result-card .search-result-left-value.small,
-	.search-panel[data-panel="following"] .search-result-card .search-result-left-value.small {
+	.search-panel[data-panel="following"] .search-result-card:not(.search-company-card) .search-result-left-value.small {
 		font-size: 0.8rem;
 		line-height: 1.35;
+	}
+
+	.search-panel[data-panel="following"] .search-company-card .search-result-card-main-right {
+		gap: 3px;
 	}
 
 	.search-result-media {
@@ -658,7 +698,7 @@
 	}
 
 	.search-panel[data-panel="people"] .search-result-card .search-result-media,
-	.search-panel[data-panel="following"] .search-result-card .search-result-media {
+	.search-panel[data-panel="following"] .search-result-card:not(.search-company-card) .search-result-media {
 		width: 100px;
 		height: 100px;
 	}

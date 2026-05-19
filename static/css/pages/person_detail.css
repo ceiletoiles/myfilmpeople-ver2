@@ -712,10 +712,15 @@ main {
     margin-top: 6px;
   }
 
-  /* Visually place the muted date before the label on wide screens while keeping DOM order logical. */
+  /* Vertically center the muted date text with the label on mobile */
+  .person-active-line,
+  .person-inactive-line {
+    align-items: center;
+  }
+
+  /* Keep the muted date styled but preserve DOM order on mobile. */
   .person-active-line .muted,
   .person-inactive-line .muted {
-    order: -1;
     opacity: 0.85;
     white-space: nowrap;
   }
@@ -735,7 +740,6 @@ main {
     }
     .person-active-line .muted,
     .person-inactive-line .muted {
-      order: -1;
       white-space: nowrap;
     }
   }
