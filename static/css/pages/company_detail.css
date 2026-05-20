@@ -169,6 +169,31 @@
   flex-wrap: wrap;
 }
 
+@media (max-width: 700px) {
+  .company-meta-row {
+    flex-wrap: nowrap;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .company-meta-row .muted {
+    font-size: 13px;
+  }
+
+  .company-meta-row > :first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .company-meta-row > :last-child {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
+
 .company-filmography {
   margin-top: 8px;
 }

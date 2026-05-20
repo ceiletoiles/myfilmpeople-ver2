@@ -409,6 +409,31 @@ main {
   font-size: 1rem;
 }
 
+@media (max-width: 700px) {
+  .person-meta-row {
+    flex-wrap: nowrap;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .person-meta-row .muted {
+    font-size: 13px;
+  }
+
+  .person-meta-row > :first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .person-meta-row > :last-child {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
+
 .person-filmography {
   margin-top: 8px;
 }
