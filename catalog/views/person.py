@@ -593,6 +593,32 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			for it in filmography_items
 			if isinstance(it, dict) and isinstance(it.get("id"), int)
 		}
+
+		# Exclude movies where the current person has any self/archive-style credit
+		current_credits = person.tmdb_credits_raw or {}
+		def _current_has_no_self_credit(mid: int) -> bool:
+			# If any cast entry for this movie has a self-like character, exclude.
+			for c in (current_credits.get("cast") or []):
+				if not isinstance(c, dict):
+					continue
+				if c.get("id") != mid:
+					continue
+				char = str(c.get("character") or "")
+				if _is_self_character(char):
+					return False
+			# If any crew entry for this movie has a self-like job/department, exclude.
+			for c in (current_credits.get("crew") or []):
+				if not isinstance(c, dict):
+					continue
+				if c.get("id") != mid:
+					continue
+				job = str(c.get("job") or "")
+				dept = str(c.get("department") or "")
+				if _is_self_character(job) or _is_self_character(dept):
+					return False
+			return True
+
+		current_movie_ids = {mid for mid in current_movie_ids if _current_has_no_self_credit(mid)}
 		followed_people_qs = (
 			PersonFollow.objects.select_related("person")
 			.filter(user=request.user)
@@ -606,8 +632,31 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			if followed_person is None or followed_tmdb_id <= 0 or followed_tmdb_id in seen_followed_people:
 				continue
 
-			other_movie_ids = extract_movie_ids_from_credits(getattr(followed_person, "tmdb_credits_raw", None) or {})
-			shared_movie_ids = current_movie_ids & other_movie_ids
+			followed_credits = getattr(followed_person, "tmdb_credits_raw", None) or {}
+			other_movie_ids = extract_movie_ids_from_credits(followed_credits)
+
+			# Exclude movies where the followed person only appears as "self" / "archive footage"
+			def _followed_has_no_self_credit(mid: int) -> bool:
+				# Return False if any cast entry is self-like
+				for c in (followed_credits.get("cast") or []):
+					if not isinstance(c, dict):
+						continue
+					if c.get("id") != mid:
+						continue
+					if _is_self_character(str(c.get("character") or "")):
+						return False
+				# Return False if any crew entry is self-like
+				for c in (followed_credits.get("crew") or []):
+					if not isinstance(c, dict):
+						continue
+					if c.get("id") != mid:
+						continue
+					if _is_self_character(str(c.get("job") or "")) or _is_self_character(str(c.get("department") or "")):
+						return False
+				return True
+
+			other_movie_ids_filtered = {mid for mid in other_movie_ids if _followed_has_no_self_credit(mid)}
+			shared_movie_ids = current_movie_ids & other_movie_ids_filtered
 			if not shared_movie_ids:
 				continue
 
@@ -630,7 +679,6 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		shared_followed_people.sort(
 			key=lambda item: (-int(item.get("shared_count") or 0), str(item.get("name") or "").lower())
 		)
-		shared_followed_people = shared_followed_people[:6]
 	except Exception:
 		shared_followed_people = []
 
