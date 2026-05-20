@@ -121,16 +121,18 @@
                       <div class="release-item">
                         <div class="release-content">
                           <div class="release-left">
-                            <div class="release-top">
-                              <div class="release-date-block">
-                                <span class="release-date">{% if rd.show_date %}{{ rd.date_display|default:rd.date }}{% else %}&nbsp;{% endif %}</span>
-                                {% if rd.show_date and rd.note %}<p class="release-note">{{ rd.note }}</p>{% endif %}
+                              <div class="release-top-grid">
+                                <div class="release-date-block">
+                                  <span class="release-date">{% if rd.show_date %}{{ rd.date_display|default:rd.date }}{% else %}&nbsp;{% endif %}</span>
+                                </div>
+                                <div class="release-country-wrapper">
+                                  <span class="release-country">{{ rd.country_name|default:rd.country_code }}{% if rd.certification %} <span class="release-certification">{{ rd.certification }}</span>{% endif %}</span>
+                                </div>
                               </div>
-                              <div class="release-country-wrapper">
-                                <span class="release-country">{{ rd.country_name|default:rd.country_code }}{% if rd.certification %} <span class="release-certification">{{ rd.certification }}</span>{% endif %}</span>
-                                {% if not rd.show_date and rd.note %}<p class="release-note">{{ rd.note }}</p>{% endif %}
+                              <div class="release-notes-row">
+                                <div class="date-note-cell">{% if rd.show_note_on_date and rd.note %}<p class="release-note date-note">{{ rd.note }}</p>{% endif %}</div>
+                                <div class="country-note-cell">{% if not rd.show_note_on_date and rd.note %}<p class="release-note country-note">{{ rd.note }}</p>{% endif %}</div>
                               </div>
-                            </div>
                           </div>
                         </div>
                       </div>

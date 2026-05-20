@@ -390,12 +390,23 @@ def _build_release_groups(tmdb_raw: dict[str, Any]) -> list[dict[str, Any]]:
 	for release_type in ordered_types:
 		releases = grouped.get(release_type, [])
 		displayed_releases: list[dict[str, Any]] = []
+		# For certain release types we want to show the date for each country
+		# (do not collapse countries that share the same date). However we
+		# still want to keep release notes associated with the original
+		# date-grouping (notes intended for the date only appear once).
+		special_types_no_merge = {1, 2}  # Premiere, Theatrical (limited)
 		previous_date_key: str | None = None
 		for release in releases:
-			date_key = release.get("date") or release.get("raw_date") or ""
-			display_release = {**release, "show_date": date_key != previous_date_key}
+			date_only_key = release.get("date") or release.get("raw_date") or ""
+			# show_date: True for special types (never merge), otherwise only
+			# show when the date differs from the previous date in the group.
+			show_date = (release_type in special_types_no_merge) or (date_only_key != previous_date_key)
+			# show_note_on_date: True only for the first entry of a date group
+			# (this preserves whether a note belongs to the date vs a country).
+			show_note_on_date = date_only_key != previous_date_key
+			display_release = {**release, "show_date": show_date, "show_note_on_date": show_note_on_date}
 			displayed_releases.append(display_release)
-			previous_date_key = date_key
+			previous_date_key = date_only_key
 
 		release_groups.append(
 			{
