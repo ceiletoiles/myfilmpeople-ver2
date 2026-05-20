@@ -52,6 +52,11 @@ def _is_self_character(character: str) -> bool:
 	return False
 
 
+def _is_documentary(item: dict) -> bool:
+	genres = item.get("genre_ids", []) or []
+	return 99 in genres
+
+
 def _calculate_age(birthday: date | None, deathday: date | None = None) -> int | None:
 	"""Calculate age from birthday to today (or to deathday if provided)."""
 	if not birthday:
@@ -406,6 +411,8 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		mid = item.get("id")
 		if not isinstance(mid, int):
 			continue
+		if _is_documentary(item):
+			continue
 		character = str(item.get("character") or "").strip()
 		if hide_self_appearances and _is_self_character(character):
 			continue
@@ -416,6 +423,8 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	for item in crew_items:
 		mid = item.get("id")
 		if not isinstance(mid, int):
+			continue
+		if _is_documentary(item):
 			continue
 		dept = str(item.get("department") or "").strip()
 		job = str(item.get("job") or "").strip()

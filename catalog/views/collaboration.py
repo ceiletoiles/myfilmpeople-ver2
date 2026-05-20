@@ -85,6 +85,8 @@ def _get_frequent_collaborators(
 		for item in credit_items:
 			if item.get("media_type") not in (None, "movie"):
 				continue
+			if _is_documentary(item):
+				continue
 			mid = item.get("id")
 			if not isinstance(mid, int):
 				continue
@@ -263,6 +265,8 @@ def _build_collaboration_results(
 		for item in credit_items:
 			if item.get("media_type") not in (None, "movie"):
 				continue
+			if _is_documentary(item):
+				continue
 			mid = item.get("id")
 			if not isinstance(mid, int):
 				continue
@@ -284,6 +288,9 @@ def _build_collaboration_results(
 			any_item = per_person_credit_index.get(p.tmdb_id, {}).get(mid)
 			if any_item:
 				break
+
+		if any_item is not None and _is_documentary(any_item):
+			continue
 
 		title = (any_item or {}).get("title") or (any_item or {}).get("name") or str(mid)
 		release_date_str = (any_item or {}).get("release_date") or (any_item or {}).get("first_air_date")
