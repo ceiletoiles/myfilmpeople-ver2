@@ -56,6 +56,40 @@
     });
   }
 
+  function setPersonSection(sectionKey) {
+    var tabs = document.querySelectorAll('[data-person-section-tab]');
+    var panels = document.querySelectorAll('[data-person-section-panel]');
+    if (!tabs.length || !panels.length) return;
+
+    var activeKey = sectionKey || 'filmography';
+
+    tabs.forEach(function (tab) {
+      var isActive = tab.getAttribute('data-person-section-tab') === activeKey;
+      tab.classList.toggle('active', isActive);
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+
+    panels.forEach(function (panel) {
+      var isActive = panel.getAttribute('data-person-section-panel') === activeKey;
+      panel.hidden = !isActive;
+      panel.classList.toggle('is-active', isActive);
+    });
+  }
+
+  function initPersonSections() {
+    var tabs = document.querySelectorAll('[data-person-section-tab]');
+    var panels = document.querySelectorAll('[data-person-section-panel]');
+    if (!tabs.length || !panels.length) return;
+
+    setPersonSection('filmography');
+
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        setPersonSection(tab.getAttribute('data-person-section-tab') || 'filmography');
+      });
+    });
+  }
+
   function closeAllKebabMenus(exceptDetails) {
     document.querySelectorAll('details[data-kebab-menu][open]').forEach(function (d) {
       if (exceptDetails && d === exceptDetails) return;
@@ -65,10 +99,12 @@
 
   // Init ASAP (script is loaded at end of body).
   initFilmographyFilters();
+  initPersonSections();
 
   // Also init on DOMContentLoaded as a fallback.
   document.addEventListener('DOMContentLoaded', function () {
     initFilmographyFilters();
+    initPersonSections();
   });
 
   document.addEventListener('click', function (e) {

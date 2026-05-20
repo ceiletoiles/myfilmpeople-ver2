@@ -4,7 +4,7 @@
 {% block title %}{{ person.name }}{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/person_detail.css?v=20260519a" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/person_detail.css?v=20260520a" />
 {% endblock %}
 
 {% block extra_js %}
@@ -110,63 +110,104 @@
   </div>
 
   <div class="person-filmography">
-    <h2 class="person-filmography-title">Filmography</h2>
+    <input type="radio" name="person-section" id="person-section-filmography" class="person-section-toggle" checked />
+    {% if shared_followed_people %}
+      <input type="radio" name="person-section" id="person-section-worked-with" class="person-section-toggle" />
+    {% endif %}
 
-    <div class="filmography-filters" id="filmographyFilters">
-      {% for f in filmography_filters %}
-        <button
-          type="button"
-          class="filter-btn{% if f.key == default_filmography_filter %} active{% endif %}"
-          data-filter="{{ f.key }}"
-        >
-          {{ f.label }} ({{ f.count }})
-        </button>
-      {% endfor %}
+    <div class="person-filmography-header">
+      <div class="person-section-tabs" role="tablist" aria-label="Person sections">
+        <label for="person-section-filmography" class="person-section-tab" role="tab" aria-selected="true">Filmography</label>
+        {% if shared_followed_people %}
+          <label for="person-section-worked-with" class="person-section-tab" role="tab" aria-selected="false">Worked with</label>
+        {% endif %}
+      </div>
     </div>
 
-    <div class="filmography-grid" id="filmographyList" data-default-filter="{{ default_filmography_filter }}">
-      {% if filmography_items %}
-        {% for it in filmography_items %}
-          <div
-            class="filmography-item"
-            data-filmography-item
-            data-depts="{% for k in it.filters %}{{ k }} {% endfor %}"
-          >
-            <a class="filmography-poster-link" href="{% url 'movie_detail' it.id %}">
-              {% if it.poster_path %}
-                <img class="filmography-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
-              {% else %}
-                <img class="filmography-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
-              {% endif %}
-            </a>
+    <div class="person-section-panels">
+      <section class="person-section-panel is-active" data-person-section-panel="filmography" role="tabpanel">
+        <div class="filmography-filters" id="filmographyFilters">
+          {% for f in filmography_filters %}
+            <button
+              type="button"
+              class="filter-btn{% if f.key == default_filmography_filter %} active{% endif %}"
+              data-filter="{{ f.key }}"
+            >
+              {{ f.label }} ({{ f.count }})
+            </button>
+          {% endfor %}
+        </div>
 
-            <div class="filmography-meta">
-              <a class="filmography-title" href="{% url 'movie_detail' it.id %}"><strong>{{ it.title }}</strong></a>
-              <div class="filmography-year muted">{% if it.year %}{{ it.year }}{% else %}TBA{% endif %}</div>
-              <div class="muted filmography-role">
-                {% if it.countdown_text %}
-                  <div class="film-countdown">{{ it.countdown_text }}</div>
-                {% endif %}
-                <span data-role="all">
-                  {% for role in it.roles_all_primary_parts %}
-                    {{ role }}{% if not forloop.last %}, {% endif %}
-                  {% endfor %}
-                  {% if it.roles_all_secondary_parts %}<br />{% for role in it.roles_all_secondary_parts %}{{ role }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
-                </span>
-                {% for r in it.roles_by_filter %}
-                  <span data-role="{{ r.key }}">
-                    {% for role in r.primary_parts %}
-                      {{ role }}{% if not forloop.last %}, {% endif %}
+        <div class="filmography-grid" id="filmographyList" data-default-filter="{{ default_filmography_filter }}">
+          {% if filmography_items %}
+            {% for it in filmography_items %}
+              <div
+                class="filmography-item"
+                data-filmography-item
+                data-depts="{% for k in it.filters %}{{ k }} {% endfor %}"
+              >
+                <a class="filmography-poster-link" href="{% url 'movie_detail' it.id %}">
+                  {% if it.poster_path %}
+                    <img class="filmography-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                  {% else %}
+                    <img class="filmography-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                  {% endif %}
+                </a>
+
+                <div class="filmography-meta">
+                  <a class="filmography-title" href="{% url 'movie_detail' it.id %}"><strong>{{ it.title }}</strong></a>
+                  <div class="filmography-year muted">{% if it.year %}{{ it.year }}{% else %}TBA{% endif %}</div>
+                  <div class="muted filmography-role">
+                    {% if it.countdown_text %}
+                      <div class="film-countdown">{{ it.countdown_text }}</div>
+                    {% endif %}
+                    <span data-role="all">
+                      {% for role in it.roles_all_primary_parts %}
+                        {{ role }}{% if not forloop.last %}, {% endif %}
+                      {% endfor %}
+                      {% if it.roles_all_secondary_parts %}<br />{% for role in it.roles_all_secondary_parts %}{{ role }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
+                    </span>
+                    {% for r in it.roles_by_filter %}
+                      <span data-role="{{ r.key }}">
+                        {% for role in r.primary_parts %}
+                          {{ role }}{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                        {% if r.secondary_parts %}<br />{% for role in r.secondary_parts %}{{ role }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
+                      </span>
                     {% endfor %}
-                    {% if r.secondary_parts %}<br />{% for role in r.secondary_parts %}{{ role }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
-                  </span>
-                {% endfor %}
+                  </div>
+                </div>
               </div>
-            </div>
+            {% endfor %}
+          {% else %}
+            <p class="muted">No credits found.</p>
+          {% endif %}
+        </div>
+      </section>
+
+      {% if shared_followed_people %}
+        <section class="person-section-panel" data-person-section-panel="worked-with" role="tabpanel">
+          <div class="person-worked-with-list person-worked-with-grid">
+            {% for colleague in shared_followed_people %}
+              <a class="person-worked-with-item no-decoration" href="{% url 'person_detail' colleague.tmdb_id %}">
+                <span class="person-worked-with-avatar-wrap">
+                  {% if colleague.profile_path %}
+                    <img class="person-worked-with-avatar{% if colleague.deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ colleague.profile_path }}" alt="{{ colleague.name }}" loading="lazy" />
+                  {% else %}
+                    <img class="person-worked-with-avatar{% if colleague.deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ colleague.name }}" loading="lazy" />
+                  {% endif %}
+                </span>
+
+                <span class="person-worked-with-copy">
+                  <span class="person-worked-with-name">{{ colleague.name }}</span>
+                  <span class="person-worked-with-meta muted">{{ colleague.shared_count }} shared film{{ colleague.shared_count|pluralize }}</span>
+                </span>
+
+                <span class="person-worked-with-caret" aria-hidden="true"></span>
+              </a>
+            {% endfor %}
           </div>
-        {% endfor %}
-      {% else %}
-        <p class="muted">No credits found.</p>
+        </section>
       {% endif %}
     </div>
   </div>

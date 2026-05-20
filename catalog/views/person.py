@@ -14,6 +14,7 @@ from django.core.cache import cache
 from ..models import PersonFollow
 from ..new_movie_helpers import (
 	build_person_comeback_event_meta,
+	extract_movie_ids_from_credits,
 	extract_movie_ids_from_credits_for_role,
 	extract_movie_release_dates_from_credits_for_role,
 	get_person_active_info,
@@ -585,6 +586,49 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	for k in filter_keys:
 		filmography_filters.append({"key": k, "label": _filter_label(k), "count": filter_counts.get(k, 0)})
 
+	shared_followed_people: list[dict[str, object]] = []
+	try:
+		current_movie_ids = {
+			int(it.get("id"))
+			for it in filmography_items
+			if isinstance(it, dict) and isinstance(it.get("id"), int)
+		}
+		followed_people_qs = (
+			PersonFollow.objects.select_related("person")
+			.filter(user=request.user)
+			.exclude(person__tmdb_id=tmdb_id)
+			.order_by("person__name", "person__tmdb_id", "role")
+		)
+		seen_followed_people: set[int] = set()
+		for follow in followed_people_qs:
+			followed_person = getattr(follow, "person", None)
+			followed_tmdb_id = int(getattr(followed_person, "tmdb_id", 0) or 0)
+			if followed_person is None or followed_tmdb_id <= 0 or followed_tmdb_id in seen_followed_people:
+				continue
+
+			other_movie_ids = extract_movie_ids_from_credits(getattr(followed_person, "tmdb_credits_raw", None) or {})
+			shared_movie_ids = current_movie_ids & other_movie_ids
+			if not shared_movie_ids:
+				continue
+
+			seen_followed_people.add(followed_tmdb_id)
+			shared_followed_people.append(
+				{
+					"tmdb_id": followed_tmdb_id,
+					"name": getattr(followed_person, "name", str(followed_tmdb_id)),
+					"profile_path": getattr(followed_person, "profile_path", "") or "",
+					"deathday": (getattr(followed_person, "tmdb_raw", {}) or {}).get("deathday"),
+					"shared_count": len(shared_movie_ids),
+				}
+			)
+
+		shared_followed_people.sort(
+			key=lambda item: (-int(item.get("shared_count") or 0), str(item.get("name") or "").lower())
+		)
+		shared_followed_people = shared_followed_people[:6]
+	except Exception:
+		shared_followed_people = []
+
 	def _follow_role_default_filter() -> str:
 		if not follow_roles:
 			return "all"
@@ -624,6 +668,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"follow_roles": follow_roles,
 			"role_options": role_options,
 			"role_options_remaining": role_options_remaining,
+			"shared_followed_people": shared_followed_people,
 			"note_text": note_text,
 			"born_display": born_display,
 			"also_known_as": also_known_as,
