@@ -189,7 +189,7 @@
         <section class="person-section-panel" data-person-section-panel="worked-with" role="tabpanel">
           <div class="person-worked-with-list person-worked-with-grid">
             {% for colleague in shared_followed_people %}
-              <a class="person-worked-with-item no-decoration" href="{% url 'person_detail' colleague.tmdb_id %}">
+              <a class="person-worked-with-item no-decoration" href="{% url 'collaboration_finder' %}?person_ids={{ person.tmdb_id }}&person_ids={{ colleague.tmdb_id }}">
                 <span class="person-worked-with-avatar-wrap">
                   {% if colleague.profile_path %}
                     <img class="person-worked-with-avatar{% if colleague.deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ colleague.profile_path }}" alt="{{ colleague.name }}" loading="lazy" />

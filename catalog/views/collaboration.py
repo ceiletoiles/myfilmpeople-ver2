@@ -189,6 +189,138 @@ def _roles_for_movie(*, credits_raw: dict, movie_id: int) -> tuple[list[str], bo
 	return roles, has_self_role
 
 
+def _build_collaboration_results(
+	user_id: int,
+	selected_ids: list[int],
+	*,
+	client: TMDbClient | None = None,
+) -> tuple[list[dict], list[dict], int]:
+	seen: set[int] = set()
+	selected_ids = [pid for pid in selected_ids if not (pid in seen or seen.add(pid))]
+	selected_people: list[dict] = []
+	results: list[dict] = []
+	collaborators_count = 0
+
+	if len(selected_ids) < 2:
+		return selected_people, results, collaborators_count
+
+	if client is None:
+		client = TMDbClient.from_settings()
+
+	persons = []
+	movie_sets: list[set[int]] = []
+	per_person_credit_index: dict[int, dict[int, dict]] = {}
+
+	followed_ids = set(
+		PersonFollow.objects.filter(user_id=user_id)
+		.values_list("person__tmdb_id", flat=True)
+		.distinct()
+	)
+
+	for pid in selected_ids:
+		person_obj = None
+		try:
+			person_obj = Person.objects.get(tmdb_id=pid)
+		except Person.DoesNotExist:
+			pass
+
+		if not person_obj:
+			try:
+				raw = client.get_person(pid)
+				credits = client.get_person_credits(pid)
+			except Exception:
+				continue
+			person_obj = SimpleNamespace(
+				tmdb_id=pid,
+				name=(raw.get("name") or str(pid)),
+				profile_path=(raw.get("profile_path") or ""),
+				tmdb_raw=raw,
+				tmdb_credits_raw=credits,
+				tmdb_last_sync_at=None,
+			)
+
+		persons.append(person_obj)
+		selected_people.append(
+			{
+				"tmdb_id": person_obj.tmdb_id,
+				"name": person_obj.name,
+				"profile_path": getattr(person_obj, "profile_path", "") or "",
+				"known_for_department": str((getattr(person_obj, "tmdb_raw", {}) or {}).get("known_for_department") or "").strip(),
+				"followed": pid in followed_ids,
+			}
+		)
+
+		credits = person_obj.tmdb_credits_raw or {}
+		credit_items = []
+		credit_items.extend(credits.get("cast", []) or [])
+		credit_items.extend(credits.get("crew", []) or [])
+
+		movie_index: dict[int, dict] = {}
+		movie_ids: set[int] = set()
+		for item in credit_items:
+			if item.get("media_type") not in (None, "movie"):
+				continue
+			mid = item.get("id")
+			if not isinstance(mid, int):
+				continue
+			movie_ids.add(mid)
+			movie_index.setdefault(mid, item)
+
+		movie_sets.append(movie_ids)
+		per_person_credit_index[person_obj.tmdb_id] = movie_index
+
+	if len(persons) < 2:
+		return selected_people, results, collaborators_count
+
+	collaborators_count = len(persons)
+	shared_movie_ids: set[int] = set.intersection(*movie_sets) if movie_sets else set()
+
+	for mid in shared_movie_ids:
+		any_item = None
+		for p in persons:
+			any_item = per_person_credit_index.get(p.tmdb_id, {}).get(mid)
+			if any_item:
+				break
+
+		title = (any_item or {}).get("title") or (any_item or {}).get("name") or str(mid)
+		release_date_str = (any_item or {}).get("release_date") or (any_item or {}).get("first_air_date")
+		release_dt = _parse_iso_date(release_date_str)
+		poster_path = (any_item or {}).get("poster_path") or ""
+
+		roles = []
+		has_self_role = False
+		for p in persons:
+			role_texts, is_self_role = _roles_for_movie(
+				credits_raw=p.tmdb_credits_raw or {},
+				movie_id=mid,
+			)
+			if is_self_role:
+				has_self_role = True
+			roles.append(
+				{
+					"person": p,
+					"role": ", ".join(role_texts),
+				}
+			)
+
+		if has_self_role:
+			continue
+
+		results.append(
+			{
+				"tmdb_id": mid,
+				"title": title,
+				"release_date": release_date_str or "",
+				"release_dt": release_dt,
+				"poster_path": poster_path,
+				"roles": roles,
+			}
+		)
+
+	results.sort(key=lambda r: (r["release_dt"] is None, r["release_dt"] or date.min), reverse=True)
+	return selected_people, results, collaborators_count
+
+
 @login_required
 def collaboration_finder(request: HttpRequest) -> HttpResponse:
 	query = (request.GET.get("q") or "").strip()
@@ -207,140 +339,33 @@ def collaboration_finder(request: HttpRequest) -> HttpResponse:
 		min_shared_count=2,
 	)
 
+	if request.method == "GET":
+		try:
+			selected_ids = [int(x) for x in request.GET.getlist("person_ids")]
+		except ValueError:
+			selected_ids = []
+
+		if len(selected_ids) >= 2:
+			selected_people, results, collaborators_count = _build_collaboration_results(
+				request.user.id,
+				selected_ids,
+			)
+
 	if request.method == "POST":
 		try:
 			selected_ids = [int(x) for x in request.POST.getlist("person_ids")]
 		except ValueError:
 			selected_ids = []
 
-		# De-duplicate while preserving order
-		seen: set[int] = set()
-		selected_ids = [pid for pid in selected_ids if not (pid in seen or seen.add(pid))]
-
 		if len(selected_ids) < 2:
 			messages.error(request, "Select at least two people.")
 		else:
-			client = TMDbClient.from_settings()
-			persons = []
-			movie_sets: list[set[int]] = []
-			per_person_credit_index: dict[int, dict[int, dict]] = {}
-			
-			# Pre-fetch all followed person IDs for this user
-			followed_ids = set(
-				PersonFollow.objects.filter(user=request.user)
-				.values_list("person__tmdb_id", flat=True)
-				.distinct()
+			selected_people, results, collaborators_count = _build_collaboration_results(
+				request.user.id,
+				selected_ids,
 			)
-
-			for pid in selected_ids:
-				# Try to get person from database first (already cached)
-				person_obj = None
-				try:
-					person_obj = Person.objects.get(tmdb_id=pid)
-				except Person.DoesNotExist:
-					pass
-
-				# If not in DB, fetch from API
-				if not person_obj:
-					try:
-						raw = client.get_person(pid)
-						credits = client.get_person_credits(pid)
-					except Exception as exc:  # noqa: BLE001
-						messages.error(request, f"TMDb error for person {pid}: {exc}")
-						continue
-					person_obj = SimpleNamespace(
-						tmdb_id=pid,
-						name=(raw.get("name") or str(pid)),
-						profile_path=(raw.get("profile_path") or ""),
-						tmdb_raw=raw,
-						tmdb_credits_raw=credits,
-						tmdb_last_sync_at=None,
-					)
-
-				persons.append(person_obj)
-				selected_people.append(
-					{
-						"tmdb_id": person_obj.tmdb_id,
-						"name": person_obj.name,
-						"profile_path": getattr(person_obj, "profile_path", "") or "",
-						"known_for_department": str((getattr(person_obj, "tmdb_raw", {}) or {}).get("known_for_department") or "").strip(),
-						"followed": pid in followed_ids,
-					}
-				)
-
-				credits = person_obj.tmdb_credits_raw or {}
-				credit_items = []
-				credit_items.extend(credits.get("cast", []) or [])
-				credit_items.extend(credits.get("crew", []) or [])
-
-				movie_index: dict[int, dict] = {}
-				movie_ids: set[int] = set()
-				for item in credit_items:
-					if item.get("media_type") not in (None, "movie"):
-						continue
-					mid = item.get("id")
-					if not isinstance(mid, int):
-						continue
-					movie_ids.add(mid)
-					movie_index.setdefault(mid, item)
-
-				movie_sets.append(movie_ids)
-				per_person_credit_index[person_obj.tmdb_id] = movie_index
-
-			if len(persons) < 2:
+			if len(selected_people) < 2:
 				messages.error(request, "Select at least two valid people.")
-			else:
-				collaborators_count = len(persons)
-				shared_movie_ids: set[int] = set.intersection(*movie_sets) if movie_sets else set()
-
-				for mid in shared_movie_ids:
-					any_item = None
-					for p in persons:
-						any_item = per_person_credit_index.get(p.tmdb_id, {}).get(mid)
-						if any_item:
-							break
-
-					title = (any_item or {}).get("title") or (any_item or {}).get("name") or str(mid)
-					release_date_str = (any_item or {}).get("release_date") or (any_item or {}).get(
-						"first_air_date"
-					)
-					release_dt = _parse_iso_date(release_date_str)
-					poster_path = (any_item or {}).get("poster_path") or ""
-
-					roles = []
-					has_self_role = False
-					for p in persons:
-						role_texts, is_self_role = _roles_for_movie(
-							credits_raw=p.tmdb_credits_raw or {},
-							movie_id=mid,
-						)
-						if is_self_role:
-							has_self_role = True
-						roles.append(
-							{
-								"person": p,
-								"role": ", ".join(role_texts),
-							}
-						)
-
-					if has_self_role:
-						continue
-
-					results.append(
-						{
-							"tmdb_id": mid,
-							"title": title,
-							"release_date": release_date_str or "",
-							"release_dt": release_dt,
-							"poster_path": poster_path,
-							"roles": roles,
-						}
-					)
-
-				results.sort(
-					key=lambda r: (r["release_dt"] is None, r["release_dt"] or date.min),
-					reverse=True,
-				)
 
 	return render(
 		request,
@@ -353,7 +378,7 @@ def collaboration_finder(request: HttpRequest) -> HttpResponse:
 			"results": results,
 			"results_count": len(results),
 			"collaborators_count": collaborators_count,
-			"has_results_request": request.method == "POST" and len(selected_people) >= 2,
+			"has_results_request": len(selected_people) >= 2,
 			"frequent_collaborators": frequent_collaborators,
 		},
 	)
