@@ -618,6 +618,11 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 					"name": getattr(followed_person, "name", str(followed_tmdb_id)),
 					"profile_path": getattr(followed_person, "profile_path", "") or "",
 					"deathday": (getattr(followed_person, "tmdb_raw", {}) or {}).get("deathday"),
+					"known_for_department": str(
+						((getattr(followed_person, "tmdb_raw", {}) or {}).get("known_for_department") or "")
+						.strip()
+						or (getattr(follow, "role", "") or "").strip()
+					),
 					"shared_count": len(shared_movie_ids),
 				}
 			)

@@ -18,8 +18,8 @@ main {
 }
 
 .person-profile {
-  width: 250px;
-  height: 375px;
+  width: 300px;
+  height: 450px;
   object-fit: cover;
   border-radius: 10px;
   background: #e2e8f0;
@@ -36,7 +36,7 @@ main {
   align-items: start;
   min-width: 0;
   align-content: start;
-  min-height: 375px;
+  min-height: 450px;
   height: auto;
 }
 
@@ -593,21 +593,24 @@ main {
 }
 
 .person-worked-with-grid {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: 0;
 }
 
 .person-worked-with-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid #dbe4f0;
-  border-radius: 16px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03);
+  gap: 14px;
+  padding: 14px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   min-width: 0;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .person-worked-with-avatar-wrap {
@@ -615,8 +618,8 @@ main {
 }
 
 .person-worked-with-avatar {
-  width: 46px;
-  height: 46px;
+  width: 54px;
+  height: 54px;
   border-radius: 999px;
   object-fit: cover;
   background: #e2e8f0;
@@ -638,7 +641,7 @@ main {
 }
 
 .person-worked-with-meta {
-  font-size: 0.92rem;
+  font-size: 0.95rem;
 }
 
 .person-worked-with-caret {
@@ -661,14 +664,14 @@ main {
 
 .person-worked-with-subtitle {
   margin-top: 4px;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
 }
 
 /* Mobile: reduce font sizes for compact person profile and filmography tags */
 @media (max-width: 700px) {
   .person-profile {
-    width: 160px;
-    height: 240px;
+    width: 200px;
+    height: 300px;
   }
 
   .person-header {
@@ -690,7 +693,7 @@ main {
   .person-bio-text,
   .person-aka-list,
   .person-known-for-grid {
-    font-size: 13px;
+    font-size: 14px;
   }
 
   .person-bio-text {
@@ -731,7 +734,7 @@ main {
 
   .person-worked-with-empty,
   .person-worked-with-subtitle {
-    font-size: 13px;
+    font-size: 14px;
   }
 
   /* Tighten filmography filter and grid spacing on mobile */

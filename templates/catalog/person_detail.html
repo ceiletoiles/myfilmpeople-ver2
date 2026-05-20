@@ -200,7 +200,12 @@
 
                 <span class="person-worked-with-copy">
                   <span class="person-worked-with-name">{{ colleague.name }}</span>
-                  <span class="person-worked-with-meta muted">{{ colleague.shared_count }} shared film{{ colleague.shared_count|pluralize }}</span>
+                  <span class="person-worked-with-meta muted">
+                    {% if colleague.known_for_department %}
+                      {{ colleague.known_for_department }} ·
+                    {% endif %}
+                    {{ colleague.shared_count }} shared film{{ colleague.shared_count|pluralize }}
+                  </span>
                 </span>
 
                 <span class="person-worked-with-caret" aria-hidden="true"></span>
