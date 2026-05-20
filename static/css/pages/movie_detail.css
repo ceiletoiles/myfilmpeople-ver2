@@ -122,14 +122,14 @@ main {
   margin: 0;
   font-size: 35px;
   line-height: 1.1;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  hyphens: auto;
 }
 
 .movie-details {
+  min-width: 0;
   height: 300px;
   display: flex;
   flex-direction: column;
@@ -785,9 +785,8 @@ main {
   }
 
   .movie-details {
-    min-height: 240px;
-    height: auto;
-    overflow: visible;
+    height: 240px;
+    overflow: hidden;
   }
 
   .movie-trailer-section {
@@ -804,8 +803,6 @@ main {
 
   .movie-title {
     font-size: 28px;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
   }
   .movie-tagline {
     font-size: 13px;

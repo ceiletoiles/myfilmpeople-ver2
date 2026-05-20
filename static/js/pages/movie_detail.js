@@ -210,3 +210,85 @@
     window.setTimeout(scrollToContent, 140);
   });
 })();
+
+(function () {
+  // Keep the title+meta column aligned with the poster height.
+  // We shrink the title font-size (within a reasonable range) until the
+  // `.movie-details` content fits without overflowing.
+
+  var title = document.querySelector('.movie-title');
+  var details = document.querySelector('.movie-details');
+  var poster = document.querySelector('.movie-poster-image');
+
+  if (!title || !details || !poster) {
+    return;
+  }
+
+  var scheduled = false;
+
+  function isMobile() {
+    return (
+      window.matchMedia &&
+      window.matchMedia('(max-width: 700px)').matches
+    );
+  }
+
+  function fitTitleToPoster() {
+    if (scheduled) {
+      return;
+    }
+    scheduled = true;
+
+    window.requestAnimationFrame(function () {
+      scheduled = false;
+
+      var posterRect = poster.getBoundingClientRect();
+      var posterHeight = Math.round(posterRect.height || 0);
+      if (!posterHeight) {
+        return;
+      }
+
+      // Match the details column height to the poster height.
+      details.style.height = String(posterHeight) + 'px';
+      details.style.overflow = 'hidden';
+
+      // Reset any previous inline styles so we start from the CSS baseline.
+      title.style.fontSize = '';
+      title.style.lineHeight = '';
+
+      var computed = window.getComputedStyle(title);
+      var startSize = parseFloat(computed.fontSize || '0') || (isMobile() ? 28 : 35);
+
+      // Don't go above the intended baseline sizes.
+      var maxSize = Math.min(startSize, isMobile() ? 28 : 35);
+      var minSize = isMobile() ? 14 : 16;
+      var size = maxSize;
+
+      // Apply and shrink until the whole details block fits.
+      title.style.fontSize = String(size) + 'px';
+
+      var guard = 0;
+      while (guard < 48 && details.scrollHeight > posterHeight + 1 && size > minSize) {
+        size -= 1;
+        title.style.fontSize = String(size) + 'px';
+        guard += 1;
+      }
+
+      // Last resort: tighten title line-height a touch if still overflowing.
+      if (details.scrollHeight > posterHeight + 1) {
+        title.style.lineHeight = '1.05';
+      }
+    });
+  }
+
+  // Run after the poster image dimensions are known.
+  if (poster.complete) {
+    fitTitleToPoster();
+  } else {
+    poster.addEventListener('load', fitTitleToPoster, { once: true });
+  }
+
+  window.addEventListener('resize', fitTitleToPoster);
+  // Fonts/layout can shift shortly after first paint.
+  window.setTimeout(fitTitleToPoster, 60);
+})();

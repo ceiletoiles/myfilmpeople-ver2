@@ -561,12 +561,12 @@ main {
   font-size: 14.4px;
   line-height: 1.2;
   width: 100%;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
-  min-height: 34.6px;
+  display: block;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  min-height: 0;
 }
 
 .filmography-year {
