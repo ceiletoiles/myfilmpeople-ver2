@@ -33,6 +33,7 @@ from ._shared import (
 
 
 _SELF_CHARACTER_RE = re.compile(r"\bself\b", re.IGNORECASE)
+_NON_REAL_COLLAB_RE = re.compile(r"\b(?:special\s+)?thanks?\b|\bin\s+memory\s+of\b", re.IGNORECASE)
 
 
 def _is_self_character(character: str) -> bool:
@@ -41,6 +42,8 @@ def _is_self_character(character: str) -> bool:
 		return False
 	ch_l = ch.lower()
 	if _SELF_CHARACTER_RE.search(ch_l):
+		return True
+	if _NON_REAL_COLLAB_RE.search(ch_l):
 		return True
 	# Common TMDb variants that imply a self appearance.
 	self_variants = ("himself", "herself", "themselves", "archive footage")
