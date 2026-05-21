@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.conf import settings
 
 from ..models import CompanyFollow
+from ..related_links import build_company_related_links
 from ..new_movie_helpers import (
 	extract_movie_ids_from_filmography,
 	extract_movie_release_dates_from_filmography,
@@ -137,6 +138,8 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			tmdb_raw=raw,
 			tmdb_last_sync_at=None,
 		)
+
+	related_links = build_company_related_links(tmdb_id, company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {})
 
 	filmography_items: list[dict] = []
 	prev_page = page - 1
@@ -379,5 +382,6 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"upcoming_total_pages_plus": upcoming_total_pages_plus,
 			"is_followed": is_followed,
 			"note_text": note_text,
+			"related_links": related_links,
 		},
 	)

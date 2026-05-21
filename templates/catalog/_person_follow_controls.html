@@ -35,6 +35,8 @@
           <button type="button" role="menuitem" data-open-dialog="#person-follow-other-roles">Follow for other roles</button>
         {% endif %}
 
+        <button type="button" role="menuitem" data-open-dialog="#person-related-links">Related</button>
+
         {% if follow_roles|length == 1 %}
           <form method="post" action="{% url 'person_unfollow' person.tmdb_id %}" data-ajax="1" role="none">
             {% csrf_token %}
@@ -132,6 +134,23 @@
       <textarea name="notes" placeholder="Add notes...">{{ note_text }}</textarea>
       <button type="submit">Save</button>
     </form>
+  </dialog>
+
+  <dialog id="person-related-links" class="person-dialog">
+    <div class="row person-dialog-header">
+      <strong>Related</strong>
+      <form method="dialog" class="inline">
+        <button type="submit" class="secondary dialog-close" aria-label="Close dialog">&times;</button>
+      </form>
+    </div>
+
+    <div class="person-related-links-list">
+      {% for link in related_links %}
+        <a class="person-related-link" href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ link.label }}</a>
+      {% empty %}
+        <div class="muted person-related-empty">No related links available.</div>
+      {% endfor %}
+    </div>
   </dialog>
 {% else %}
   <div class="person-follow-summary">

@@ -161,6 +161,39 @@
   margin-bottom: 10px;
 }
 
+.company-related-links-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.company-related-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #0f172a;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.company-related-link:hover {
+  background: #e2e8f0;
+}
+
+.company-related-link:focus,
+.company-related-link:focus-visible {
+  outline: none;
+}
+
+.company-related-empty {
+  color: #64748b;
+}
+
 .company-meta-row {
   margin-top: 8px;
   display: flex;

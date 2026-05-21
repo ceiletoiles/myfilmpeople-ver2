@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.core.cache import cache
 
 from ..models import PersonFollow
+from ..related_links import build_person_related_links
 from ..new_movie_helpers import (
 	build_person_comeback_event_meta,
 	extract_movie_ids_from_credits,
@@ -98,6 +99,15 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		old_baseline_present = isinstance(old_credits.get("cast"), list) or isinstance(old_credits.get("crew"), list)
 
 		person = get_or_sync_person(tmdb_id)
+		person_raw = person.tmdb_raw if isinstance(person.tmdb_raw, dict) else {}
+		if not isinstance(person_raw.get("external_ids"), dict):
+			client = TMDbClient.from_settings()
+			try:
+				external_ids = client.get_person_external_ids(tmdb_id)
+			except Exception:
+				external_ids = {}
+			person.tmdb_raw = {**person_raw, "external_ids": external_ids}
+			person.save(update_fields=["tmdb_raw", "updated_at"])
 		# Keep denormalized follow snapshot fresh.
 		PersonFollow.objects.filter(user=request.user, person__tmdb_id=tmdb_id).update(name=person.name)
 
@@ -169,9 +179,17 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		try:
 			raw = client.get_person(tmdb_id)
 			credits = client.get_person_credits(tmdb_id)
+			try:
+				external_ids = client.get_person_external_ids(tmdb_id)
+			except Exception:
+				external_ids = {}
 		except Exception as exc:  # noqa: BLE001
 			messages.error(request, f"TMDb error: {exc}")
 			return redirect("search")
+		if isinstance(raw, dict):
+			raw = {**raw, "external_ids": external_ids}
+		else:
+			raw = {"external_ids": external_ids}
 		person = SimpleNamespace(
 			tmdb_id=tmdb_id,
 			name=(raw.get("name") or str(tmdb_id)),
@@ -723,6 +741,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		return "all"
 
 	default_filmography_filter = _follow_role_default_filter()
+	related_links = build_person_related_links(tmdb_id, raw)
 
 	return render(
 		request,
@@ -738,6 +757,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"born_display": born_display,
 			"also_known_as": also_known_as,
 			"known_for_items": known_for_items,
+			"related_links": related_links,
 			"filmography_items": filmography_items,
 			"comeback_info": comeback_info,
 			"active_info": active_info,
@@ -803,6 +823,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		born_display = str(pob)
 	role_options = _person_role_options_from_credits(credits)
 	role_options_remaining = [r for r in role_options if r not in follow_roles_set]
+	related_links = build_person_related_links(tmdb_id, raw)
 
 	known_for_items: list[dict[str, object]] = []
 	filmography_items: list[dict[str, object]] = []
@@ -1135,6 +1156,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"born_display": born_display,
 			"also_known_as": also_known_as,
 			"known_for_items": known_for_items,
+			"related_links": related_links,
 			"filmography_items": filmography_items,
 			"filmography_filters": filmography_filters,
 			"default_filmography_filter": default_filmography_filter,

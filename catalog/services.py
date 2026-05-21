@@ -565,8 +565,9 @@ def get_or_sync_person(tmdb_id: int, *, force: bool = False) -> Person:
 
     tmdb_raw = person.tmdb_raw if isinstance(person.tmdb_raw, dict) else {}
     has_credited_roles = isinstance(tmdb_raw.get("credited_roles"), list)
+    has_external_ids = isinstance(tmdb_raw.get("external_ids"), dict)
 
-    if force or _is_stale(person.tmdb_last_sync_at) or not person.tmdb_raw or not person.tmdb_credits_raw:
+    if force or _is_stale(person.tmdb_last_sync_at) or not person.tmdb_raw or not person.tmdb_credits_raw or not has_external_ids:
         # If forcing a fresh sync, invalidate any cached TMDb HTTP responses
         # so the client will fetch a fresh payload instead of returning stale cached JSON.
         if force:
@@ -584,6 +585,10 @@ def get_or_sync_person(tmdb_id: int, *, force: bool = False) -> Person:
                     cache.delete(client.cache_key_for(f"/person/{tmdb_id}/images"))
                 except Exception:
                     pass
+                try:
+                    cache.delete(client.cache_key_for(f"/person/{tmdb_id}/external_ids"))
+                except Exception:
+                    pass
             except Exception:
                 client = TMDbClient.from_settings()
         else:
@@ -591,12 +596,16 @@ def get_or_sync_person(tmdb_id: int, *, force: bool = False) -> Person:
 
         raw = client.get_person(tmdb_id)
         credits = client.get_person_credits(tmdb_id)
+        try:
+            external_ids = client.get_person_external_ids(tmdb_id)
+        except Exception:
+            external_ids = {}
 
         credited_roles = extract_person_credited_roles(credits or {})
         if isinstance(raw, dict):
-            raw = {**raw, "credited_roles": credited_roles}
+            raw = {**raw, "credited_roles": credited_roles, "external_ids": external_ids}
         else:
-            raw = {"credited_roles": credited_roles}
+            raw = {"credited_roles": credited_roles, "external_ids": external_ids}
 
         person.name = raw.get("name") or person.name
         person.profile_path = raw.get("profile_path") or ""
@@ -613,10 +622,24 @@ def get_or_sync_person(tmdb_id: int, *, force: bool = False) -> Person:
             "tmdb_last_sync_source",
             "updated_at",
         ])
-    elif person.tmdb_credits_raw and not has_credited_roles:
+        tmdb_raw = person.tmdb_raw if isinstance(person.tmdb_raw, dict) else {}
+        has_credited_roles = isinstance(tmdb_raw.get("credited_roles"), list)
+        has_external_ids = isinstance(tmdb_raw.get("external_ids"), dict)
+    if person.tmdb_credits_raw and not has_credited_roles:
         # Backfill derived roles from cached credits without making a TMDb call.
         credited_roles = extract_person_credited_roles(person.tmdb_credits_raw or {})
         person.tmdb_raw = {**tmdb_raw, "credited_roles": credited_roles}
+        person.save(update_fields=["tmdb_raw", "updated_at"])
+        tmdb_raw = person.tmdb_raw if isinstance(person.tmdb_raw, dict) else {}
+        has_external_ids = isinstance(tmdb_raw.get("external_ids"), dict)
+    if not has_external_ids:
+        # Backfill social/external link ids once so related links work for older caches too.
+        client = TMDbClient.from_settings()
+        try:
+            external_ids = client.get_person_external_ids(tmdb_id)
+        except Exception:
+            external_ids = {}
+        person.tmdb_raw = {**tmdb_raw, "external_ids": external_ids}
         person.save(update_fields=["tmdb_raw", "updated_at"])
     try:
         cache.set(cache_key, person, timeout=5 * 60)

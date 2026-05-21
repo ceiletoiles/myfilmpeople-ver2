@@ -222,6 +222,9 @@ class TMDbClient:
     def get_person(self, person_id: int) -> dict[str, Any]:
         return self._get(f"/person/{person_id}")
 
+    def get_person_external_ids(self, person_id: int) -> dict[str, Any]:
+        return self._get(f"/person/{person_id}/external_ids")
+
     def get_person_credits(self, person_id: int) -> dict[str, Any]:
         return self._get(f"/person/{person_id}/combined_credits")
 

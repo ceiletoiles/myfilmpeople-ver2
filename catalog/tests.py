@@ -7,9 +7,11 @@ from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from .context_processors import new_arrivals_context
-from .models import Movie, NewMovieArrival, NewsletterIssue, NewsletterItem, NewsletterItemSeen
+from .models import Movie, NewMovieArrival, NewsletterIssue, NewsletterItem, NewsletterItemSeen, Person, PersonFollow
+from .related_links import build_person_related_links
 from .newsletter import parse_issue, publish_issue, split_newsletter_items, upsert_issue_from_raw_text
 from .new_movie_helpers import (
 	build_person_comeback_event_meta,
@@ -19,6 +21,7 @@ from .new_movie_helpers import (
 	get_person_last_release_date,
 	record_new_movie_arrivals,
 )
+from .services import get_or_sync_person
 
 
 class PersonComebackHelperTests(TestCase):
@@ -326,3 +329,73 @@ class SearchPrefixTests(TestCase):
 		self.assertEqual(data["companies"], [])
 		self.assertEqual(data["movies"], [])
 		mock_tmdb.assert_not_called()
+
+
+class RelatedLinksTests(TestCase):
+	def test_person_detail_exposes_related_links(self) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="related-user", password="pw")
+		person = Person.objects.create(
+			tmdb_id=99,
+			name="Example Person",
+			profile_path="/profile.jpg",
+			tmdb_raw={
+				"name": "Example Person",
+				"homepage": "https://example.com",
+				"imdb_id": "nm1234567",
+				"external_ids": {"instagram_id": "example"},
+			},
+			tmdb_credits_raw={"cast": []},
+			tmdb_last_sync_at=timezone.now(),
+		)
+		PersonFollow.objects.create(user=user, person=person, name=person.name, role="Actor")
+
+		with patch("catalog.views.person.get_or_sync_person", return_value=person):
+			client = self.client
+			client.force_login(user)
+			response = client.get(reverse("person_detail", args=[person.tmdb_id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertIn("related_links", response.context)
+		self.assertTrue(any(link["label"] == "TMDb" for link in response.context["related_links"]))
+
+	def test_build_person_related_links_includes_imdb_and_socials(self) -> None:
+		raw = {
+			"homepage": "https://example.com",
+			"imdb_id": "nm1234567",
+			"external_ids": {
+				"instagram_id": "example",
+				"twitter_id": "example",
+			},
+		}
+
+		links = build_person_related_links(7, raw)
+		self.assertTrue(any(link["label"] == "TMDb" for link in links))
+		self.assertTrue(any(link["label"] == "IMDb" for link in links))
+		self.assertTrue(any(link["label"] == "Instagram" for link in links))
+
+	@patch("catalog.services.TMDbClient.from_settings")
+	def test_get_or_sync_person_caches_external_ids(self, mock_from_settings) -> None:
+		client = mock_from_settings.return_value
+		client.get_person.return_value = {
+			"id": 7,
+			"name": "Example Person",
+			"profile_path": "/profile.jpg",
+			"homepage": "https://example.com",
+			"imdb_id": "nm1234567",
+		}
+		client.get_person_credits.return_value = {"cast": []}
+		client.get_person_external_ids.return_value = {
+			"instagram_id": "example",
+			"twitter_id": "example",
+		}
+
+		person = get_or_sync_person(7, force=True)
+		raw = person.tmdb_raw if isinstance(person.tmdb_raw, dict) else {}
+
+		self.assertIn("external_ids", raw)
+		self.assertEqual(raw["external_ids"].get("instagram_id"), "example")
+
+		links = build_person_related_links(7, raw)
+		self.assertTrue(any(link["label"] == "TMDb" for link in links))
+		self.assertTrue(any(link["label"] == "Instagram" for link in links))

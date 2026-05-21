@@ -33,6 +33,8 @@
           <button type="submit" role="menuitem">Unfollow</button>
         </form>
 
+        <button type="button" role="menuitem" data-open-dialog="#company-related-links">Related</button>
+
         <button type="button" role="menuitem" data-open-dialog="#company-edit-note">{% if note_text %}Edit note{% else %}Create note{% endif %}</button>
       </div>
     </details>
@@ -52,6 +54,23 @@
       <textarea name="notes" placeholder="Add notes...">{{ note_text }}</textarea>
       <button type="submit">Save</button>
     </form>
+  </dialog>
+
+  <dialog id="company-related-links" class="company-dialog">
+    <div class="row company-dialog-header">
+      <strong>Related</strong>
+      <form method="dialog" class="inline">
+        <button type="submit" class="secondary">Close</button>
+      </form>
+    </div>
+
+    <div class="company-related-links-list">
+      {% for link in related_links %}
+        <a class="company-related-link" href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ link.label }}</a>
+      {% empty %}
+        <div class="muted company-related-empty">No related links available.</div>
+      {% endfor %}
+    </div>
   </dialog>
 {% else %}
   <form method="post" action="{% url 'follow' %}" class="mt-2" data-ajax="1">

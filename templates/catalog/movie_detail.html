@@ -45,6 +45,14 @@
               </a>
             </div>
           {% endif %}
+
+          <div class="movie-external-links">
+            <a class="movie-external-link" href="https://www.themoviedb.org/movie/{{ movie.tmdb_id }}" target="_blank" rel="noopener noreferrer">TMDb</a>
+            {% if movie.tmdb_raw.imdb_id %}
+              <span class="movie-external-links-spacer" aria-hidden="true"></span>
+              <a class="movie-external-link movie-external-link-imdb" href="https://www.imdb.com/title/{{ movie.tmdb_raw.imdb_id }}/" target="_blank" rel="noopener noreferrer">IMDb</a>
+            {% endif %}
+          </div>
         </div>
       </div>
 

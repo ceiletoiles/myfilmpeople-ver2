@@ -163,6 +163,43 @@ main {
   gap: 0.3rem;
 }
 
+.movie-external-links {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding-top: 0.8rem;
+}
+
+.movie-external-links-spacer {
+  flex: 1 1 auto;
+}
+
+.movie-external-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  font-size: 12px;
+  color: #334155;
+  font-weight: 700;
+  text-decoration: none;
+  line-height: 1;
+}
+
+.movie-external-link:hover {
+  background: #cbd5e1;
+}
+
+.movie-external-link:focus,
+.movie-external-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.35);
+}
+
 .movie-trailer-embed {
   width: 100%;
   max-width: 560px;
