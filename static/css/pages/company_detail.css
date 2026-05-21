@@ -217,6 +217,12 @@
   flex-wrap: wrap;
 }
 
+.meta-id-link {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 @media (max-width: 700px) {
   .company-meta-row {
     flex-wrap: nowrap;

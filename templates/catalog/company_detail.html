@@ -170,6 +170,9 @@
         Last synced: not cached (live TMDb)
       {% endif %}
     </div>
-    <div class="muted">TMDb: {{ company.tmdb_id }}</div>
+    <div class="muted">
+      TMDb:
+      <a class="meta-id-link" href="https://www.themoviedb.org/company/{{ company.tmdb_id }}" target="_blank" rel="noopener noreferrer">{{ company.tmdb_id }}</a>
+    </div>
   </div>
 {% endblock %}

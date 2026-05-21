@@ -146,7 +146,9 @@
 
     <div class="person-related-links-list">
       {% for link in related_links %}
-        <a class="person-related-link" href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ link.label }}</a>
+        {% if link.label != 'TMDb' %}
+          <a class="person-related-link" href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ link.label }}</a>
+        {% endif %}
       {% empty %}
         <div class="muted person-related-empty">No related links available.</div>
       {% endfor %}
