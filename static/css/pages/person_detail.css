@@ -767,6 +767,7 @@ main {
   .filmography-filters {
     gap: 6px;
     margin-top: 6px;
+    justify-content: center;
   }
 
   .filmography-filters .filter-btn {
@@ -789,6 +790,7 @@ main {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  justify-content: flex-start;
 }
 
 .filter-btn {
@@ -800,6 +802,7 @@ main {
   cursor: pointer;
   font-size: 13px;
   line-height: 1;
+  text-transform: uppercase;
 }
 
 .filter-btn:focus,
@@ -809,6 +812,12 @@ main {
 
 .filter-btn.active {
   font-weight: 700;
+}
+
+@media (max-width: 767px) {
+  .filmography-filters {
+    justify-content: center;
+  }
 }
 
 
@@ -997,10 +1006,18 @@ main {
     grid-column: 1 / -1;
     grid-row: 7;
     margin-top: 2px;
+    align-items: center;
+    text-align: center;
   }
 
   .person-inactive-line {
     margin-top: 6px;
+  }
+
+  .person-comeback-note .person-active-line,
+  .person-comeback-note .person-inactive-line {
+    align-items: center;
+    justify-content: center;
   }
 
   /* Vertically center the muted date text with the label on mobile */
