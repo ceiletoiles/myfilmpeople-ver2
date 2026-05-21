@@ -23,12 +23,18 @@ from ..services import (
 	get_or_sync_company_filmography_page,
 	get_or_sync_company_tba_movies_page,
 )
-from ..tmdb import TMDbClient
+from ..tmdb import TMDbClient, TMDbError
 from ._shared import _countdown_text, _parse_iso_date
 
 
 @login_required
 def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
+	def _safe_get_or_sync_company_filmography_page(company, page: int) -> dict:
+		try:
+			return get_or_sync_company_filmography_page(company, page=page)
+		except TMDbError:
+			return {}
+
 	mode = (request.GET.get("mode") or "").strip().lower()
 	filmography_mode = "upcoming" if mode in {"upcoming", "tba"} else "filmography"
 
@@ -59,11 +65,7 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		old_pages = old_tmdb_raw.get("discover_movies_pages")
 		old_baseline_present = isinstance(old_pages, dict) and len(old_pages) > 0
 
-		discover_page = (
-			get_or_sync_company_filmography_page(company, page=page)
-			if filmography_mode == "filmography"
-			else {}
-		)
+		discover_page = _safe_get_or_sync_company_filmography_page(company, page) if filmography_mode == "filmography" else {}
 
 		# If this request refreshed cached filmography via TTL, record any new arrivals.
 		new_last_sync_at = getattr(company, "tmdb_last_sync_at", None)
@@ -189,7 +191,7 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			prev_page = page - 1
 			next_page = page + 1
 			if follow:
-				discover_page = get_or_sync_company_filmography_page(company, page=page)
+				discover_page = _safe_get_or_sync_company_filmography_page(company, page)
 				movies_all = discover_page.get("results") or []
 				movies = [m for m in list(movies_all) if isinstance(m, dict)]
 				for m in movies:
