@@ -22,6 +22,7 @@ from .new_movie_helpers import (
 	record_new_movie_arrivals,
 )
 from .services import get_or_sync_company, get_or_sync_person
+from .views.movie import _build_country_name_lookup, _build_release_groups
 
 
 class PersonComebackHelperTests(TestCase):
@@ -245,6 +246,37 @@ Liam Hemsworth is set to star in They Like the Dark. (more)
 		self.assertEqual(context2["newsletter_new_arrivals_count"], 1)
 		self.assertEqual(context2["new_arrivals_count"], 1)
 		self.assertEqual(NewsletterIssue.objects.count(), 1)
+
+
+class MovieReleaseCountryLookupTests(TestCase):
+	def test_release_groups_use_tmdb_country_lookup(self) -> None:
+		country_lookup = _build_country_name_lookup(
+			[
+				{"iso_3166_1": "AX", "english_name": "Aland Islands"},
+			]
+		)
+		release_groups = _build_release_groups(
+			{
+				"release_dates": {
+					"results": [
+						{
+							"iso_3166_1": "AX",
+							"release_dates": [
+								{
+									"release_date": "2024-01-01T00:00:00.000Z",
+									"type": 3,
+									"certification": "PG",
+									"note": "Festival premiere",
+								},
+							],
+						}
+					]
+				}
+			},
+			country_lookup,
+		)
+
+		self.assertEqual(release_groups[0]["releases"][0]["country_name"], "Aland Islands")
 
 
 class NewArrivalsSeenHistoryTests(TestCase):

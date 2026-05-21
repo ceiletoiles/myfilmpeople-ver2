@@ -7,8 +7,6 @@ main {
 }
 .person-title {
   margin: 0;
-  grid-column: 1;
-  grid-row: 1;
 }
 
 .person-header {
@@ -28,16 +26,13 @@ main {
 
 .person-header-body {
   flex: 1;
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  grid-template-rows: auto auto auto auto auto auto auto auto;
-  column-gap: 16px;
-  row-gap: 8px;
-  align-items: start;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   min-width: 0;
-  align-content: start;
-  min-height: 450px;
-  height: auto;
+  min-height: 0;
+  padding-right: 44px;
 }
 
 #person-follow-controls {
@@ -45,8 +40,7 @@ main {
 }
 
 .person-follow-message {
-  grid-column: 1 / -1;
-  grid-row: 3;
+  margin-top: 2px;
 }
 
 .person-follow-message .msg {
@@ -59,14 +53,13 @@ main {
 }
 
 .person-follow-summary {
-  grid-column: 1;
-  grid-row: 2;
+  margin-top: 2px;
 }
 
 .person-actions {
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: end;
+  position: absolute;
+  top: 0;
+  right: 0;
   display: flex;
   gap: 10px;
   align-items: flex-start;
@@ -107,28 +100,23 @@ main {
 }
 
 .person-born {
-  grid-column: 1;
-  grid-row: 4;
+  margin-top: 2px;
 }
 
 .person-comeback-note {
-  grid-column: 1;
-  grid-row: 5;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   align-items: flex-start;
   font-size: 1rem;
-  padding: 10px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 12px;
-  background: #f8fafc;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   overflow-x: auto;
 }
 
 .person-collaboration-note {
-  grid-column: 1 / -1;
-  grid-row: 6;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -209,16 +197,12 @@ main {
 }
 
 .person-bio {
-  grid-column: 1 / -1;
-  grid-row: 7;
   min-width: 0;
 }
 
 .person-extras {
-  grid-column: 1 / -1;
-  grid-row: 8;
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
   min-width: 0;
 }

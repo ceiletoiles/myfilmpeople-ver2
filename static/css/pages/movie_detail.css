@@ -568,46 +568,40 @@ main {
 }
 
 .release-top-grid {
-  display: flex;
-  justify-content: space-between;
-  /* keep the top row a single-line layout so country names line up */
-  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 260px);
+  align-items: flex-start;
   width: 100%;
   gap: 0.6rem;
 }
 
 .release-notes-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 260px);
   gap: 0.6rem;
   margin-top: 0.15rem;
 }
 
 .date-note-cell {
-  flex: 1 1 0;
   min-width: 0;
-}
-
-.country-note-cell {
-  min-width: 140px;
-  max-width: 260px;
-  margin-left: auto;
-}
-
-/* Ensure notes cells align to the top so notes sit directly under the
-   country name on desktop */
-.release-notes-row,
-.date-note-cell,
-.country-note-cell {
-  align-items: flex-start;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+}
+
+.country-note-cell {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .release-country-wrapper {
-  /* make sure country name and note share the same left alignment */
   align-items: flex-start;
   display: flex;
   flex-direction: column;
+  gap: 0.15rem;
+  width: 100%;
 }
 
 .release-date {
@@ -630,18 +624,11 @@ main {
   justify-content: flex-start;
 }
 
-.release-country-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  /* fixed-ish column for country to avoid layout shifts; allow more room */
-  min-width: 140px;
-  max-width: 260px;
-  margin-left: auto;
-}
+
 
 .release-country {
   font-size: 12.8px;
+  line-height: 1.25;
 }
 
 .release-certification {
@@ -679,47 +666,38 @@ main {
   margin: 0;
   color: #64748b;
   font-size: 11.2px;
-  font-style: italic;
+  font-style: normal;
   line-height: 1.2;
 }
 
-/* Country-level notes: clamp to two lines to avoid tall country columns */
+/* Date and country notes share the same wrapping style. */
+.release-note.date-note,
 .release-note.country-note {
-  max-width: 100%;
   word-wrap: break-word;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-@media (min-width: 900px) {
-  /* On wider screens allow slightly more room for country notes */
-  .release-note.country-note {
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
-  }
+  white-space: normal;
+  max-width: 100%;
+  width: 100%;
+  margin-top: 0;
 }
 
 /* Mobile-specific tweaks to avoid vertical misalignment on narrow viewports */
 @media (max-width: 480px) {
   .release-date-block {
-    max-width: 58%;
+    max-width: 100%;
   }
 
   .release-country-wrapper {
-    /* keep the country column compact on phones to reduce wrapping */
-    min-width: 110px;
-    max-width: 160px;
+    min-width: 0;
+    max-width: none;
   }
 
-  .release-note.country-note {
-    /* clamp tightly on phones and slightly smaller text */
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    font-size: 10.2px;
+  .release-top-grid,
+  .release-notes-row {
+    grid-template-columns: minmax(0, 1fr) minmax(110px, 44%);
+    gap: 0.45rem;
   }
+
+
 
   .release-top {
     gap: 0.4rem;
@@ -1049,8 +1027,8 @@ main {
   }
 
   .release-country-wrapper {
-    min-width: 180px;
-    max-width: 220px;
+    min-width: 0;
+    max-width: none;
   }
 
   .release-note {

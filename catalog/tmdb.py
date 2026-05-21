@@ -42,7 +42,7 @@ class TMDbClient:
             return {"Authorization": f"Bearer {self.read_access_token}"}
         return {}
 
-    def _get(self, path: str, *, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _get(self, path: str, *, params: dict[str, Any] | None = None) -> Any:
         if not self.api_key and not self.read_access_token:
             raise TMDbError(
                 "TMDb API key missing. Set TMDB_API_KEY (or TMDB_API_READ_ACCESS_TOKEN) in .env."
@@ -83,7 +83,7 @@ class TMDbClient:
                 json.dumps(cache_input, sort_keys=True, ensure_ascii=True, default=str).encode("utf-8")
             ).hexdigest()
             cached = cache.get(cache_key)
-            if isinstance(cached, dict):
+            if isinstance(cached, (dict, list)):
                 return cached
         except Exception:
             # If cache is unavailable/misconfigured, continue without caching.
@@ -129,7 +129,7 @@ class TMDbClient:
             if resp.status_code < 400:
                 try:
                     payload = resp.json()
-                    if cache_key and isinstance(payload, dict):
+                    if cache_key and isinstance(payload, (dict, list)):
                         try:
                             cache.set(cache_key, payload, timeout=cache_ttl_seconds)
                         except Exception:
@@ -169,7 +169,7 @@ class TMDbClient:
                     continue
                 try:
                     payload = proxied_resp.json()
-                    if cache_key and isinstance(payload, dict):
+                    if cache_key and isinstance(payload, (dict, list)):
                         try:
                             cache.set(cache_key, payload, timeout=cache_ttl_seconds)
                         except Exception:
@@ -257,6 +257,12 @@ class TMDbClient:
 
     def get_movie_alternative_titles(self, movie_id: int) -> dict[str, Any]:
         return self._get(f"/movie/{movie_id}/alternative_titles")
+
+    def get_configuration_countries(self) -> list[dict[str, Any]]:
+        payload = self._get("/configuration/countries")
+        if isinstance(payload, list):
+            return [item for item in payload if isinstance(item, dict)]
+        return []
 
     def get_movie_images(self, movie_id: int) -> dict[str, Any]:
         return self._get(f"/movie/{movie_id}/images")

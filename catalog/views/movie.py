@@ -86,7 +86,10 @@ def _format_money(value: Any) -> str:
 	return f"${amount:,}"
 
 
-def _build_alternative_titles(payload: dict[str, Any]) -> list[dict[str, str]]:
+def _build_alternative_titles(
+	payload: dict[str, Any],
+	country_name_lookup: dict[str, str],
+) -> list[dict[str, str]]:
 	titles = payload.get("titles") or []
 	if not isinstance(titles, list):
 		return []
@@ -105,7 +108,7 @@ def _build_alternative_titles(payload: dict[str, Any]) -> list[dict[str, str]]:
 			{
 				"title": title,
 				"country_code": country_code,
-				"country_name": _get_country_name(country_code) if country_code else "",
+				"country_name": _get_country_name(country_code, country_name_lookup) if country_code else "",
 			}
 		)
 
@@ -237,98 +240,23 @@ def _format_release_date(date_value: str) -> str:
 	return f"{release_date:%b} {release_date.day}, {release_date:%Y}"
 
 
-def _get_country_name(country_code: str) -> str:
-	countries = {
-		"US": "United States",
-		"GB": "United Kingdom",
-		"FR": "France",
-		"DE": "Germany",
-		"IT": "Italy",
-		"ES": "Spain",
-		"JP": "Japan",
-		"KR": "South Korea",
-		"CN": "China",
-		"IN": "India",
-		"CA": "Canada",
-		"AU": "Australia",
-		"BR": "Brazil",
-		"MX": "Mexico",
-		"RU": "Russia",
-		"NL": "Netherlands",
-		"BE": "Belgium",
-		"CH": "Switzerland",
-		"AT": "Austria",
-		"SE": "Sweden",
-		"NO": "Norway",
-		"DK": "Denmark",
-		"FI": "Finland",
-		"PL": "Poland",
-		"CZ": "Czech Republic",
-		"HU": "Hungary",
-		"GR": "Greece",
-		"PT": "Portugal",
-		"IE": "Ireland",
-		"NZ": "New Zealand",
-		"ZA": "South Africa",
-		"AR": "Argentina",
-		"CL": "Chile",
-		"CO": "Colombia",
-		"PE": "Peru",
-		"VE": "Venezuela",
-		"TH": "Thailand",
-		"ID": "Indonesia",
-		"MY": "Malaysia",
-		"SG": "Singapore",
-		"PH": "Philippines",
-		"VN": "Vietnam",
-		"TW": "Taiwan",
-		"HK": "Hong Kong",
-		"TR": "Turkey",
-		"IL": "Israel",
-		"SA": "Saudi Arabia",
-		"AE": "United Arab Emirates",
-		"EG": "Egypt",
-		"NG": "Nigeria",
-		"KE": "Kenya",
-		"ET": "Ethiopia",
-		"GH": "Ghana",
-		"PR": "Puerto Rico",
-		"AM": "Armenia",
-		"HR": "Croatia",
-		"RO": "Romania",
-		"BG": "Bulgaria",
-		"RS": "Serbia",
-		"SI": "Slovenia",
-		"SK": "Slovakia",
-		"LT": "Lithuania",
-		"LV": "Latvia",
-		"EE": "Estonia",
-		"UA": "Ukraine",
-		"BY": "Belarus",
-		"MD": "Moldova",
-		"BA": "Bosnia and Herzegovina",
-		"MK": "North Macedonia",
-		"AL": "Albania",
-		"MT": "Malta",
-		"CY": "Cyprus",
-		"IS": "Iceland",
-		"LU": "Luxembourg",
-		"MC": "Monaco",
-		"AD": "Andorra",
-		"LI": "Liechtenstein",
-		"SM": "San Marino",
-		"VA": "Vatican City",
-		"GI": "Gibraltar",
-		"IM": "Isle of Man",
-		"JE": "Jersey",
-		"GG": "Guernsey",
-		"FO": "Faroe Islands",
-		"GL": "Greenland",
-	}
-	return countries.get(country_code, country_code)
+def _build_country_name_lookup(country_payload: list[dict[str, Any]]) -> dict[str, str]:
+	lookup: dict[str, str] = {}
+	for country in country_payload:
+		country_code = (country.get("iso_3166_1") or "").strip()
+		country_name = (country.get("english_name") or "").strip()
+		if country_code and country_name:
+			lookup[country_code] = country_name
+	return lookup
 
 
-def _build_release_groups(tmdb_raw: dict[str, Any]) -> list[dict[str, Any]]:
+def _get_country_name(country_code: str, country_name_lookup: dict[str, str]) -> str:
+	if not country_code:
+		return ""
+	return country_name_lookup.get(country_code, country_code)
+
+
+def _build_release_groups(tmdb_raw: dict[str, Any], country_name_lookup: dict[str, str]) -> list[dict[str, Any]]:
 	release_dates = tmdb_raw.get("release_dates") or {}
 	results = release_dates.get("results") or []
 	if not isinstance(results, list):
@@ -364,7 +292,7 @@ def _build_release_groups(tmdb_raw: dict[str, Any]) -> list[dict[str, Any]]:
 					"raw_date": raw_release_date,
 					"date_display": _format_release_date(release_date),
 					"country_code": country_code,
-					"country_name": _get_country_name(country_code),
+					"country_name": _get_country_name(country_code, country_name_lookup),
 					"certification": (entry.get("certification") or "").strip(),
 					"note": (entry.get("note") or "").strip(),
 				}
@@ -432,6 +360,7 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		include_credits=include_credits,
 		include_release_dates=include_release_dates,
 	)
+	client = TMDbClient.from_settings()
 
 	cast = []
 	crew_groups = []
@@ -444,17 +373,21 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	movie_rating_text = _format_tmdb_rating(movie_raw)
 	movie_budget_text = _format_money(movie_raw.get("budget"))
 	movie_box_office_text = _format_money(movie_raw.get("revenue"))
+	country_name_lookup: dict[str, str] = {}
+	try:
+		country_name_lookup = _build_country_name_lookup(client.get_configuration_countries())
+	except TMDbError:
+		country_name_lookup = {}
 	if include_credits:
 		cast = credits.get("cast", []) or []
 		crew_groups = _build_crew_groups(credits)
 
-	release_groups = _build_release_groups(movie_raw)
-	client = TMDbClient.from_settings()
+	release_groups = _build_release_groups(movie_raw, country_name_lookup)
 	try:
 		alt_titles_payload = client.get_movie_alternative_titles(tmdb_id)
 	except TMDbError:
 		alt_titles_payload = {}
-	alternative_titles = _build_alternative_titles(alt_titles_payload)
+	alternative_titles = _build_alternative_titles(alt_titles_payload, country_name_lookup)
 	try:
 		trailer_payload = client.get_movie_videos(tmdb_id)
 	except TMDbError:
