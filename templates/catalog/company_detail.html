@@ -56,7 +56,7 @@
             <div class="muted company-alternative-names-label">Also known as</div>
             <div class="company-alternative-names-list">
               {% for name in alternative_names %}
-                <span class="company-alternative-name">{{ name }}</span>{% if not forloop.last %}<span class="muted">, </span>{% endif %}
+                <span class="company-alternative-name">{{ name }}</span>{% if not forloop.last %}<span class="muted"> · </span>{% endif %}
               {% endfor %}
             </div>
           </div>

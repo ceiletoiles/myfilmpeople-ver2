@@ -45,14 +45,6 @@
               </a>
             </div>
           {% endif %}
-
-          <div class="movie-external-links">
-            <a class="movie-external-link" href="https://www.themoviedb.org/movie/{{ movie.tmdb_id }}" target="_blank" rel="noopener noreferrer">TMDb</a>
-            {% if movie.tmdb_raw.imdb_id %}
-              <span class="movie-external-links-spacer" aria-hidden="true"></span>
-              <a class="movie-external-link movie-external-link-imdb" href="https://www.imdb.com/title/{{ movie.tmdb_raw.imdb_id }}/" target="_blank" rel="noopener noreferrer">IMDb</a>
-            {% endif %}
-          </div>
         </div>
       </div>
 
@@ -236,6 +228,20 @@
                   <div class="tech-spec-item">Status: {{ movie.tmdb_raw.status|default:'-' }}</div>
                 </div>
               </div>
+
+              <div class="detail-category">
+                <h3 class="detail-category-title">External Links</h3>
+                <div class="detail-items movie-external-links-detail">
+                  <a class="detail-item detail-item-interactive movie-external-link-card" href="https://www.themoviedb.org/movie/{{ movie.tmdb_id }}" target="_blank" rel="noopener noreferrer">
+                    <p class="detail-name">TMDb</p>
+                  </a>
+                  {% if movie.tmdb_raw.imdb_id %}
+                    <a class="detail-item detail-item-interactive movie-external-link-card" href="https://www.imdb.com/title/{{ movie.tmdb_raw.imdb_id }}/" target="_blank" rel="noopener noreferrer">
+                      <p class="detail-name">IMDb</p>
+                    </a>
+                  {% endif %}
+                </div>
+              </div>
             </div>
           </section>
         </div>
@@ -270,6 +276,7 @@
           <div class="movie-card-grid" role="list" data-movies-grid></div>
         </section>
       {% endif %}
+
     </div>
   </div>
 {% endblock %}
