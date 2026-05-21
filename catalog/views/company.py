@@ -140,6 +140,21 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		)
 
 	related_links = build_company_related_links(tmdb_id, company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {})
+	raw_company = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+	alternative_names_payload = raw_company.get("alternative_names") if isinstance(raw_company, dict) else {}
+	alternative_names: list[str] = []
+	if isinstance(alternative_names_payload, dict):
+		items = alternative_names_payload.get("results") or []
+		if isinstance(items, list):
+			seen_names: set[str] = set()
+			for item in items:
+				if not isinstance(item, dict):
+					continue
+				name = (item.get("name") or item.get("title") or "").strip()
+				if not name or name in seen_names:
+					continue
+				seen_names.add(name)
+				alternative_names.append(name)
 
 	filmography_items: list[dict] = []
 	prev_page = page - 1
@@ -383,5 +398,6 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"is_followed": is_followed,
 			"note_text": note_text,
 			"related_links": related_links,
+			"alternative_names": alternative_names,
 		},
 	)

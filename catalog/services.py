@@ -689,7 +689,10 @@ def get_or_sync_company(tmdb_id: int, *, force: bool = False) -> Company:
             pass
 
     company, _ = Company.objects.get_or_create(tmdb_id=tmdb_id, defaults={"name": str(tmdb_id)})
-    if force or _is_stale(company.tmdb_last_sync_at) or not company.tmdb_raw:
+    tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+    has_alternative_names = isinstance(tmdb_raw.get("alternative_names"), dict)
+
+    if force or _is_stale(company.tmdb_last_sync_at) or not company.tmdb_raw or not has_alternative_names:
         # When forcing a company sync, clear TMDb HTTP cache keys used for
         # the company details and first page of company movies so we get
         # fresh data from TMDb.
@@ -704,14 +707,22 @@ def get_or_sync_company(tmdb_id: int, *, force: bool = False) -> Company:
                     cache.delete(client.cache_key_for(f"/company/{tmdb_id}/movies", params={"page": 1}))
                 except Exception:
                     pass
+                try:
+                    cache.delete(client.cache_key_for(f"/company/{tmdb_id}/alternative_names"))
+                except Exception:
+                    pass
             except Exception:
                 client = TMDbClient.from_settings()
         else:
             client = TMDbClient.from_settings()
         raw = client.get_company(tmdb_id)
+        try:
+            alternative_names = client.get_company_alternative_names(tmdb_id)
+        except Exception:
+            alternative_names = {}
 
         # Preserve any cached filmography pages unless forcing a refresh.
-        existing = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+        existing = tmdb_raw
         if force:
             existing = {
                 k: v
@@ -750,9 +761,9 @@ def get_or_sync_company(tmdb_id: int, *, force: bool = False) -> Company:
         )
 
         if isinstance(raw, dict):
-            merged = {**existing, **raw}
+            merged = {**existing, **raw, "alternative_names": alternative_names}
         else:
-            merged = {**existing}
+            merged = {**existing, "alternative_names": alternative_names}
         merged.update({
             "discover_movies_pages": discover_pages,
             "discover_movies_meta": discover_meta,

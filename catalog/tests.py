@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .context_processors import new_arrivals_context
-from .models import Movie, NewMovieArrival, NewsletterIssue, NewsletterItem, NewsletterItemSeen, Person, PersonFollow
+from .models import Company, CompanyFollow, Movie, NewMovieArrival, NewsletterIssue, NewsletterItem, NewsletterItemSeen, Person, PersonFollow
 from .related_links import build_person_related_links
 from .newsletter import parse_issue, publish_issue, split_newsletter_items, upsert_issue_from_raw_text
 from .new_movie_helpers import (
@@ -21,7 +21,7 @@ from .new_movie_helpers import (
 	get_person_last_release_date,
 	record_new_movie_arrivals,
 )
-from .services import get_or_sync_person
+from .services import get_or_sync_company, get_or_sync_person
 
 
 class PersonComebackHelperTests(TestCase):
@@ -373,6 +373,54 @@ class RelatedLinksTests(TestCase):
 		self.assertTrue(any(link["label"] == "TMDb" for link in links))
 		self.assertTrue(any(link["label"] == "IMDb" for link in links))
 		self.assertTrue(any(link["label"] == "Instagram" for link in links))
+
+	@patch("catalog.services.TMDbClient.from_settings")
+	def test_get_or_sync_company_caches_alternative_names(self, mock_from_settings) -> None:
+		client = mock_from_settings.return_value
+		client.get_company.return_value = {
+			"id": 77,
+			"name": "Example Studio",
+			"logo_path": "/logo.png",
+			"homepage": "https://example.com",
+		}
+		client.get_company_alternative_names.return_value = {
+			"results": [
+				{"name": "Example Studios"},
+				{"name": "Example Motion Pictures"},
+			],
+		}
+
+		company = get_or_sync_company(77, force=True)
+		raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+
+		self.assertIn("alternative_names", raw)
+		self.assertEqual(len((raw["alternative_names"].get("results") or [])), 2)
+
+	def test_company_detail_exposes_alternative_names(self) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="company-related-user", password="pw")
+		company = Company.objects.create(
+			tmdb_id=77,
+			name="Example Studio",
+			logo_path="/logo.png",
+			tmdb_raw={
+				"name": "Example Studio",
+				"alternative_names": {
+					"results": [{"name": "Example Studios"}, {"name": "Example Motion Pictures"}],
+				},
+			},
+			tmdb_last_sync_at=timezone.now(),
+		)
+		CompanyFollow.objects.create(user=user, company=company, name=company.name)
+
+		with patch("catalog.views.company.get_or_sync_company", return_value=company):
+			client = self.client
+			client.force_login(user)
+			response = client.get(reverse("company_detail", args=[company.tmdb_id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertIn("alternative_names", response.context)
+		self.assertEqual(response.context["alternative_names"], ["Example Studios", "Example Motion Pictures"])
 
 	@patch("catalog.services.TMDbClient.from_settings")
 	def test_get_or_sync_person_caches_external_ids(self, mock_from_settings) -> None:

@@ -50,6 +50,17 @@
             <a href="{{ company.tmdb_raw.homepage }}" target="_blank" rel="noreferrer">Homepage</a>
           </div>
         {% endif %}
+
+        {% if is_followed and alternative_names %}
+          <div class="company-alternative-names">
+            <div class="muted company-alternative-names-label">Also known as</div>
+            <div class="company-alternative-names-list">
+              {% for name in alternative_names %}
+                <span class="company-alternative-name">{{ name }}</span>{% if not forloop.last %}<span class="muted">, </span>{% endif %}
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
       </div>
     </div>
   </div>

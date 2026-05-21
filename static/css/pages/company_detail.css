@@ -49,6 +49,21 @@
   grid-column: 1;
 }
 
+.company-alternative-names {
+  grid-column: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.company-alternative-names-list {
+  line-height: 1.35;
+}
+
+.company-alternative-name {
+  font-weight: 700;
+}
+
 #company-follow-controls {
   display: contents;
 }
