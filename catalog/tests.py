@@ -25,6 +25,96 @@ from .services import get_or_sync_company, get_or_sync_person
 from .views.movie import _build_country_name_lookup, _build_release_groups
 
 
+class ConnectPageTests(TestCase):
+	def setUp(self) -> None:
+		self.User = get_user_model()
+		self.user = self.User.objects.create_user(username="connect-user", password="testpass123")
+		self.client.force_login(self.user)
+
+	def _make_person(self, *, tmdb_id: int, name: str, roles: list[str], external_ids: dict[str, str]) -> Person:
+		return Person.objects.create(
+			tmdb_id=tmdb_id,
+			name=name,
+			profile_path="",
+			tmdb_raw={"credited_roles": roles, "external_ids": external_ids},
+			tmdb_credits_raw={},
+		)
+
+	def _follow_person(self, person: Person, role: str) -> None:
+		PersonFollow.objects.create(user=self.user, person=person, name=person.name, role=role)
+
+	def test_connect_page_filters_by_role_and_external_id(self) -> None:
+		director = self._make_person(
+			tmdb_id=1,
+			name="Direct Her",
+			roles=["Director", "Writer"],
+			external_ids={"instagram_id": "directher"},
+		)
+		actor = self._make_person(
+			tmdb_id=2,
+			name="Act Her",
+			roles=["Actor", "Producer"],
+			external_ids={"twitter_id": "acther"},
+		)
+		crew = self._make_person(
+			tmdb_id=3,
+			name="Crew Her",
+			roles=["Writer"],
+			external_ids={"instagram_id": "crewher"},
+		)
+		wiki_crew = self._make_person(
+			tmdb_id=4,
+			name="Wiki Crew",
+			roles=["Writer", "Producer"],
+			external_ids={"wikidata_id": "Q123"},
+		)
+		composer = self._make_person(
+			tmdb_id=5,
+			name="Hans Zimmer",
+			roles=["Actor", "Original Music Composer"],
+			external_ids={"instagram_id": "hanszimmer"},
+		)
+
+		self._follow_person(director, "Director")
+		self._follow_person(actor, "Actor")
+		self._follow_person(crew, "Writer")
+		self._follow_person(wiki_crew, "Producer")
+		self._follow_person(composer, "Original Music Composer")
+
+		response = self.client.get(reverse("connect"), {"role": "director", "external": "instagram"})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Direct Her")
+		self.assertNotContains(response, "Act Her")
+		self.assertNotContains(response, "Crew Her")
+		self.assertNotContains(response, "Wiki Crew")
+		self.assertContains(response, "Instagram")
+		self.assertContains(response, "Director")
+		self.assertNotContains(response, "Twitter")
+
+		response = self.client.get(reverse("connect"), {"role": "actor", "external": "twitter"})
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'href="https://x.com/acther"')
+		self.assertContains(response, "X")
+		self.assertNotContains(response, "Twitter")
+
+		response = self.client.get(reverse("connect"), {"role": "crew", "external": "wikidata"})
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Wiki Crew")
+		self.assertNotContains(response, "Direct Her")
+		self.assertNotContains(response, "Act Her")
+
+		response = self.client.get(reverse("connect"), {"role": "crew", "external": "instagram"})
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Hans Zimmer")
+		self.assertContains(response, "Original Music Composer")
+
+	def test_home_menu_links_to_connect(self) -> None:
+		response = self.client.get(reverse("home"))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, reverse("connect"))
+
+
 class PersonComebackHelperTests(TestCase):
 	@override_settings(TMDB_PERSON_COMEBACK_GAP_YEARS=3)
 	def test_get_person_last_release_date_ignores_future_titles(self) -> None:

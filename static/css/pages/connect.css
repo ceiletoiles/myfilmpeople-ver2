@@ -1,0 +1,154 @@
+/* Page-specific styles for Connect */
+
+.connect-shell {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+	padding: 8px 0 12px;
+}
+
+.connect-toolbar {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	padding: 18px;
+	border: 1px solid #dbe4f0;
+	border-radius: 20px;
+	background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+	box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+}
+
+.connect-group {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.connect-label {
+	font-size: 12px;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: #475569;
+}
+
+.connect-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.connect-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	border: 1px solid #cbd5e1;
+	border-radius: 999px;
+	background: #ffffff;
+	color: #334155;
+	text-decoration: none;
+	font-weight: 700;
+	line-height: 1.2;
+	transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.connect-chip:hover {
+	transform: translateY(-1px);
+	border-color: #94a3b8;
+	color: #0f172a;
+}
+
+.connect-chip.active {
+	background: #0f172a;
+	border-color: #0f172a;
+	color: #ffffff;
+}
+
+.connect-chip-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.8em;
+	padding: 2px 8px;
+	border-radius: 999px;
+	background: rgba(148, 163, 184, 0.16);
+	font-size: 12px;
+	font-weight: 800;
+	line-height: 1;
+}
+
+.connect-chip.active .connect-chip-count {
+	background: rgba(255, 255, 255, 0.18);
+	color: #ffffff;
+}
+
+.connect-summary {
+	font-size: 1rem;
+	color: #475569;
+}
+
+.connect-summary strong {
+	color: #0f172a;
+}
+
+.connect-grid {
+	margin-top: 4px;
+}
+
+.connect-person {
+	align-items: center;
+}
+
+.connect-person .home-person-media {
+	width: 85px;
+	height: 128px;
+	flex: 0 0 auto;
+	aspect-ratio: 85 / 128;
+}
+
+.connect-person .home-person-name,
+.connect-person .connect-person-meta {
+	width: 100%;
+}
+
+.connect-person-meta {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	text-align: center;
+	color: #475569;
+	font-size: 12px;
+	line-height: 1.25;
+}
+
+.connect-person-role {
+	font-weight: 700;
+	color: #0f172a;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.connect-person-external {
+	word-break: break-word;
+}
+
+.connect-empty {
+	margin: 0;
+	padding: 8px 2px;
+	font-size: 1rem;
+}
+
+@media (max-width: 700px) {
+	.connect-toolbar {
+		padding: 14px;
+	}
+
+	.connect-chip {
+		padding: 7px 10px;
+	}
+
+	.connect-person-meta {
+		font-size: 11px;
+	}
+}

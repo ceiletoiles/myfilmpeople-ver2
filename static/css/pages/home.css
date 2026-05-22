@@ -209,8 +209,10 @@
 
 .home-person-media {
 	position: relative;
-	width: 100%;
-	aspect-ratio: 2 / 3;
+	width: 85px;
+	height: 128px;
+	flex: 0 0 auto;
+	aspect-ratio: 85 / 128;
 	border-radius: 10px;
 	overflow: hidden;
 	background: #e2e8f0;
@@ -249,6 +251,15 @@
 	object-fit: cover;
 	display: block;
 	background: transparent;
+}
+
+.home-person {
+	align-items: center;
+}
+
+.home-person-name,
+.home-person-meta {
+	width: 100%;
 }
 
 .home-person-name {
