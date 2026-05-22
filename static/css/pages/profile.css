@@ -20,6 +20,13 @@
 	color: #0f172a;
 }
 
+.following-head-count {
+	display: inline-block;
+	min-width: 1ch;
+	margin-right: 6px;
+	color: #0f172a;
+}
+
 .following-tabs {
 	margin-bottom: 12px;
 }
@@ -159,6 +166,7 @@
 .tab-label {
 	display: inline-flex;
 	align-items: center;
+	gap: 8px;
 	padding: 6px 12px;
 	border: 1px solid #cbd5e1;
 	border-radius: 999px;
@@ -168,6 +176,20 @@
 	font-weight: 600;
 	line-height: 1.2;
 	cursor: pointer;
+}
+
+.tab-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.8em;
+	padding: 2px 7px;
+	border-radius: 999px;
+	background: #e2e8f0;
+	color: #334155;
+	font-size: 12px;
+	font-weight: 700;
+	line-height: 1;
 }
 
 .tab-panel {

@@ -35,7 +35,7 @@
 
     <div class="profile-separator" aria-hidden="true"></div>
 
-    <div class="following-head">Following:</div>
+    <div class="following-head">Following: <span class="following-head-count" data-following-count>0</span></div>
 
     <div class="following-tabs">
       <input type="radio" name="following-tab" id="tab-director" checked />
@@ -45,10 +45,10 @@
 
       <div class="tab-row">
         <div class="tab-list" role="tablist" aria-label="Following tabs">
-          <label for="tab-director" class="tab-label" role="tab">Director</label>
-          <label for="tab-actor" class="tab-label" role="tab">Actor</label>
-          <label for="tab-crew" class="tab-label" role="tab">Crew</label>
-          <label for="tab-studio" class="tab-label" role="tab">Studios</label>
+          <label for="tab-director" class="tab-label" role="tab" data-tab-count="{{ tab_counts.director }}">Director</label>
+          <label for="tab-actor" class="tab-label" role="tab" data-tab-count="{{ tab_counts.actor }}">Actor</label>
+          <label for="tab-crew" class="tab-label" role="tab" data-tab-count="{{ tab_counts.crew }}">Crew</label>
+          <label for="tab-studio" class="tab-label" role="tab" data-tab-count="{{ tab_counts.studio }}">Studios</label>
         </div>
 
         <details class="status-filter-menu">

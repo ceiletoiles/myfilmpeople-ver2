@@ -170,6 +170,13 @@ def profile(request: HttpRequest) -> HttpResponse:
 		crew = [f for f in crew if f.status_key == selected_status]
 		company_follows = [c for c in company_follows if getattr(c, "status_key", "") == selected_status]
 
+	tab_counts = {
+		"director": len(directors),
+		"actor": len(actors),
+		"crew": len(crew),
+		"studio": len(company_follows),
+	}
+
 	status_filters = _build_status_filters(request.path, selected_status)
 	selected_status_label = next((f["label"] for f in status_filters if f["key"] == selected_status), "Status")
 
@@ -184,6 +191,7 @@ def profile(request: HttpRequest) -> HttpResponse:
 			"actors": actors,
 			"crew": crew,
 			"companies": company_follows,
+			"tab_counts": tab_counts,
 			"follow_count": len(person_follows) + len(company_follows),
 		},
 	)
@@ -223,6 +231,13 @@ def user_following(request: HttpRequest, username: str) -> HttpResponse:
 		crew = [f for f in crew if f.status_key == selected_status]
 		company_follows = [c for c in company_follows if getattr(c, "status_key", "") == selected_status]
 
+	tab_counts = {
+		"director": len(directors),
+		"actor": len(actors),
+		"crew": len(crew),
+		"studio": len(company_follows),
+	}
+
 	status_filters = _build_status_filters(request.path, selected_status)
 	selected_status_label = next((f["label"] for f in status_filters if f["key"] == selected_status), "Status")
 
@@ -239,6 +254,7 @@ def user_following(request: HttpRequest, username: str) -> HttpResponse:
 			"actors": actors,
 			"crew": crew,
 			"companies": company_follows,
+			"tab_counts": tab_counts,
 			"follow_count": len(person_follows) + len(company_follows),
 		},
 	)

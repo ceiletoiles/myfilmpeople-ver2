@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	const storageKey = "myfilmpeople.followingTab";
 	const tabs = Array.from(document.querySelectorAll('input[name="following-tab"]'));
 	const statusMenus = Array.from(document.querySelectorAll(".status-filter-menu"));
+	const followingCountEl = document.querySelector("[data-following-count]");
 	if (tabs.length === 0) return;
 
 	const setActiveTab = (tabId) => {
@@ -10,6 +11,15 @@ document.addEventListener("DOMContentLoaded", () => {
 		if (target) {
 			target.checked = true;
 		}
+	};
+
+	const updateFollowingCount = () => {
+		if (!followingCountEl) return;
+		const checked = tabs.find((tab) => tab.checked) || tabs[0];
+		if (!checked) return;
+		const label = document.querySelector(`label[for="${checked.id}"]`);
+		const countText = (label?.dataset.tabCount || "0").trim();
+		followingCountEl.textContent = countText === "0" ? "" : countText;
 	};
 
 	const savedTabId = window.sessionStorage.getItem(storageKey);
@@ -21,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		tab.addEventListener("change", () => {
 			if (tab.checked) {
 				window.sessionStorage.setItem(storageKey, tab.id);
+				updateFollowingCount();
 			}
 		});
 	});
@@ -29,6 +40,8 @@ document.addEventListener("DOMContentLoaded", () => {
 	if (checkedTab) {
 		window.sessionStorage.setItem(storageKey, checkedTab.id);
 	}
+
+	updateFollowingCount();
 
 	const closeStatusMenus = () => {
 		statusMenus.forEach((menu) => {

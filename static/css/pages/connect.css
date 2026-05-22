@@ -1,5 +1,9 @@
 /* Page-specific styles for Connect */
 
+.connect-page-header {
+	grid-template-columns: 42px minmax(0, 1fr) 42px;
+}
+
 .connect-shell {
 	display: flex;
 	flex-direction: column;
