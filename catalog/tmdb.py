@@ -258,6 +258,9 @@ class TMDbClient:
     def get_movie_alternative_titles(self, movie_id: int) -> dict[str, Any]:
         return self._get(f"/movie/{movie_id}/alternative_titles")
 
+    def get_movie_external_ids(self, movie_id: int) -> dict[str, Any]:
+        return self._get(f"/movie/{movie_id}/external_ids")
+
     def get_configuration_countries(self) -> list[dict[str, Any]]:
         payload = self._get("/configuration/countries")
         if isinstance(payload, list):

@@ -59,3 +59,33 @@ def build_company_related_links(tmdb_id: int, tmdb_raw: dict[str, Any] | None = 
 		_append_link(links, label="IMDb", url=f"https://www.imdb.com/company/{imdb_id}/")
 
 	return links
+
+
+def build_movie_related_links(tmdb_id: int, tmdb_raw: dict[str, Any] | None = None) -> list[dict[str, str]]:
+	raw = tmdb_raw if isinstance(tmdb_raw, dict) else {}
+	links: list[dict[str, str]] = []
+	_append_link(links, label="TMDb", url=f"https://www.themoviedb.org/movie/{int(tmdb_id)}")
+
+	homepage = _clean_text(raw.get("homepage"))
+	if homepage:
+		_append_link(links, label="Homepage", url=homepage)
+
+	imdb_id = _clean_text(raw.get("imdb_id"))
+	if imdb_id:
+		_append_link(links, label="IMDb", url=f"https://www.imdb.com/title/{imdb_id}/")
+
+	# Include social/external ids if available
+	external_ids = raw.get("external_ids")
+	if isinstance(external_ids, dict):
+		for key, label, prefix in (
+			("facebook_id", "Facebook", "https://www.facebook.com/"),
+			("instagram_id", "Instagram", "https://www.instagram.com/"),
+			("twitter_id", "X", "https://x.com/"),
+			("tiktok_id", "TikTok", "https://www.tiktok.com/@"),
+			("youtube_id", "YouTube", "https://www.youtube.com/channel/"),
+		):
+			value = _clean_text(external_ids.get(key))
+			if value:
+				_append_link(links, label=label, url=f"{prefix}{value}")
+
+	return links

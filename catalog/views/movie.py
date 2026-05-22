@@ -10,6 +10,7 @@ from django.shortcuts import render
 
 from ..services import get_or_sync_movie
 from ..tmdb import TMDbClient, TMDbError
+from ..related_links import build_movie_related_links
 
 
 def _format_year_runtime(tmdb_raw: dict) -> str:
@@ -394,6 +395,20 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		trailer_payload = {}
 	movie_trailer = _build_trailer(trailer_payload)
 
+	# External/related links (TMDb, IMDb, homepage, socials)
+	try:
+		external_ids_payload = client.get_movie_external_ids(tmdb_id)
+	except TMDbError:
+		external_ids_payload = {}
+
+	# Merge external ids into a copy of the movie raw payload so
+	# `build_movie_related_links` can discover social ids.
+	combined_raw = dict(movie_raw or {})
+	if isinstance(external_ids_payload, dict):
+		combined_raw["external_ids"] = external_ids_payload
+
+	related_links = build_movie_related_links(tmdb_id, combined_raw)
+
 	# Similar/Related movies are lazy-loaded via JSON endpoints.
 
 	return render(
@@ -412,6 +427,7 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"movie_rating_text": movie_rating_text,
 			"movie_budget_text": movie_budget_text,
 			"movie_box_office_text": movie_box_office_text,
+			"related_links": related_links,
 		},
 	)
 

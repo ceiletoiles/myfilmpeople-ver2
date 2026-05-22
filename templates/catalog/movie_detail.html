@@ -232,13 +232,14 @@
               <div class="detail-category">
                 <h3 class="detail-category-title">External Links</h3>
                 <div class="detail-items movie-external-links-detail">
-                  <a class="detail-item detail-item-interactive movie-external-link-card" href="https://www.themoviedb.org/movie/{{ movie.tmdb_id }}" target="_blank" rel="noopener noreferrer">
-                    <p class="detail-name">TMDb</p>
-                  </a>
-                  {% if movie.tmdb_raw.imdb_id %}
-                    <a class="detail-item detail-item-interactive movie-external-link-card" href="https://www.imdb.com/title/{{ movie.tmdb_raw.imdb_id }}/" target="_blank" rel="noopener noreferrer">
-                      <p class="detail-name">IMDb</p>
-                    </a>
+                  {% if related_links %}
+                    {% for link in related_links %}
+                      <a class="detail-item detail-item-interactive movie-external-link-card" href="{{ link.url }}" target="_blank" rel="noopener noreferrer">
+                        <p class="detail-name">{{ link.label }}</p>
+                      </a>
+                    {% endfor %}
+                  {% else %}
+                    <p class="no-data">No external links available.</p>
                   {% endif %}
                 </div>
               </div>

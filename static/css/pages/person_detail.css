@@ -114,6 +114,9 @@ main {
   border-radius: 0;
   background: transparent;
   overflow-x: auto;
+  align-self: start;
+  margin-left: 0;
+  padding-left: 0;
 }
 
 .person-collaboration-note {
@@ -194,6 +197,13 @@ main {
   min-width: 0;
   flex-wrap: nowrap;
   white-space: nowrap;
+  margin: 0;
+  padding: 0;
+}
+
+.person-comeback-note strong {
+  margin: 0;
+  padding: 0;
 }
 
 .person-bio {
@@ -740,7 +750,6 @@ main {
   }
 
   .person-comeback-note {
-    padding: 8px 10px;
     font-size: 13px;
   }
 
@@ -1006,19 +1015,18 @@ main {
     grid-column: 1 / -1;
     grid-row: 7;
     margin-top: 2px;
-    align-items: center;
-    text-align: center;
+  }
+
+  /* Use the grid gap to evenly space header items on mobile; reset child margins */
+  .person-header > * {
+    margin: 0;
   }
 
   .person-inactive-line {
-    margin-top: 6px;
+    margin-top: 0;
   }
 
-  .person-comeback-note .person-active-line,
-  .person-comeback-note .person-inactive-line {
-    align-items: center;
-    justify-content: center;
-  }
+  /* Keep default alignment for comeback note children (no centering) */
 
   /* Vertically center the muted date text with the label on mobile */
   .person-active-line,
