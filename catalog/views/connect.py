@@ -22,6 +22,7 @@ EXTERNAL_ID_TABS = [
 	{"key": "facebook", "label": "Facebook", "field": "facebook_id", "url_prefix": "https://www.facebook.com/"},
 	{"key": "youtube", "label": "Youtube", "field": "youtube_id", "url_prefix": "https://www.youtube.com/channel/"},
 	{"key": "wikidata", "label": "Wikidata", "field": "wikidata_id", "url_prefix": "https://www.wikidata.org/wiki/"},
+	{"key": "homepage", "label": "Homepage", "field": "homepage", "url_prefix": ""},
 ]
 
 DEFAULT_ROLE_KEY = "director"
@@ -46,6 +47,8 @@ def _primary_role_category(role: str) -> str:
 
 def _external_id_value(person: Person, field_name: str) -> str:
 	raw = person.tmdb_raw if isinstance(person.tmdb_raw, dict) else {}
+	if field_name == "homepage":
+		return str(raw.get("homepage") or "").strip()
 	external_ids = raw.get("external_ids")
 	if not isinstance(external_ids, dict):
 		return ""
@@ -63,6 +66,8 @@ def _external_display_value(tab: dict[str, str], value: str) -> str:
 def _external_url(tab: dict[str, str], value: str) -> str:
 	if not value:
 		return ""
+	if tab["key"] == "homepage":
+		return value
 	return f"{tab['url_prefix']}{value}"
 
 

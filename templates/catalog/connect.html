@@ -5,7 +5,7 @@
 
 {% block extra_css %}
   <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/home.css?v=20260509a" />
-  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/connect.css?v=20260522a" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/connect.css?v=20260523a" />
 {% endblock %}
 
 {% block page_header %}
@@ -24,29 +24,27 @@
 
 {% block content %}
   <section class="connect-shell">
-    <div class="connect-toolbar">
-      <div class="connect-group">
-        <div class="connect-label">Role</div>
-        <div class="connect-tabs" role="tablist" aria-label="Connect roles">
-          {% for tab in role_tabs %}
-            <a class="connect-chip{% if tab.active %} active{% endif %}" href="{{ tab.url }}" role="tab" aria-selected="{% if tab.active %}true{% else %}false{% endif %}">
-              <span>{{ tab.label }}</span>
-              <span class="connect-chip-count">{{ tab.count }}</span>
-            </a>
-          {% endfor %}
-        </div>
+    <div class="connect-group">
+      <div class="connect-label">Role</div>
+      <div class="movie-tabs credits-tabs connect-tabs connect-tabs--role" role="tablist" aria-label="Connect roles">
+        {% for tab in role_tabs %}
+          <a class="movie-tab-btn credits-tab connect-tab-btn connect-tab-btn--role{% if tab.active %} active{% endif %}" href="{{ tab.url }}" role="tab" aria-selected="{% if tab.active %}true{% else %}false{% endif %}">
+            <span>{{ tab.label }}</span>
+            <span class="connect-tab-count">{{ tab.count }}</span>
+          </a>
+        {% endfor %}
       </div>
+    </div>
 
-      <div class="connect-group">
-        <div class="connect-label">External ID</div>
-        <div class="connect-tabs" role="tablist" aria-label="Connect external ids">
-          {% for tab in external_tabs %}
-            <a class="connect-chip{% if tab.active %} active{% endif %}" href="{{ tab.url }}" role="tab" aria-selected="{% if tab.active %}true{% else %}false{% endif %}">
-              <span>{{ tab.label }}</span>
-              <span class="connect-chip-count">{{ tab.count }}</span>
-            </a>
-          {% endfor %}
-        </div>
+    <div class="connect-group">
+      <div class="connect-label">External ID</div>
+      <div class="movie-tabs credits-tabs connect-tabs connect-tabs--external" role="tablist" aria-label="Connect external ids">
+        {% for tab in external_tabs %}
+          <a class="movie-tab-btn credits-tab connect-tab-btn connect-tab-btn--external{% if tab.active %} active{% endif %}" href="{{ tab.url }}" role="tab" aria-selected="{% if tab.active %}true{% else %}false{% endif %}">
+            <span>{{ tab.label }}</span>
+            <span class="connect-tab-count">{{ tab.count }}</span>
+          </a>
+        {% endfor %}
       </div>
     </div>
 

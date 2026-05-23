@@ -74,12 +74,20 @@ class ConnectPageTests(TestCase):
 			roles=["Actor", "Original Music Composer"],
 			external_ids={"instagram_id": "hanszimmer"},
 		)
+		homepage_person = Person.objects.create(
+			tmdb_id=6,
+			name="Homepage Person",
+			profile_path="",
+			tmdb_raw={"credited_roles": ["Director"], "homepage": "https://example.com"},
+			tmdb_credits_raw={},
+		)
 
 		self._follow_person(director, "Director")
 		self._follow_person(actor, "Actor")
 		self._follow_person(crew, "Writer")
 		self._follow_person(wiki_crew, "Producer")
 		self._follow_person(composer, "Original Music Composer")
+		self._follow_person(homepage_person, "Director")
 
 		response = self.client.get(reverse("connect"), {"role": "director", "external": "instagram"})
 
@@ -108,6 +116,11 @@ class ConnectPageTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Hans Zimmer")
 		self.assertContains(response, "Original Music Composer")
+
+		response = self.client.get(reverse("connect"), {"role": "director", "external": "homepage"})
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Homepage Person")
+		self.assertContains(response, 'href="https://example.com"')
 
 	def test_home_menu_links_to_connect(self) -> None:
 		response = self.client.get(reverse("home"))
