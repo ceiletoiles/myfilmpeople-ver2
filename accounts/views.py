@@ -152,6 +152,7 @@ def profile(request: HttpRequest) -> HttpResponse:
 		.filter(user=request.user)
 		.order_by("company__name")
 	)
+	total_company_count = len(company_follows)
 
 	directors = [f for f in person_follows if _role_category(f.role) == "director"]
 	actors = [f for f in person_follows if _role_category(f.role) == "actor"]
@@ -192,7 +193,7 @@ def profile(request: HttpRequest) -> HttpResponse:
 			"crew": crew,
 			"companies": company_follows,
 			"tab_counts": tab_counts,
-			"follow_count": len(person_follows) + len(company_follows),
+			"follow_count": len(person_follows) + total_company_count,
 		},
 	)
 
