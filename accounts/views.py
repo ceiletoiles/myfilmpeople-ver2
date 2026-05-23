@@ -11,7 +11,11 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from urllib.parse import urlencode
 
 from catalog.models import CompanyFollow, PersonFollow
-from catalog.services import get_person_status_key, get_person_status_label
+from catalog.services import (
+	get_or_sync_company_tba_movies_page,
+	get_person_status_key,
+	get_person_status_label,
+)
 from django.utils import timezone
 from datetime import date
 from catalog.views._shared import _parse_iso_date, _add_years_safe
@@ -128,12 +132,26 @@ def _annotate_company_status(follow) -> None:
 		elif upcoming_no_date > 0:
 			follow.status_key = "tba"
 			follow.status = "TBA"
-		elif latest_past_release is not None and latest_past_release < ten_years_ago:
-			follow.status_key = "inactive"
-			follow.status = "Inactive"
 		else:
-			follow.status_key = "idle"
-			follow.status = "Idle"
+			tba_items: list[dict] = []
+			try:
+				tba_items, _, _ = get_or_sync_company_tba_movies_page(
+					company,
+					page=1,
+					page_size=1,
+				)
+			except Exception:
+				tba_items = []
+
+			if tba_items:
+				follow.status_key = "tba"
+				follow.status = "TBA"
+			elif latest_past_release is not None and latest_past_release < ten_years_ago:
+				follow.status_key = "inactive"
+				follow.status = "Inactive"
+			else:
+				follow.status_key = "idle"
+				follow.status = "Idle"
 	except Exception:
 		follow.status = ""
 		follow.status_key = ""
