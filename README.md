@@ -151,9 +151,6 @@ Troubleshooting
 - MySQL connection issues: validate `DB_HOST`/`DB_USER`/`DB_PASSWORD` and make sure the database uses `utf8mb4`
 - TMDb 401/403: confirm `TMDB_API_KEY` and `TMDB_API_READ_ACCESS_TOKEN` values
 
-Contributing
-- Fork, create a feature branch, and open a pull request describing your change.
-- Run tests before submitting PRs. Add tests for new features where appropriate.
 
 License & contact
 - This repository does not include an explicit license file. Add one if you intend to publish or share externally.
