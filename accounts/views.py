@@ -5,8 +5,9 @@ from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.utils.http import url_has_allowed_host_and_scheme
 from urllib.parse import urlencode
 
@@ -198,21 +199,30 @@ def profile(request: HttpRequest) -> HttpResponse:
 
 	status_filters = _build_status_filters(request.path, selected_status)
 	selected_status_label = next((f["label"] for f in status_filters if f["key"] == selected_status), "Status")
+	context = {
+		"status_filters": status_filters,
+		"selected_status": selected_status,
+		"selected_status_label": selected_status_label,
+		"directors": directors,
+		"actors": actors,
+		"crew": crew,
+		"companies": company_follows,
+		"tab_counts": tab_counts,
+		"follow_count": len(person_follows) + total_company_count,
+	}
+
+	if request.GET.get("partial") == "1":
+		return JsonResponse(
+			{
+				"ok": True,
+				"html": render_to_string("accounts/_profile_content.html", context, request=request),
+			}
+		)
 
 	return render(
 		request,
 		"accounts/profile.html",
-		{
-			"status_filters": status_filters,
-			"selected_status": selected_status,
-			"selected_status_label": selected_status_label,
-			"directors": directors,
-			"actors": actors,
-			"crew": crew,
-			"companies": company_follows,
-			"tab_counts": tab_counts,
-			"follow_count": len(person_follows) + total_company_count,
-		},
+		context,
 	)
 
 

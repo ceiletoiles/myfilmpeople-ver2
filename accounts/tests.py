@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.urls import reverse
 
 from catalog.models import Company, CompanyFollow
 
@@ -58,3 +59,16 @@ class CompanyStatusTests(TestCase):
 
 		self.assertEqual(follow.status_key, "inactive")
 		self.assertEqual(follow.status, "Inactive")
+
+
+class ProfilePartialResponseTests(TestCase):
+	def test_profile_status_filter_returns_partial_html(self) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="profile-user", password="pass12345")
+		self.client.force_login(user)
+
+		response = self.client.get(reverse("user_profile"), {"status": "all", "partial": "1"})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertTrue(response.json()["ok"])
+		self.assertIn("data-profile-shell", response.json()["html"])
