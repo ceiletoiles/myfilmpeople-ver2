@@ -1,0 +1,64 @@
+{% load static %}
+
+<section class="connect-shell" data-connect-shell>
+  <div class="connect-group">
+    <div class="connect-label">Role</div>
+    <div class="movie-tabs credits-tabs connect-tabs connect-tabs--role" role="tablist" aria-label="Connect roles">
+      {% for tab in role_tabs %}
+        <a class="movie-tab-btn credits-tab connect-tab-btn connect-tab-btn--role{% if tab.active %} active{% endif %}" href="{{ tab.url }}" role="tab" aria-selected="{% if tab.active %}true{% else %}false{% endif %}" data-connect-tab>
+          <span>{{ tab.label }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="connect-group">
+    <div class="connect-label">External ID</div>
+    <div class="movie-tabs credits-tabs connect-tabs connect-tabs--external" role="tablist" aria-label="Connect external ids">
+      {% for tab in external_tabs %}
+        <a class="movie-tab-btn credits-tab connect-tab-btn connect-tab-btn--external{% if tab.active %} active{% endif %}" href="{{ tab.url }}" role="tab" aria-selected="{% if tab.active %}true{% else %}false{% endif %}" data-connect-tab>
+          <span>{{ tab.label }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="connect-summary">
+    <strong>{{ people_count }}</strong> {{ entity_label }} with {{ active_external.label }} in the {{ active_role.label }} group
+  </div>
+
+  {% if people %}
+    <div class="home-people-grid connect-grid">
+      {% for item in people %}
+        <a class="home-person connect-person" href="{{ item.external_url }}" target="_blank" rel="noopener noreferrer">
+          {% if item.entity_type == 'company' %}
+            <span class="connect-studio-media">
+              {% if item.image_path %}
+                <img class="connect-studio-logo" src="https://image.tmdb.org/t/p/w500{{ item.image_path }}" alt="{{ item.name }}" loading="lazy" />
+              {% else %}
+                <img class="connect-studio-logo connect-studio-logo--placeholder" src="{% static 'img/placeholder-company.svg' %}" alt="{{ item.name }}" loading="lazy" />
+              {% endif %}
+            </span>
+          {% else %}
+            <span class="home-person-media">
+              {% if item.image_path %}
+                <img class="home-person-img{% if item.is_deceased %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w300{{ item.image_path }}" alt="{{ item.name }}" loading="lazy" width="300" height="450" />
+              {% else %}
+                <img class="home-person-img{% if item.is_deceased %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ item.name }}" loading="lazy" width="300" height="450" />
+              {% endif %}
+            </span>
+          {% endif %}
+          <div class="home-person-name">{{ item.name }}</div>
+          <div class="connect-person-meta">
+            {% if active_role.key == 'crew' %}
+              <span class="connect-person-role">{{ item.follow_role }}</span>
+            {% endif %}
+            <span class="connect-person-external">{{ item.external_display }}</span>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted connect-empty">No {{ entity_label }} found for this combination yet.</p>
+  {% endif %}
+</section>

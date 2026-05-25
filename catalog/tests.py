@@ -48,7 +48,7 @@ class ConnectPageTests(TestCase):
 			tmdb_id=1,
 			name="Direct Her",
 			roles=["Director", "Writer"],
-			external_ids={"instagram_id": "directher"},
+			external_ids={"instagram_id": "directher", "youtube_id": "JosephKosinski"},
 		)
 		actor = self._make_person(
 			tmdb_id=2,
@@ -81,6 +81,12 @@ class ConnectPageTests(TestCase):
 			tmdb_raw={"credited_roles": ["Director"], "homepage": "https://example.com"},
 			tmdb_credits_raw={},
 		)
+		studio_company = Company.objects.create(
+			tmdb_id=7,
+			name="Studio People",
+			logo_path="",
+			tmdb_raw={"homepage": "https://studio.example"},
+		)
 
 		self._follow_person(director, "Director")
 		self._follow_person(actor, "Actor")
@@ -88,16 +94,19 @@ class ConnectPageTests(TestCase):
 		self._follow_person(wiki_crew, "Producer")
 		self._follow_person(composer, "Original Music Composer")
 		self._follow_person(homepage_person, "Director")
+		CompanyFollow.objects.create(user=self.user, company=studio_company, name=studio_company.name)
 
 		response = self.client.get(reverse("connect"), {"role": "director", "external": "instagram"})
-
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Direct Her")
 		self.assertNotContains(response, "Act Her")
 		self.assertNotContains(response, "Crew Her")
 		self.assertNotContains(response, "Wiki Crew")
+		self.assertNotContains(response, 'class="connect-person-role"')
 		self.assertContains(response, "Instagram")
+		self.assertContains(response, "@directher")
 		self.assertContains(response, "Director")
+		self.assertNotContains(response, "Instagram: @")
 		self.assertNotContains(response, "Twitter")
 
 		response = self.client.get(reverse("connect"), {"role": "actor", "external": "twitter"})
@@ -116,11 +125,39 @@ class ConnectPageTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Hans Zimmer")
 		self.assertContains(response, "Original Music Composer")
+		self.assertContains(response, 'class="connect-person-role"')
 
 		response = self.client.get(reverse("connect"), {"role": "director", "external": "homepage"})
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Homepage Person")
 		self.assertContains(response, 'href="https://example.com"')
+		self.assertNotContains(response, "Homepage: https://example.com")
+
+		response = self.client.get(reverse("connect"), {"role": "director", "external": "youtube"})
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'href="https://m.youtube.com/@JosephKosinski"')
+		self.assertContains(response, "YouTube")
+		self.assertContains(response, "@JosephKosinski")
+		self.assertNotContains(response, "YouTube: @")
+
+		response = self.client.get(reverse("connect"), {"role": "studio", "external": "instagram"})
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Studio People")
+		self.assertContains(response, 'class="connect-studio-media"')
+		self.assertContains(response, 'href="https://studio.example"')
+		self.assertContains(response, "Homepage")
+		self.assertContains(response, "https://studio.example")
+		self.assertNotContains(response, 'width="300" height="450"')
+		self.assertNotContains(response, "Homepage: ")
+		self.assertNotContains(response, "Instagram")
+		self.assertNotContains(response, "Facebook")
+		self.assertNotContains(response, "YouTube")
+		self.assertNotContains(response, "Wikidata")
+
+		partial_response = self.client.get(reverse("connect"), {"role": "director", "external": "homepage", "partial": "1"})
+		self.assertEqual(partial_response.status_code, 200)
+		self.assertEqual(partial_response.json()["ok"], True)
+		self.assertIn("connect-shell", partial_response.json()["html"])
 
 	def test_home_menu_links_to_connect(self) -> None:
 		response = self.client.get(reverse("home"))
@@ -300,7 +337,6 @@ Scarlett Johansson is starring in Ari Aster's next A24 film, Scapegoat. (more)
 		self.assertIn("Scarlett Johansson", items[1])
 
 	def test_upsert_parse_publish_and_unread_seen_flow(self) -> None:
-		User = get_user_model()
 		user = User.objects.create_user(username="newsletter-user", password="pw")
 		rf = RequestFactory()
 
@@ -311,7 +347,6 @@ Brendan Fraser is going to star in the Mars survival thriller Starman. (more)
 
 Liam Hemsworth is set to star in They Like the Dark. (more)
 """.strip()
-
 		issue_date = date(2026, 5, 8)
 		issue, created = upsert_issue_from_raw_text(
 			provider_name="The Dailies",

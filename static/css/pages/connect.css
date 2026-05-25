@@ -135,6 +135,36 @@
 	aspect-ratio: 85 / 128;
 }
 
+.connect-person .connect-studio-media {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 85px;
+	width: fit-content;
+	height: 128px;
+	max-width: 132px;
+	max-height: 128px;
+	padding: 0;
+	flex: 0 0 auto;
+	border-radius: 10px;
+	overflow: hidden;
+	background: transparent;
+}
+
+.connect-studio-logo {
+	display: block;
+	max-width: 100%;
+	max-height: 100%;
+	width: auto;
+	height: auto;
+	object-fit: contain;
+}
+
+.connect-studio-logo--placeholder {
+	max-width: 88px;
+	max-height: 56px;
+}
+
 .connect-person .home-person-name,
 .connect-person .connect-person-meta {
 	width: 100%;

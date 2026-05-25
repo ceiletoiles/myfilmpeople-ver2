@@ -8,6 +8,10 @@
   <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/connect.css?v=20260523a" />
 {% endblock %}
 
+{% block extra_js %}
+  <script src="{{ STATIC_PREFIX }}js/pages/connect.js?v=20260525a"></script>
+{% endblock %}
+
 {% block page_header %}
   <div class="page-header connect-page-header">
     <button type="button" class="nav-icon-btn" data-menu-toggle aria-controls="site-drawer" aria-expanded="false">
@@ -23,58 +27,5 @@
 {% endblock %}
 
 {% block content %}
-  <section class="connect-shell">
-    <div class="connect-group">
-      <div class="connect-label">Role</div>
-      <div class="movie-tabs credits-tabs connect-tabs connect-tabs--role" role="tablist" aria-label="Connect roles">
-        {% for tab in role_tabs %}
-          <a class="movie-tab-btn credits-tab connect-tab-btn connect-tab-btn--role{% if tab.active %} active{% endif %}" href="{{ tab.url }}" role="tab" aria-selected="{% if tab.active %}true{% else %}false{% endif %}">
-            <span>{{ tab.label }}</span>
-            <span class="connect-tab-count">{{ tab.count }}</span>
-          </a>
-        {% endfor %}
-      </div>
-    </div>
-
-    <div class="connect-group">
-      <div class="connect-label">External ID</div>
-      <div class="movie-tabs credits-tabs connect-tabs connect-tabs--external" role="tablist" aria-label="Connect external ids">
-        {% for tab in external_tabs %}
-          <a class="movie-tab-btn credits-tab connect-tab-btn connect-tab-btn--external{% if tab.active %} active{% endif %}" href="{{ tab.url }}" role="tab" aria-selected="{% if tab.active %}true{% else %}false{% endif %}">
-            <span>{{ tab.label }}</span>
-            <span class="connect-tab-count">{{ tab.count }}</span>
-          </a>
-        {% endfor %}
-      </div>
-    </div>
-
-    <div class="connect-summary">
-      <strong>{{ people_count }}</strong> people with {{ active_external.label }} in the {{ active_role.label }} group
-    </div>
-
-    {% if people %}
-      <div class="home-people-grid connect-grid">
-        {% for item in people %}
-          {% with person=item.person %}
-            <a class="home-person connect-person" href="{{ item.external_url }}" target="_blank" rel="noopener noreferrer">
-              <span class="home-person-media">
-                {% if person.profile_path %}
-                  <img class="home-person-img{% if person.tmdb_raw.deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w300{{ person.profile_path }}" alt="{{ person.name }}" loading="lazy" width="300" height="450" />
-                {% else %}
-                  <img class="home-person-img{% if person.tmdb_raw.deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ person.name }}" loading="lazy" width="300" height="450" />
-                {% endif %}
-              </span>
-              <div class="home-person-name">{{ person.name }}</div>
-              <div class="connect-person-meta">
-                <span class="connect-person-role">{{ item.follow_role }}</span>
-                <span class="connect-person-external">{{ active_external.label }}: {{ item.external_display }}</span>
-              </div>
-            </a>
-          {% endwith %}
-        {% endfor %}
-      </div>
-    {% else %}
-      <p class="muted connect-empty">No people found for this combination yet.</p>
-    {% endif %}
-  </section>
+  {% include 'catalog/_connect_section.html' %}
 {% endblock %}
