@@ -22,7 +22,7 @@ EXTERNAL_ID_TABS = [
 	{"key": "instagram", "label": "Instagram", "field": "instagram_id", "url_prefix": "https://www.instagram.com/"},
 	{"key": "x", "label": "X", "field": "twitter_id", "url_prefix": "https://x.com/"},
 	{"key": "facebook", "label": "Facebook", "field": "facebook_id", "url_prefix": "https://www.facebook.com/"},
-	{"key": "youtube", "label": "YouTube", "field": "youtube_id", "url_prefix": "https://m.youtube.com/@"},
+	{"key": "youtube", "label": "YouTube", "field": "youtube_id", "url_prefix": "https://www.youtube.com/@"},
 	{"key": "wikidata", "label": "Wikidata", "field": "wikidata_id", "url_prefix": "https://www.wikidata.org/wiki/"},
 	{"key": "homepage", "label": "Homepage", "field": "homepage", "url_prefix": ""},
 ]
@@ -54,14 +54,17 @@ def _external_id_value(person: Person, field_name: str) -> str:
 	external_ids = raw.get("external_ids")
 	if not isinstance(external_ids, dict):
 		return ""
-	return str(external_ids.get(field_name) or "").strip()
+	value = str(external_ids.get(field_name) or "").strip()
+	if field_name == "youtube_id":
+		return value.lstrip("@")
+	return value
 
 
 def _external_display_value(tab: dict[str, str], value: str) -> str:
 	if not value:
 		return ""
 	if tab["key"] in {"instagram", "x", "twitter"}:
-		return f"@{value}"
+		return f"@{value.lstrip('@')}"
 	return value
 
 

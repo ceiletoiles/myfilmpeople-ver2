@@ -36,7 +36,7 @@ def build_person_related_links(tmdb_id: int, tmdb_raw: dict[str, Any] | None = N
 			("instagram_id", "Instagram", "https://www.instagram.com/"),
 			("twitter_id", "X", "https://x.com/"),
 			("tiktok_id", "TikTok", "https://www.tiktok.com/@"),
-			("youtube_id", "YouTube", "https://www.youtube.com/channel/"),
+			("youtube_id", "YouTube", "https://www.youtube.com/"),
 		):
 			value = _clean_text(external_ids.get(key))
 			if value:
@@ -82,7 +82,7 @@ def build_movie_related_links(tmdb_id: int, tmdb_raw: dict[str, Any] | None = No
 			("instagram_id", "Instagram", "https://www.instagram.com/"),
 			("twitter_id", "X", "https://x.com/"),
 			("tiktok_id", "TikTok", "https://www.tiktok.com/@"),
-			("youtube_id", "YouTube", "https://www.youtube.com/channel/"),
+			("youtube_id", "YouTube", "https://www.youtube.com/"),
 		):
 			value = _clean_text(external_ids.get(key))
 			if value:

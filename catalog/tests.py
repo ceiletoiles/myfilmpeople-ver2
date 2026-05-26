@@ -48,7 +48,7 @@ class ConnectPageTests(TestCase):
 			tmdb_id=1,
 			name="Direct Her",
 			roles=["Director", "Writer"],
-			external_ids={"instagram_id": "directher", "youtube_id": "JosephKosinski"},
+			external_ids={"instagram_id": "directher", "youtube_id": "@JosephKosinski"},
 		)
 		actor = self._make_person(
 			tmdb_id=2,
@@ -135,7 +135,7 @@ class ConnectPageTests(TestCase):
 
 		response = self.client.get(reverse("connect"), {"role": "director", "external": "youtube"})
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'href="https://m.youtube.com/@JosephKosinski"')
+		self.assertContains(response, 'href="https://www.youtube.com/@JosephKosinski"')
 		self.assertContains(response, "YouTube")
 		self.assertContains(response, "@JosephKosinski")
 		self.assertNotContains(response, "YouTube: @")
@@ -337,7 +337,7 @@ Scarlett Johansson is starring in Ari Aster's next A24 film, Scapegoat. (more)
 		self.assertIn("Scarlett Johansson", items[1])
 
 	def test_upsert_parse_publish_and_unread_seen_flow(self) -> None:
-		user = User.objects.create_user(username="newsletter-user", password="pw")
+		user = get_user_model().objects.create_user(username="newsletter-user", password="pw")
 		rf = RequestFactory()
 
 		raw_text = """
