@@ -28,32 +28,34 @@
   </div>
 
   {% if people %}
-    <div class="home-people-grid connect-grid">
+    <div class="connect-grid" role="list">
       {% for item in people %}
-        <a class="home-person connect-person" href="{{ item.external_url }}" target="_blank" rel="noopener noreferrer">
+        <a class="connect-person{% if item.entity_type == 'company' %} connect-person--studio{% endif %}" href="{{ item.external_url }}" target="_blank" rel="noopener noreferrer" role="listitem">
           {% if item.entity_type == 'company' %}
-            <span class="connect-studio-media">
+            <span class="connect-avatar connect-avatar--studio" aria-hidden="true">
               {% if item.image_path %}
-                <img class="connect-studio-logo" src="https://image.tmdb.org/t/p/w500{{ item.image_path }}" alt="{{ item.name }}" loading="lazy" />
+                <img class="connect-avatar-img connect-avatar-img--studio" src="https://image.tmdb.org/t/p/w300{{ item.image_path }}" alt="{{ item.name }}" loading="lazy" />
               {% else %}
-                <img class="connect-studio-logo connect-studio-logo--placeholder" src="{% static 'img/placeholder-company.svg' %}" alt="{{ item.name }}" loading="lazy" />
+                <img class="connect-avatar-img connect-avatar-img--studio connect-avatar-img--studio-placeholder" src="{% static 'img/placeholder-company.svg' %}" alt="{{ item.name }}" loading="lazy" />
               {% endif %}
             </span>
           {% else %}
-            <span class="home-person-media">
+            <span class="connect-avatar" aria-hidden="true">
               {% if item.image_path %}
-                <img class="home-person-img{% if item.is_deceased %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w300{{ item.image_path }}" alt="{{ item.name }}" loading="lazy" width="300" height="450" />
+                <img class="connect-avatar-img{% if item.is_deceased %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ item.image_path }}" alt="{{ item.name }}" loading="lazy" width="185" height="185" />
               {% else %}
-                <img class="home-person-img{% if item.is_deceased %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ item.name }}" loading="lazy" width="300" height="450" />
+                <img class="connect-avatar-img{% if item.is_deceased %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ item.name }}" loading="lazy" width="185" height="185" />
               {% endif %}
             </span>
           {% endif %}
-          <div class="home-person-name">{{ item.name }}</div>
-          <div class="connect-person-meta">
-            {% if active_role.key == 'crew' %}
-              <span class="connect-person-role">{{ item.follow_role }}</span>
-            {% endif %}
-            <span class="connect-person-external">{{ item.external_display }}</span>
+          <div class="connect-person-text">
+            <div class="connect-person-name-row">
+              <div class="connect-person-name">{{ item.name }}</div>
+              {% if active_role.key == 'crew' %}
+                <span class="connect-person-role">{{ item.follow_role }}</span>
+              {% endif %}
+            </div>
+            <div class="connect-person-username">{{ item.external_display }}</div>
           </div>
         </a>
       {% endfor %}
