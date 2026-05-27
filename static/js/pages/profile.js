@@ -158,6 +158,22 @@
       return;
     }
 
+    // activity pagination links (ajax)
+    const paginateLink = target.closest('[data-profile-paginate]');
+    if (paginateLink) {
+      const href = paginateLink.getAttribute('href');
+      if (!href) return;
+      event.preventDefault();
+      try {
+        const list = document.querySelector('.profile-section.profile-activity .activity-list');
+        if (list) list.outerHTML = renderProfileSkeleton();
+      } catch (e) {
+        // ignore
+      }
+      loadProfileState(href, true);
+      return;
+    }
+
     const statusLink = target.closest('[data-profile-status-option]');
     if (!statusLink) return;
 

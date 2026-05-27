@@ -607,7 +607,6 @@ button.secondary:where(:not(.nav-icon-btn):not(.menu-close)) {
 }
 
 nav {
-    display: flex;
     flex-wrap: wrap;
     gap: 10px;
     align-items: center;

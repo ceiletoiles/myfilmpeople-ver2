@@ -184,11 +184,53 @@ def profile(request: HttpRequest) -> HttpResponse:
 	for c in company_follows:
 		_annotate_company_status(c)
 
-	follow_activities = list(
+	# Follow activity: by default return all activities for the activity section.
+	# Optional pagination: pass `per_page` (int) and `page` (int) in the querystring
+	# e.g. `?per_page=100&page=1` to receive pages of 100 items. We intentionally
+	# do not limit to 50 anymore — show everything unless pagination is requested.
+	activities_qs = (
 		FollowActivity.objects.select_related("person", "company")
 		.filter(user=request.user)
-		.order_by("-created_at", "-id")[:50]
+		.order_by("-created_at", "-id")
 	)
+
+	follow_activities = []
+	follow_activities_pagination = None
+
+	# parse pagination params; default to page size 100
+	page = 1
+	per_page = 100
+	try:
+		if request.GET.get("per_page") is not None:
+			_per = int(request.GET.get("per_page") or 0)
+			if _per > 0:
+				per_page = max(1, min(_per, 100))
+		page = int(request.GET.get("page") or 1)
+		page = max(1, page)
+	except Exception:
+		# fall back to defaults
+		page = 1
+		per_page = 100
+
+	if per_page:
+		total = activities_qs.count()
+		total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+		# clamp page
+		if page > total_pages:
+			page = total_pages
+		start = (page - 1) * per_page
+		end = start + per_page
+		follow_activities = list(activities_qs[start:end])
+		follow_activities_pagination = {
+			"page": page,
+			"per_page": per_page,
+			"total_pages": total_pages,
+			"has_prev": page > 1,
+			"has_next": page < total_pages,
+		}
+	else:
+		# no pagination requested — return all activities
+		follow_activities = list(activities_qs)
 
 	if selected_status != "all":
 		directors = [f for f in directors if f.status_key == selected_status]
@@ -214,6 +256,7 @@ def profile(request: HttpRequest) -> HttpResponse:
 		"crew": crew,
 		"companies": company_follows,
 		"follow_activities": follow_activities,
+		"follow_activities_pagination": follow_activities_pagination,
 		"tab_counts": tab_counts,
 		"follow_count": len(person_follows) + total_company_count,
 	}

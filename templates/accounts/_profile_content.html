@@ -225,5 +225,20 @@
         <p class="muted">No follow activity yet.</p>
       {% endif %}
     </div>
+    {% if follow_activities_pagination %}
+      <nav class="activity-pagination" aria-label="Activity pagination">
+        <div class="activity-pagination-inner">
+          {% if follow_activities_pagination.has_prev %}
+            <a href="?page={{ follow_activities_pagination.page|add:-1 }}&per_page={{ follow_activities_pagination.per_page }}" class="btn btn-sm activity-pager-prev" data-profile-paginate>Previous</a>
+          {% endif %}
+
+          <span class="muted activity-pagination-info">Page {{ follow_activities_pagination.page }} of {{ follow_activities_pagination.total_pages }}</span>
+
+          {% if follow_activities_pagination.has_next %}
+            <a href="?page={{ follow_activities_pagination.page|add:1 }}&per_page={{ follow_activities_pagination.per_page }}" class="btn btn-sm activity-pager-next" data-profile-paginate>Next</a>
+          {% endif %}
+        </div>
+      </nav>
+    {% endif %}
   </section>
 </div>
