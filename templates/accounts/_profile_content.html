@@ -165,18 +165,38 @@
                 <article class="activity-row">
                   {% if activity.is_person %}
                     <span class="activity-avatar-wrap">
-                      {% if activity.image_path %}
-                        <img class="activity-avatar activity-avatar-person" src="https://image.tmdb.org/t/p/w185{{ activity.image_path }}" alt="{{ activity.entity_name }}" loading="lazy" />
+                      {% if activity.person %}
+                        <a class="activity-link" href="{% url 'person_detail' activity.person.tmdb_id %}" aria-label="View {{ activity.entity_name }}">
+                          {% if activity.image_path %}
+                            <img class="activity-avatar activity-avatar-person" src="https://image.tmdb.org/t/p/w185{{ activity.image_path }}" alt="{{ activity.entity_name }}" loading="lazy" />
+                          {% else %}
+                            <img class="activity-avatar activity-avatar-person" src="{% static 'img/placeholder-person.svg' %}" alt="{{ activity.entity_name }}" loading="lazy" />
+                          {% endif %}
+                        </a>
                       {% else %}
-                        <img class="activity-avatar activity-avatar-person" src="{% static 'img/placeholder-person.svg' %}" alt="{{ activity.entity_name }}" loading="lazy" />
+                        {% if activity.image_path %}
+                          <img class="activity-avatar activity-avatar-person" src="https://image.tmdb.org/t/p/w185{{ activity.image_path }}" alt="{{ activity.entity_name }}" loading="lazy" />
+                        {% else %}
+                          <img class="activity-avatar activity-avatar-person" src="{% static 'img/placeholder-person.svg' %}" alt="{{ activity.entity_name }}" loading="lazy" />
+                        {% endif %}
                       {% endif %}
                     </span>
                   {% else %}
                     <span class="activity-avatar-wrap activity-avatar-wrap-studio">
-                      {% if activity.image_path %}
-                        <img class="activity-avatar activity-avatar-studio" src="https://image.tmdb.org/t/p/w300{{ activity.image_path }}" alt="{{ activity.entity_name }} logo" loading="lazy" />
+                      {% if activity.company %}
+                        <a class="activity-link" href="{% url 'company_detail' activity.company.tmdb_id %}" aria-label="View {{ activity.entity_name }}">
+                          {% if activity.image_path %}
+                            <img class="activity-avatar activity-avatar-studio" src="https://image.tmdb.org/t/p/w300{{ activity.image_path }}" alt="{{ activity.entity_name }} logo" loading="lazy" />
+                          {% else %}
+                            <img class="activity-avatar activity-avatar-studio" src="{% static 'img/placeholder-company.svg' %}" alt="{{ activity.entity_name }} logo" loading="lazy" />
+                          {% endif %}
+                        </a>
                       {% else %}
-                        <img class="activity-avatar activity-avatar-studio" src="{% static 'img/placeholder-company.svg' %}" alt="{{ activity.entity_name }} logo" loading="lazy" />
+                        {% if activity.image_path %}
+                          <img class="activity-avatar activity-avatar-studio" src="https://image.tmdb.org/t/p/w300{{ activity.image_path }}" alt="{{ activity.entity_name }} logo" loading="lazy" />
+                        {% else %}
+                          <img class="activity-avatar activity-avatar-studio" src="{% static 'img/placeholder-company.svg' %}" alt="{{ activity.entity_name }} logo" loading="lazy" />
+                        {% endif %}
                       {% endif %}
                     </span>
                   {% endif %}
@@ -184,7 +204,13 @@
                     <span class="activity-title">
                       <span class="activity-action">{{ activity.get_action_display }}</span>
                       &nbsp;
-                      <strong class="activity-entity">{{ activity.entity_name }}</strong>
+                      {% if activity.is_person and activity.person %}
+                        <a class="activity-link" href="{% url 'person_detail' activity.person.tmdb_id %}"><strong class="activity-entity">{{ activity.entity_name }}</strong></a>
+                      {% elif activity.is_company and activity.company %}
+                        <a class="activity-link" href="{% url 'company_detail' activity.company.tmdb_id %}"><strong class="activity-entity">{{ activity.entity_name }}</strong></a>
+                      {% else %}
+                        <strong class="activity-entity">{{ activity.entity_name }}</strong>
+                      {% endif %}
                       {% if activity.is_person and activity.role %}
                         &nbsp;<strong class="activity-role">as {{ activity.role }}</strong>
                       {% endif %}

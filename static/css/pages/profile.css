@@ -209,6 +209,16 @@
 	font-weight: 700;
 }
 
+.activity-link {
+	color: inherit;
+	text-decoration: none;
+}
+
+.activity-link:focus,
+.activity-link:hover {
+	text-decoration: underline;
+}
+
 .activity-date {
 	flex: 0 0 auto;
 	margin-left: auto;
