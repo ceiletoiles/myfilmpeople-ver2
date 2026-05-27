@@ -11,7 +11,7 @@ from django.template.loader import render_to_string
 from django.utils.http import url_has_allowed_host_and_scheme
 from urllib.parse import urlencode
 
-from catalog.models import CompanyFollow, PersonFollow
+from catalog.models import CompanyFollow, FollowActivity, PersonFollow
 from catalog.services import (
 	get_or_sync_company_tba_movies_page,
 	get_person_status_key,
@@ -184,6 +184,12 @@ def profile(request: HttpRequest) -> HttpResponse:
 	for c in company_follows:
 		_annotate_company_status(c)
 
+	follow_activities = list(
+		FollowActivity.objects.select_related("person", "company")
+		.filter(user=request.user)
+		.order_by("-created_at", "-id")[:50]
+	)
+
 	if selected_status != "all":
 		directors = [f for f in directors if f.status_key == selected_status]
 		actors = [f for f in actors if f.status_key == selected_status]
@@ -207,6 +213,7 @@ def profile(request: HttpRequest) -> HttpResponse:
 		"actors": actors,
 		"crew": crew,
 		"companies": company_follows,
+		"follow_activities": follow_activities,
 		"tab_counts": tab_counts,
 		"follow_count": len(person_follows) + total_company_count,
 	}

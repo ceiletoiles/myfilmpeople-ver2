@@ -4,8 +4,250 @@
 	padding: 4px 0 20px;
 }
 
+.profile-section[hidden] {
+	display: none;
+}
+
+.profile-view-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 42px;
+	padding: 8px 12px;
+	border: 1px solid #cbd5e1;
+	border-radius: 999px;
+	background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+	color: #0f172a;
+	font-size: 14px;
+	font-weight: 700;
+	line-height: 1;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+	cursor: pointer;
+	transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.profile-view-toggle:hover,
+.profile-view-toggle:focus-visible,
+.profile-page[data-profile-view="activity"] .profile-view-toggle {
+	border-color: #94a3b8;
+	box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+}
+
+.profile-view-toggle:focus-visible {
+	outline: none;
+}
+
+.profile-view-toggle-icon {
+	width: 18px;
+	height: 18px;
+	flex: 0 0 18px;
+}
+
+.profile-view-toggle-text {
+	white-space: nowrap;
+}
+
 .profile-summary p {
 	margin: 0 0 10px;
+}
+
+.profile-activity {
+	padding-top: 2px;
+}
+
+.activity-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 12px;
+}
+
+.activity-head h2 {
+	margin: 0 0 4px;
+	font-size: 18px;
+	line-height: 1.2;
+	color: #0f172a;
+}
+
+.activity-head p {
+	margin: 0;
+}
+
+.activity-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.activity-day-header {
+	display: flex;
+	align-items: center;
+	padding: 8px 6px;
+	margin: 6px 0 0;
+	border-radius: 10px;
+	background: #f8fafc;
+	color: #334155;
+}
+
+.activity-day-header .activity-date {
+	margin-left: 0;
+	border: 1px solid #e2e8f0;
+	background: #ffffff;
+}
+
+.activity-day {
+	display: flex;
+	gap: 12px;
+	align-items: flex-start;
+}
+
+.activity-day-col-date {
+	flex: 0 0 84px;
+	display: flex;
+	align-items: flex-start;
+}
+
+.activity-day-col-list {
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.activity-day .activity-row {
+	border-bottom: 1px solid transparent;
+	padding: 6px 0;
+}
+
+.activity-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 10px 0;
+	border-bottom: 1px solid #e2e8f0;
+}
+
+.activity-row:last-child {
+	border-bottom: 0;
+}
+
+.activity-avatar-wrap {
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.activity-avatar-wrap-studio {
+	width: clamp(92px, 18vw, 148px);
+	justify-content: flex-start;
+	flex-shrink: 0;
+	overflow: hidden;
+}
+
+.activity-avatar {
+	width: 36px;
+	height: 36px;
+	object-fit: cover;
+	background: #e2e8f0;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.activity-avatar-person {
+	border-radius: 999px;
+}
+
+.activity-avatar-studio {
+	width: auto;
+	height: auto;
+	max-width: 100%;
+	max-height: 34px;
+	object-fit: contain;
+	object-position: left center;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.activity-copy {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.activity-title {
+	color: #0f172a;
+	font-weight: 600;
+	line-height: 1.3;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	/* allow wrapping and clamp to two lines on narrow viewports */
+	white-space: normal;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	-webkit-box-orient: vertical;
+	max-height: calc(1.3em * 2);
+}
+
+.activity-meta {
+	color: #64748b;
+	font-size: 13px;
+	line-height: 1.3;
+}
+
+.activity-entity {
+	color: #0f172a;
+	font-weight: 800;
+}
+
+.activity-role {
+	color: #0f172a;
+	font-weight: 700;
+}
+
+.activity-date {
+	flex: 0 0 auto;
+	margin-left: auto;
+	display: inline-flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	min-width: 52px;
+	min-height: 44px;
+	padding: 6px 8px;
+	border: 1px solid #dbe3ef;
+	border-radius: 14px;
+	background: #ffffff;
+	line-height: 1;
+	color: #475569;
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.activity-date-month {
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: #64748b;
+}
+
+.activity-date-day {
+	font-size: 17px;
+	font-weight: 800;
+	color: #0f172a;
+	line-height: 1.05;
+}
+
+.activity-date-year {
+	font-size: 11px;
+	font-weight: 600;
+	color: #64748b;
 }
 
 .profile-separator {
@@ -212,6 +454,35 @@
 	display: block;
 }
 
+/* Small screen tweaks to keep activity rows compact */
+@media (max-width: 480px) {
+	.activity-title {
+		font-size: 14px;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+	}
+
+	.activity-date {
+		min-width: 44px;
+		padding: 4px 6px;
+		font-size: 12px;
+	}
+
+	.activity-avatar {
+		width: 32px;
+		height: 32px;
+	}
+
+	.activity-avatar-studio {
+		max-height: 28px;
+	}
+
+	.activity-row {
+		gap: 10px;
+		padding: 8px 0;
+	}
+}
+
 .following-row {
 	display: flex;
 	align-items: center;
@@ -237,21 +508,25 @@
 }
 
 .studio-logo {
-	max-width: 64px;
-	max-height: 24px;
+	display: block;
 	width: auto;
 	height: auto;
+	max-width: 88px;
+	max-height: 28px;
 	object-fit: contain;
+	object-position: left center;
 	flex: 0 1 auto;
 	background: transparent;
 }
 
 .studio-logo-wrap {
-	width: 72px;
-	flex: 0 0 72px;
+	width: auto;
+	min-width: 0;
+	flex: 0 0 auto;
 	display: inline-flex;
 	justify-content: flex-start;
 	align-items: center;
+	background: transparent;
 }
 
 .entity-name {
@@ -317,6 +592,18 @@
 		margin-left: auto;
 	}
 
+	.profile-view-toggle {
+		min-height: 38px;
+		padding: 7px 10px;
+		font-size: 12px;
+	}
+
+	.profile-view-toggle-icon {
+		width: 16px;
+		height: 16px;
+		flex-basis: 16px;
+	}
+
 	.status-filter-trigger {
 		min-width: 0;
 		max-width: 140px;
@@ -346,13 +633,13 @@
 	}
 
 	.studio-logo {
-		max-width: 56px;
-		max-height: 22px;
+		max-width: 72px;
+		max-height: 24px;
 	}
 
 	.studio-logo-wrap {
-		width: 64px;
-		flex-basis: 64px;
+		width: auto;
+		flex-basis: auto;
 	}
 
 	/* Mobile: keep status compact and aligned to right */
@@ -370,6 +657,19 @@
 
 	.entity-copy {
 		flex: 1 1 auto;
+	}
+
+	.activity-row {
+		align-items: flex-start;
+	}
+
+	.activity-avatar {
+		width: 32px;
+		height: 32px;
+	}
+
+	.activity-date {
+		font-size: 12px;
 	}
 }
 

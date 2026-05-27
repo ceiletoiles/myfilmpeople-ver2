@@ -111,6 +111,61 @@ class CompanyFollow(models.Model):
 		return f"{self.user_id} follows company {self.company_id}"
 
 
+class FollowActivity(models.Model):
+	ACTION_FOLLOW = "follow"
+	ACTION_UNFOLLOW = "unfollow"
+	ACTION_CHOICES = [
+		(ACTION_FOLLOW, "Followed"),
+		(ACTION_UNFOLLOW, "Unfollowed"),
+	]
+
+	ENTITY_PERSON = "person"
+	ENTITY_COMPANY = "company"
+	ENTITY_CHOICES = [
+		(ENTITY_PERSON, "Person"),
+		(ENTITY_COMPANY, "Company"),
+	]
+
+	user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+	entity_type = models.CharField(max_length=20, choices=ENTITY_CHOICES)
+	action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+	person = models.ForeignKey(Person, on_delete=models.SET_NULL, null=True, blank=True, related_name="follow_activities")
+	company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name="follow_activities")
+	entity_name = models.CharField(max_length=255)
+	role = models.CharField(max_length=100, blank=True)
+	image_path = models.CharField(max_length=255, blank=True)
+
+	created_at = models.DateTimeField(default=timezone.now, db_index=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		ordering = ["-created_at", "-id"]
+		indexes = [
+			models.Index(fields=["user", "created_at"]),
+		]
+
+	def __str__(self) -> str:
+		label = self.get_action_display().lower()
+		if self.is_person and self.role:
+			return f"{self.user_id} {label} {self.entity_name} as {self.role}"
+		return f"{self.user_id} {label} {self.entity_name}"
+
+	@property
+	def is_person(self) -> bool:
+		return self.entity_type == self.ENTITY_PERSON
+
+	@property
+	def is_company(self) -> bool:
+		return self.entity_type == self.ENTITY_COMPANY
+
+	@property
+	def summary(self) -> str:
+		prefix = self.get_action_display()
+		if self.is_person and self.role:
+			return f"{prefix} {self.entity_name} as {self.role}"
+		return f"{prefix} {self.entity_name}"
+
+
 class NewMovieArrival(models.Model):
 	"""Track newly discovered movies from synced data."""
 	user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)

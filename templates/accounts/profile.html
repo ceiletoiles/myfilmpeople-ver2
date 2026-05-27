@@ -21,7 +21,14 @@
       <h1>My Profile</h1>
       <p class="page-tagline">Account and following overview</p>
     </div>
-    <span class="page-header-spacer" aria-hidden="true"></span>
+    <button type="button" class="profile-view-toggle" data-profile-view-toggle aria-pressed="false" aria-controls="profile-overview profile-activity">
+      <svg class="profile-view-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="8.25" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+        <path d="M12 8v4.25l3 1.8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+      </svg>
+      <span class="profile-view-toggle-text" data-profile-view-label>Activity</span>
+      <span class="sr-only">Toggle profile activity</span>
+    </button>
   </div>
 {% endblock %}
 

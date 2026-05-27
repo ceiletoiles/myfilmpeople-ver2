@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from catalog.models import Company, CompanyFollow
+from catalog.models import Company, CompanyFollow, FollowActivity, Person
 
 from .views import _annotate_company_status
 
@@ -72,3 +72,79 @@ class ProfilePartialResponseTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertTrue(response.json()["ok"])
 		self.assertIn("data-profile-shell", response.json()["html"])
+
+
+class ProfileActivityTests(TestCase):
+	def setUp(self) -> None:
+		User = get_user_model()
+		self.user = User.objects.create_user(username="activity-user", password="pass12345")
+		self.client.force_login(self.user)
+
+	def test_profile_page_shows_follow_activity_toggle_and_feed(self) -> None:
+		person = Person.objects.create(tmdb_id=2001, name="Activity Person", profile_path="/person.jpg")
+		company = Company.objects.create(tmdb_id=2002, name="Activity Studio", logo_path="/studio.png")
+		FollowActivity.objects.create(
+			user=self.user,
+			entity_type=FollowActivity.ENTITY_PERSON,
+			action=FollowActivity.ACTION_FOLLOW,
+			person=person,
+			entity_name=person.name,
+			role="Actor",
+			image_path=person.profile_path,
+		)
+		FollowActivity.objects.create(
+			user=self.user,
+			entity_type=FollowActivity.ENTITY_COMPANY,
+			action=FollowActivity.ACTION_UNFOLLOW,
+			company=company,
+			entity_name=company.name,
+			image_path=company.logo_path,
+		)
+
+		response = self.client.get(reverse("user_profile"), {"partial": "1"})
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertIn("Followed Activity Person as Actor", payload["html"])
+		self.assertIn("Unfollowed Activity Studio", payload["html"])
+
+		full_response = self.client.get(reverse("user_profile"))
+		self.assertEqual(full_response.status_code, 200)
+		self.assertContains(full_response, "data-profile-view-toggle")
+		self.assertContains(full_response, "profile-activity")
+
+	@patch("catalog.views.follow._person_role_options_from_credits", return_value=["Actor"])
+	@patch("catalog.views.follow.get_or_sync_person")
+	@patch("catalog.views.follow.get_or_sync_company")
+	@patch("catalog.views.follow.prefetch_company_filmography", return_value=0)
+	def test_follow_and_unfollow_record_activity(self, _mock_prefetch, mock_get_company, mock_get_person, _mock_roles) -> None:
+		person = Person.objects.create(
+			tmdb_id=3001,
+			name="Logged Person",
+			profile_path="/logged-person.jpg",
+			tmdb_credits_raw={"cast": [{"id": 1}]},
+		)
+		company = Company.objects.create(tmdb_id=3002, name="Logged Studio", logo_path="/logged-studio.png")
+		mock_get_person.return_value = person
+		mock_get_company.return_value = company
+
+		response = self.client.post(reverse("follow"), {"entity_type": "person", "tmdb_id": person.tmdb_id, "role": "Actor"})
+		self.assertEqual(response.status_code, 302)
+		response = self.client.post(reverse("person_unfollow", args=[person.tmdb_id]), {"role": "Actor"})
+		self.assertEqual(response.status_code, 302)
+		response = self.client.post(reverse("follow"), {"entity_type": "company", "tmdb_id": company.tmdb_id})
+		self.assertEqual(response.status_code, 302)
+		response = self.client.post(reverse("company_unfollow", args=[company.tmdb_id]))
+		self.assertEqual(response.status_code, 302)
+
+		activities = list(FollowActivity.objects.filter(user=self.user).order_by("created_at", "id"))
+		self.assertEqual(
+			[activity.action for activity in activities],
+			[
+				FollowActivity.ACTION_FOLLOW,
+				FollowActivity.ACTION_UNFOLLOW,
+				FollowActivity.ACTION_FOLLOW,
+				FollowActivity.ACTION_UNFOLLOW,
+			],
+		)
+		self.assertEqual(activities[0].summary, "Followed Logged Person as Actor")
+		self.assertEqual(activities[2].summary, "Followed Logged Studio")

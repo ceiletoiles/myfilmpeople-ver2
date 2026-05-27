@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from ..models import CompanyFollow, PersonFollow
+from ..models import FollowActivity
 from ..new_movie_helpers import (
 	build_person_comeback_event_meta,
 	extract_movie_ids_from_credits,
@@ -84,6 +85,27 @@ def _render_company_follow_controls(request: HttpRequest, *, tmdb_id: int) -> st
 		},
 		request=request,
 	)
+
+
+def _record_follow_activity(*, user, action: str, person=None, company=None, role: str = "", created_at=None) -> None:
+	common_kwargs = {
+		"user": user,
+		"entity_type": FollowActivity.ENTITY_PERSON if person is not None else FollowActivity.ENTITY_COMPANY,
+		"action": action,
+		"entity_name": (person.name if person is not None else company.name) or "",
+		"role": role or "",
+		"image_path": (person.profile_path if person is not None else company.logo_path) or "",
+	}
+	if created_at is not None:
+		common_kwargs["created_at"] = created_at
+
+	if person is not None:
+		FollowActivity.objects.create(person=person, **common_kwargs)
+		return
+
+	if company is not None:
+		common_kwargs["role"] = "Studio"
+		FollowActivity.objects.create(company=company, **common_kwargs)
 
 
 @login_required
@@ -203,6 +225,14 @@ def follow(request: HttpRequest) -> HttpResponse:
 		if not created and (pf.name or "") != (person.name or ""):
 			pf.name = person.name or ""
 			pf.save(update_fields=["name", "updated_at"])
+		if created:
+			_record_follow_activity(
+				user=request.user,
+				action=FollowActivity.ACTION_FOLLOW,
+				person=pf.person,
+				role=pf.role,
+				created_at=pf.created_at,
+			)
 		if wants_json:
 			payload: dict[str, object] = {
 				"ok": True,
@@ -248,6 +278,13 @@ def follow(request: HttpRequest) -> HttpResponse:
 		if not created and (cf.name or "") != (company.name or ""):
 			cf.name = company.name or ""
 			cf.save(update_fields=["name", "updated_at"])
+		if created:
+			_record_follow_activity(
+				user=request.user,
+				action=FollowActivity.ACTION_FOLLOW,
+				company=cf.company,
+				created_at=cf.created_at,
+			)
 		messages.success(request, f"Now following {company.name}.")
 		if wants_json:
 			payload = {
@@ -673,7 +710,17 @@ def person_unfollow(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	qs = PersonFollow.objects.filter(user=request.user, person__tmdb_id=tmdb_id)
 
 	if role:
-		deleted_count, _ = qs.filter(role=role).delete()
+		follows = list(qs.filter(role=role).select_related("person"))
+		deleted_count = len(follows)
+		for follow in follows:
+			_record_follow_activity(
+				user=request.user,
+				action=FollowActivity.ACTION_UNFOLLOW,
+				person=follow.person,
+				role=follow.role,
+			)
+		if deleted_count:
+			qs.filter(role=role).delete()
 		if deleted_count:
 			if wants_json:
 				payload: dict[str, object] = {
@@ -702,7 +749,17 @@ def person_unfollow(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				)
 		return redirect("person_detail", tmdb_id=tmdb_id)
 
-	deleted_count, _ = qs.delete()
+	follows = list(qs.select_related("person"))
+	deleted_count = len(follows)
+	for follow in follows:
+		_record_follow_activity(
+			user=request.user,
+			action=FollowActivity.ACTION_UNFOLLOW,
+			person=follow.person,
+			role=follow.role,
+		)
+	if deleted_count:
+		qs.delete()
 	if deleted_count:
 		if wants_json:
 			payload = {
@@ -736,7 +793,16 @@ def company_unfollow(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	wants_json = _wants_json(request)
 	ajax_context = (request.POST.get("ajax_context") or "").strip().lower()
 
-	deleted_count, _ = CompanyFollow.objects.filter(user=request.user, company__tmdb_id=tmdb_id).delete()
+	follow = CompanyFollow.objects.filter(user=request.user, company__tmdb_id=tmdb_id).select_related("company").first()
+	if follow:
+		_record_follow_activity(
+			user=request.user,
+			action=FollowActivity.ACTION_UNFOLLOW,
+			company=follow.company,
+		)
+		deleted_count, _ = CompanyFollow.objects.filter(user=request.user, company__tmdb_id=tmdb_id).delete()
+	else:
+		deleted_count = 0
 	if deleted_count:
 		messages.success(request, "Unfollowed company.")
 		if wants_json:

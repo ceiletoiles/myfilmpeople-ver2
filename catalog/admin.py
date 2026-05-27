@@ -5,6 +5,7 @@ from django.utils.html import format_html
 from .models import (
 	Company,
 	CompanyFollow,
+	FollowActivity,
 	Movie,
 	NewsletterIssue,
 	NewsletterItem,
@@ -60,6 +61,13 @@ class CompanyFollowAdmin(admin.ModelAdmin):
 		url = reverse('admin:catalog_company_change', args=[company.id])
 		return format_html('<a href="{}">{}</a>', url, company.name)
 	company_link.short_description = 'Company'
+
+
+@admin.register(FollowActivity)
+class FollowActivityAdmin(admin.ModelAdmin):
+	list_display = ("user", "action", "entity_type", "entity_name", "role", "created_at")
+	list_filter = ("action", "entity_type", "created_at")
+	search_fields = ("user__username", "entity_name", "role")
 
 
 @admin.action(description="Parse selected newsletter issues")

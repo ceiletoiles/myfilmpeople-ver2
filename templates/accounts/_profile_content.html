@@ -1,137 +1,203 @@
 {% load static %}
 
-<div class="profile-page" data-profile-shell>
-  <div class="profile-summary">
-    <p><strong>Username:</strong> {{ user.username }}</p>
-    <p><strong>Email:</strong> {{ user.email|default:'-' }}</p>
-    <p><strong>Followed entities:</strong> {{ follow_count }}</p>
-  </div>
+<div class="profile-page" data-profile-shell data-profile-view="overview">
+  <section class="profile-section profile-overview" data-profile-section="overview" id="profile-overview">
+    <div class="profile-summary">
+      <p><strong>Username:</strong> {{ user.username }}</p>
+      <p><strong>Email:</strong> {{ user.email|default:'-' }}</p>
+      <p><strong>Followed entities:</strong> {{ follow_count }}</p>
+    </div>
 
-  <div class="profile-separator" aria-hidden="true"></div>
+    <div class="profile-separator" aria-hidden="true"></div>
 
-  <div class="following-head">Following: <span class="following-head-count" data-following-count>0</span></div>
+    <div class="following-head">Following: <span class="following-head-count" data-following-count>0</span></div>
 
-  <div class="following-tabs">
-    <input type="radio" name="following-tab" id="tab-director" checked />
-    <input type="radio" name="following-tab" id="tab-actor" />
-    <input type="radio" name="following-tab" id="tab-crew" />
-    <input type="radio" name="following-tab" id="tab-studio" />
+    <div class="following-tabs">
+      <input type="radio" name="following-tab" id="tab-director" checked />
+      <input type="radio" name="following-tab" id="tab-actor" />
+      <input type="radio" name="following-tab" id="tab-crew" />
+      <input type="radio" name="following-tab" id="tab-studio" />
 
-    <div class="tab-row">
-      <div class="tab-list" role="tablist" aria-label="Following tabs">
-        <label for="tab-director" class="tab-label" role="tab" data-tab-count="{{ tab_counts.director }}">Director</label>
-        <label for="tab-actor" class="tab-label" role="tab" data-tab-count="{{ tab_counts.actor }}">Actor</label>
-        <label for="tab-crew" class="tab-label" role="tab" data-tab-count="{{ tab_counts.crew }}">Crew</label>
-        <label for="tab-studio" class="tab-label" role="tab" data-tab-count="{{ tab_counts.studio }}">Studios</label>
+      <div class="tab-row">
+        <div class="tab-list" role="tablist" aria-label="Following tabs">
+          <label for="tab-director" class="tab-label" role="tab" data-tab-count="{{ tab_counts.director }}">Director</label>
+          <label for="tab-actor" class="tab-label" role="tab" data-tab-count="{{ tab_counts.actor }}">Actor</label>
+          <label for="tab-crew" class="tab-label" role="tab" data-tab-count="{{ tab_counts.crew }}">Crew</label>
+          <label for="tab-studio" class="tab-label" role="tab" data-tab-count="{{ tab_counts.studio }}">Studios</label>
+        </div>
+
+        <details class="status-filter-menu">
+          <summary class="status-filter-trigger" aria-label="Filter by status">
+            <span class="status-filter-trigger-label">{{ selected_status_label }}</span>
+            <span class="status-filter-caret" aria-hidden="true"></span>
+          </summary>
+
+          <div class="status-filter-options" role="menu" aria-label="Filter by status options">
+            {% for filter in status_filters %}
+              <a
+                class="status-filter-option{% if filter.active %} active{% endif %}"
+                href="{{ filter.url }}"
+                role="menuitem{% if filter.active %}radio{% endif %}"
+                {% if filter.active %}aria-current="page"{% endif %}
+                data-profile-status-option
+              >
+                <span>{{ filter.label }}</span>
+              </a>
+            {% endfor %}
+          </div>
+        </details>
       </div>
 
-      <details class="status-filter-menu">
-        <summary class="status-filter-trigger" aria-label="Filter by status">
-          <span class="status-filter-trigger-label">{{ selected_status_label }}</span>
-          <span class="status-filter-caret" aria-hidden="true"></span>
-        </summary>
-
-        <div class="status-filter-options" role="menu" aria-label="Filter by status options">
-          {% for filter in status_filters %}
-            <a
-              class="status-filter-option{% if filter.active %} active{% endif %}"
-              href="{{ filter.url }}"
-              role="menuitem{% if filter.active %}radio{% endif %}"
-              {% if filter.active %}aria-current="page"{% endif %}
-              data-profile-status-option
-            >
-              <span>{{ filter.label }}</span>
-            </a>
-          {% endfor %}
-        </div>
-      </details>
-    </div>
-
-    <div class="tab-panels">
-      <section class="tab-panel panel-director">
-        {% if directors %}
-          {% for f in directors %}
-            <a class="following-row" href="{% url 'person_detail' f.person.tmdb_id %}">
-              {% if f.person.profile_path %}
-                <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" />
-              {% else %}
-                <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
-              {% endif %}
-              <span class="entity-name">{{ f.person.name }}</span>
-              {% if f.status %}
-                <span class="entity-status muted">{{ f.status }}</span>
-              {% endif %}
-            </a>
-          {% endfor %}
-        {% else %}
-          <p class="muted">No followed directors{% if selected_status != 'all' %} with {{ selected_status_label|lower }} status{% endif %} yet.</p>
-        {% endif %}
-      </section>
-
-      <section class="tab-panel panel-actor">
-        {% if actors %}
-          {% for f in actors %}
-            <a class="following-row" href="{% url 'person_detail' f.person.tmdb_id %}">
-              {% if f.person.profile_path %}
-                <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" />
-              {% else %}
-                <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
-              {% endif %}
-              <span class="entity-name">{{ f.person.name }}</span>
-              {% if f.status %}
-                <span class="entity-status muted">{{ f.status }}</span>
-              {% endif %}
-            </a>
-          {% endfor %}
-        {% else %}
-          <p class="muted">No followed actors{% if selected_status != 'all' %} with {{ selected_status_label|lower }} status{% endif %} yet.</p>
-        {% endif %}
-      </section>
-
-      <section class="tab-panel panel-crew">
-        {% if crew %}
-          {% for f in crew %}
-            <a class="following-row" href="{% url 'person_detail' f.person.tmdb_id %}">
-              {% if f.person.profile_path %}
-                <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" />
-              {% else %}
-                <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
-              {% endif %}
-              <span class="entity-copy">
-                <span class="entity-name">{{ f.person.name }}</span>
-                <span class="entity-meta">{{ f.role }}</span>
-              </span>
-              {% if f.status %}
-                <span class="entity-status muted">{{ f.status }}</span>
-              {% endif %}
-            </a>
-          {% endfor %}
-        {% else %}
-          <p class="muted">No followed crew{% if selected_status != 'all' %} with {{ selected_status_label|lower }} status{% endif %} yet.</p>
-        {% endif %}
-      </section>
-
-      <section class="tab-panel panel-studio">
-        {% if companies %}
-          {% for f in companies %}
-            <a class="following-row" href="{% url 'company_detail' f.company.tmdb_id %}">
-              <span class="studio-logo-wrap">
-                {% if f.company.logo_path %}
-                  <img class="studio-logo" src="https://image.tmdb.org/t/p/w300{{ f.company.logo_path }}" alt="{{ f.company.name }} logo" loading="lazy" />
+      <div class="tab-panels">
+        <section class="tab-panel panel-director">
+          {% if directors %}
+            {% for f in directors %}
+              <a class="following-row" href="{% url 'person_detail' f.person.tmdb_id %}">
+                {% if f.person.profile_path %}
+                  <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" />
                 {% else %}
-                  <img class="studio-logo" src="{% static 'img/placeholder-company.svg' %}" alt="{{ f.company.name }} logo" loading="lazy" />
+                  <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
                 {% endif %}
-              </span>
-              <span class="entity-name">{{ f.company.name }}</span>
-              {% if f.status %}
-                <span class="entity-status muted">{{ f.status }}</span>
-              {% endif %}
-            </a>
-          {% endfor %}
-        {% else %}
-          <p class="muted">No followed studios yet.</p>
-        {% endif %}
-      </section>
+                <span class="entity-name">{{ f.person.name }}</span>
+                {% if f.status %}
+                  <span class="entity-status muted">{{ f.status }}</span>
+                {% endif %}
+              </a>
+            {% endfor %}
+          {% else %}
+            <p class="muted">No followed directors{% if selected_status != 'all' %} with {{ selected_status_label|lower }} status{% endif %} yet.</p>
+          {% endif %}
+        </section>
+
+        <section class="tab-panel panel-actor">
+          {% if actors %}
+            {% for f in actors %}
+              <a class="following-row" href="{% url 'person_detail' f.person.tmdb_id %}">
+                {% if f.person.profile_path %}
+                  <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" />
+                {% else %}
+                  <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
+                {% endif %}
+                <span class="entity-name">{{ f.person.name }}</span>
+                {% if f.status %}
+                  <span class="entity-status muted">{{ f.status }}</span>
+                {% endif %}
+              </a>
+            {% endfor %}
+          {% else %}
+            <p class="muted">No followed actors{% if selected_status != 'all' %} with {{ selected_status_label|lower }} status{% endif %} yet.</p>
+          {% endif %}
+        </section>
+
+        <section class="tab-panel panel-crew">
+          {% if crew %}
+            {% for f in crew %}
+              <a class="following-row" href="{% url 'person_detail' f.person.tmdb_id %}">
+                {% if f.person.profile_path %}
+                  <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" />
+                {% else %}
+                  <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
+                {% endif %}
+                <span class="entity-copy">
+                  <span class="entity-name">{{ f.person.name }}</span>
+                  <span class="entity-meta">{{ f.role }}</span>
+                </span>
+                {% if f.status %}
+                  <span class="entity-status muted">{{ f.status }}</span>
+                {% endif %}
+              </a>
+            {% endfor %}
+          {% else %}
+            <p class="muted">No followed crew{% if selected_status != 'all' %} with {{ selected_status_label|lower }} status{% endif %} yet.</p>
+          {% endif %}
+        </section>
+
+        <section class="tab-panel panel-studio">
+          {% if companies %}
+            {% for f in companies %}
+              <a class="following-row" href="{% url 'company_detail' f.company.tmdb_id %}">
+                <span class="studio-logo-wrap">
+                  {% if f.company.logo_path %}
+                    <img class="studio-logo" src="https://image.tmdb.org/t/p/w300{{ f.company.logo_path }}" alt="{{ f.company.name }} logo" loading="lazy" />
+                  {% else %}
+                    <img class="studio-logo" src="{% static 'img/placeholder-company.svg' %}" alt="{{ f.company.name }} logo" loading="lazy" />
+                  {% endif %}
+                </span>
+                <span class="entity-name">{{ f.company.name }}</span>
+                {% if f.status %}
+                  <span class="entity-status muted">{{ f.status }}</span>
+                {% endif %}
+              </a>
+            {% endfor %}
+          {% else %}
+            <p class="muted">No followed studios yet.</p>
+          {% endif %}
+        </section>
+      </div>
     </div>
-  </div>
+  </section>
+
+  <section class="profile-section profile-activity" data-profile-section="activity" id="profile-activity" hidden>
+    <div class="activity-head">
+      <div>
+        <h2>Activity</h2>
+        <p class="muted">Latest follows and unfollows.</p>
+      </div>
+    </div>
+
+    <div class="activity-list">
+      {% if follow_activities %}
+        {% regroup follow_activities by created_at|date:"Y-m-d" as day_groups %}
+        {% for day in day_groups %}
+          <div class="activity-day">
+            <div class="activity-day-col-date">
+              {% with item=day.list.0 %}
+                <time class="activity-date" datetime="{{ item.created_at|date:'c' }}">
+                  <span class="activity-date-month">{{ item.created_at|date:'M' }}</span>
+                  <span class="activity-date-day">{{ item.created_at|date:'j' }}</span>
+                  <span class="activity-date-year">{{ item.created_at|date:'Y' }}</span>
+                </time>
+              {% endwith %}
+            </div>
+
+            <div class="activity-day-col-list">
+              {% for activity in day.list %}
+                <article class="activity-row">
+                  {% if activity.is_person %}
+                    <span class="activity-avatar-wrap">
+                      {% if activity.image_path %}
+                        <img class="activity-avatar activity-avatar-person" src="https://image.tmdb.org/t/p/w185{{ activity.image_path }}" alt="{{ activity.entity_name }}" loading="lazy" />
+                      {% else %}
+                        <img class="activity-avatar activity-avatar-person" src="{% static 'img/placeholder-person.svg' %}" alt="{{ activity.entity_name }}" loading="lazy" />
+                      {% endif %}
+                    </span>
+                  {% else %}
+                    <span class="activity-avatar-wrap activity-avatar-wrap-studio">
+                      {% if activity.image_path %}
+                        <img class="activity-avatar activity-avatar-studio" src="https://image.tmdb.org/t/p/w300{{ activity.image_path }}" alt="{{ activity.entity_name }} logo" loading="lazy" />
+                      {% else %}
+                        <img class="activity-avatar activity-avatar-studio" src="{% static 'img/placeholder-company.svg' %}" alt="{{ activity.entity_name }} logo" loading="lazy" />
+                      {% endif %}
+                    </span>
+                  {% endif %}
+                  <span class="activity-copy">
+                    <span class="activity-title">
+                      <span class="activity-action">{{ activity.get_action_display }}</span>
+                      &nbsp;
+                      <strong class="activity-entity">{{ activity.entity_name }}</strong>
+                      {% if activity.is_person and activity.role %}
+                        &nbsp;<strong class="activity-role">as {{ activity.role }}</strong>
+                      {% endif %}
+                    </span>
+                  </span>
+                </article>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="muted">No follow activity yet.</p>
+      {% endif %}
+    </div>
+  </section>
 </div>

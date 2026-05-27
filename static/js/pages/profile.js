@@ -1,5 +1,6 @@
 (function () {
   const storageKey = 'myfilmpeople.followingTab';
+  const profileViewStorageKey = 'myfilmpeople.profileView';
 
   function getTabs() {
     return Array.from(document.querySelectorAll('input[name="following-tab"]'));
@@ -44,6 +45,46 @@
     });
   }
 
+  function getProfileView() {
+    return window.sessionStorage.getItem(profileViewStorageKey) === 'activity' ? 'activity' : 'overview';
+  }
+
+  function setProfileView(view) {
+    const normalizedView = view === 'activity' ? 'activity' : 'overview';
+    const shell = document.querySelector('[data-profile-shell]');
+    const toggle = document.querySelector('[data-profile-view-toggle]');
+    const label = document.querySelector('[data-profile-view-label]');
+    const sections = Array.from(document.querySelectorAll('[data-profile-section]'));
+
+    if (shell) {
+      shell.dataset.profileView = normalizedView;
+    }
+
+    sections.forEach((section) => {
+      const sectionView = section.getAttribute('data-profile-section');
+      section.hidden = sectionView !== normalizedView;
+    });
+
+    if (toggle) {
+      toggle.setAttribute('aria-pressed', String(normalizedView === 'activity'));
+    }
+
+    if (label) {
+      label.textContent = normalizedView === 'activity' ? 'Profile' : 'Activity';
+    }
+
+    window.sessionStorage.setItem(profileViewStorageKey, normalizedView);
+  }
+
+  function restoreProfileView() {
+    setProfileView(getProfileView());
+  }
+
+  function toggleProfileView() {
+    setProfileView(getProfileView() === 'activity' ? 'overview' : 'activity');
+    closeStatusMenus();
+  }
+
   function replaceProfileShell(html) {
     const nextHtml = String(html || '').trim();
     if (!nextHtml) return false;
@@ -53,6 +94,7 @@
 
     currentShell.outerHTML = nextHtml;
     restoreActiveTab();
+    restoreProfileView();
     closeStatusMenus();
     return true;
   }
@@ -92,6 +134,13 @@
   document.addEventListener('click', (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
+
+    const viewToggle = target.closest('[data-profile-view-toggle]');
+    if (viewToggle) {
+      event.preventDefault();
+      toggleProfileView();
+      return;
+    }
 
     const statusLink = target.closest('[data-profile-status-option]');
     if (!statusLink) return;
@@ -139,6 +188,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     restoreActiveTab();
+    restoreProfileView();
     closeStatusMenus();
   });
 })();
