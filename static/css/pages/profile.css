@@ -105,7 +105,8 @@
 .activity-day-col-date {
 	flex: 0 0 84px;
 	display: flex;
-	align-items: flex-start;
+	align-items: center;
+	justify-content: flex-start;
 }
 
 .activity-day-col-list {
@@ -133,16 +134,23 @@
 }
 
 .activity-avatar-wrap {
-	flex: 0 0 auto;
+	/* Use a fixed avatar slot so person and studio rows align */
+	flex: 0 0 48px;
+	width: 48px;
+	min-width: 48px;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
 }
 
 .activity-avatar-wrap-studio {
-	width: clamp(92px, 18vw, 148px);
-	justify-content: flex-start;
-	flex-shrink: 0;
+	/* Use a consistent slot width for studio logos so names line up */
+	flex: 0 0 48px;
+	width: 48px;
+	min-width: 48px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	overflow: hidden;
 }
 
@@ -176,6 +184,12 @@
 	gap: 2px;
 	min-width: 0;
 	flex: 1 1 auto;
+	align-self: center;
+}
+
+/* Ensure the copy block centers vertically next to the avatar/logo */
+.activity-copy {
+	align-self: center;
 }
 
 .activity-title {
@@ -221,7 +235,8 @@
 
 .activity-date {
 	flex: 0 0 auto;
-	margin-left: auto;
+	margin-left: 0;
+	margin-top: 6px;
 	display: inline-flex;
 	flex-direction: column;
 	align-items: center;
@@ -229,35 +244,42 @@
 	min-width: 52px;
 	min-height: 44px;
 	padding: 6px 8px;
-	border: 1px solid #dbe3ef;
 	border-radius: 14px;
-	background: #ffffff;
+	background: linear-gradient(180deg, #ffffff 0%, #f3f7fb 100%);
+	border: 1px solid rgba(13, 93, 148, 0.08);
+	box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255,255,255,0.6);
 	line-height: 1;
-	color: #475569;
+	color: #16425b;
 	font-size: 13px;
-	font-weight: 600;
+	font-weight: 700;
 	white-space: nowrap;
+	transition: transform 160ms ease, box-shadow 160ms ease;
 }
 
 .activity-date-month {
 	font-size: 11px;
-	font-weight: 700;
-	letter-spacing: 0.04em;
+	font-weight: 800;
+	letter-spacing: 0.06em;
 	text-transform: uppercase;
-	color: #64748b;
+	color: #2b5878;
 }
 
 .activity-date-day {
-	font-size: 17px;
-	font-weight: 800;
-	color: #0f172a;
-	line-height: 1.05;
+	font-size: 18px;
+	font-weight: 900;
+	color: #0b2b3a;
+	line-height: 1.02;
 }
 
 .activity-date-year {
 	font-size: 11px;
-	font-weight: 600;
-	color: #64748b;
+	font-weight: 700;
+	color: #3b677f;
+}
+
+.activity-date:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255,255,255,0.6);
 }
 
 .profile-separator {
@@ -473,9 +495,58 @@
 	}
 
 	.activity-date {
-		min-width: 44px;
+		min-width: 36px;
 		padding: 4px 6px;
-		font-size: 12px;
+		margin-top: 2px;
+		font-size: 11px;
+		background: rgba(255,255,255,0.96);
+		border: 1px solid rgba(15,23,42,0.06);
+		box-shadow: 0 6px 12px rgba(12,20,28,0.04);
+		border-radius: 12px;
+		color: #475569;
+	}
+
+	.activity-date-month {
+		font-size: 9px;
+		color: #64748b;
+		font-weight: 700;
+	}
+
+	.activity-date-day {
+		font-size: 14px;
+		font-weight: 800;
+		color: #0f172a;
+	}
+
+	.activity-date-year {
+		font-size: 9px;
+		color: #64748b;
+		font-weight: 600;
+	}
+
+	/* Tighter mobile layout: reduce gaps so content sits closer to the date */
+	.activity-day {
+		gap: 4px;
+		align-items: flex-start;
+	}
+
+	.activity-day-col-date {
+		flex: 0 0 48px;
+		width: 48px;
+	}
+
+	.activity-row {
+		gap: 6px;
+		padding: 6px 0;
+	}
+
+	.activity-avatar {
+		width: 28px;
+		height: 28px;
+	}
+
+	.activity-copy {
+		gap: 1px;
 	}
 
 	.activity-avatar {
@@ -524,17 +595,17 @@
 	max-width: 88px;
 	max-height: 28px;
 	object-fit: contain;
-	object-position: left center;
+	object-position: center center;
 	flex: 0 1 auto;
 	background: transparent;
 }
 
 .studio-logo-wrap {
-	width: auto;
-	min-width: 0;
-	flex: 0 0 auto;
+	width: 88px;
+	min-width: 88px;
+	flex: 0 0 88px;
 	display: inline-flex;
-	justify-content: flex-start;
+	justify-content: center;
 	align-items: center;
 	background: transparent;
 }
@@ -710,6 +781,7 @@
 		padding: 2px 4px;
 		margin-left: 0;
 		align-self: flex-start;
+		margin-top: 2px;
 		justify-content: flex-start;
 		font-size: 12px;
 	}
