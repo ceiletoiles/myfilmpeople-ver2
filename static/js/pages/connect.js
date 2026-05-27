@@ -5,6 +5,22 @@
 
     let pending = false;
 
+    function renderSkeleton() {
+      const rows = 4;
+      let html = '<div class="connect-grid connect-skeleton" aria-hidden="true">';
+      for (let i = 0; i < rows; i++) {
+        html += '<div class="skeleton-row">'
+          + '<div class="skeleton-avatar"></div>'
+          + '<div class="skeleton-lines">'
+            + '<div class="skeleton-line skeleton-line-short"></div>'
+            + '<div class="skeleton-line"></div>'
+          + '</div>'
+        + '</div>';
+      }
+      html += '</div>';
+      return html;
+    }
+
     function swapShell(html) {
       const nextHtml = String(html || '').trim();
       if (!nextHtml) return;
@@ -56,6 +72,12 @@
       if (!href) return;
 
       event.preventDefault();
+      // show skeleton immediately to improve perceived speed
+      try {
+        connectShell.innerHTML = renderSkeleton();
+      } catch (e) {
+        // ignore
+      }
       loadTab(href, true);
     });
 

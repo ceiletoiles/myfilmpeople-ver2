@@ -80,6 +80,48 @@
 	gap: 10px;
 }
 
+/* Skeleton placeholder for profile activity loading */
+.profile-skeleton {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.profile-skeleton .skeleton-row {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	padding: 8px 6px;
+}
+.profile-skeleton .skeleton-avatar {
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	background: linear-gradient(90deg,#eef2f6,#f7fafc,#eef2f6);
+	background-size: 200% 100%;
+	animation: skeleton-shimmer 1.2s linear infinite;
+	flex: 0 0 auto;
+}
+.profile-skeleton .skeleton-lines {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	flex: 1 1 auto;
+}
+.profile-skeleton .skeleton-line {
+	height: 10px;
+	background: linear-gradient(90deg,#eef2f6,#f7fafc,#eef2f6);
+	background-size: 200% 100%;
+	animation: skeleton-shimmer 1.2s linear infinite;
+	border-radius: 6px;
+}
+.profile-skeleton .skeleton-line-short { width: 36%; }
+.profile-skeleton .skeleton-line { width: 78%; }
+
+@keyframes skeleton-shimmer {
+	0% { background-position: 200% 0; }
+	100% { background-position: -200% 0; }
+}
+
 .activity-day-header {
 	display: flex;
 	align-items: center;

@@ -45,6 +45,22 @@
     });
   }
 
+  function renderProfileSkeleton() {
+    const rows = 3;
+    let html = '<div class="activity-list profile-skeleton" aria-hidden="true">';
+    for (let i = 0; i < rows; i++) {
+      html += '<div class="skeleton-row">'
+        + '<div class="skeleton-avatar"></div>'
+        + '<div class="skeleton-lines">'
+          + '<div class="skeleton-line skeleton-line-short"></div>'
+          + '<div class="skeleton-line"></div>'
+        + '</div>'
+      + '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
   function getProfileView() {
     return window.sessionStorage.getItem(profileViewStorageKey) === 'activity' ? 'activity' : 'overview';
   }
@@ -149,6 +165,13 @@
     if (!href) return;
 
     event.preventDefault();
+    // show a quick skeleton while the partial loads
+    try {
+      const list = document.querySelector('.profile-section.profile-activity .activity-list');
+      if (list) list.outerHTML = renderProfileSkeleton();
+    } catch (e) {
+      // ignore render errors
+    }
     loadProfileState(href, true);
   });
 
