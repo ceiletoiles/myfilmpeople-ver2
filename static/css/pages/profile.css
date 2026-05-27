@@ -153,12 +153,31 @@
 
 @media (max-width: 480px) {
 	.activity-pagination-inner {
+		display: grid;
+		grid-template-columns: auto 1fr auto;
+		align-items: center;
+		column-gap: 8px;
 		padding: 0 12px;
+		min-height: 0;
 	}
+	.activity-pagination-inner .activity-pagination-info,
 	.activity-pagination-inner .activity-pager-prev,
 	.activity-pagination-inner .activity-pager-next {
-		left: 6px;
-		right: 6px;
+		position: static;
+		left: auto;
+		right: auto;
+		top: auto;
+		transform: none;
+	}
+	.activity-pagination-inner .activity-pagination-info {
+		justify-self: center;
+		white-space: nowrap;
+	}
+	.activity-pagination-inner .activity-pager-prev {
+		justify-self: start;
+	}
+	.activity-pagination-inner .activity-pager-next {
+		justify-self: end;
 	}
 }
 
