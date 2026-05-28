@@ -3,32 +3,38 @@
 .recent-tabs {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 8px;
+	justify-content: center;
+	gap: 0.35rem;
 	margin-bottom: 24px;
-	padding: 0 0 14px 0;
+	padding-bottom: 0;
+	border-bottom: 1px solid #e2e8f0;
 }
 
 .recent-tab {
 	border: 0;
 	background: transparent;
-	color: inherit;
-	padding: 6px 2px;
-	border-radius: 999px;
-	font-size: 0.92rem;
+	color: #64748b;
+	font-weight: 600;
+	font-size: 0.86rem;
+	padding: 0.42rem 0.72rem;
+	border-radius: 0;
 	line-height: 1;
 	cursor: pointer;
-	opacity: 0.72;
-	border-bottom: 2px solid transparent;
 }
 
 .recent-tab.is-active {
-	opacity: 1;
-	border-bottom-color: currentColor;
+	color: #0f172a;
+	border-bottom: 2px solid #0f172a;
+	margin-bottom: -1px;
 }
 
 .recent-tab:focus-visible {
 	outline: none;
-	border-bottom-color: currentColor;
+	color: #0f172a;
+}
+
+.recent-tab:hover {
+	color: #0f172a;
 }
 
 .recent-panel {
@@ -224,6 +230,17 @@
 	background: white;
 }
 
+.recent-modal-close {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	z-index: 2;
+	padding: 4px 8px;
+	line-height: 1;
+	font-size: 1.4rem;
+	font-weight: 700;
+}
+
 .recent-modal-header {
 	display: flex;
 	align-items: flex-start;
@@ -236,6 +253,15 @@
 	display: flex;
 	align-items: center;
 	gap: 12px;
+}
+
+.recent-modal-dialog .recent-poster-wrapper {
+	width: 120px;
+	height: 180px;
+}
+
+.recent-modal-dialog .recent-info {
+	max-height: 180px;
 }
 
 .recent-studio-logo-slot-modal {
@@ -285,5 +311,14 @@
 	.recent-studio-logo-modal {
 		max-height: 56px;
 		max-width: 170px;
+	}
+
+	.recent-modal-dialog .recent-poster-wrapper {
+		width: 104px;
+		height: 156px;
+	}
+
+	.recent-modal-dialog .recent-info {
+		max-height: 156px;
 	}
 }

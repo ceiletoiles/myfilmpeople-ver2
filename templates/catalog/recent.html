@@ -229,17 +229,16 @@
   <div class="recent-modal" id="recent-studio-modal" hidden>
     <div class="recent-modal-backdrop" data-modal-close></div>
     <div class="recent-modal-dialog card">
+      <button type="button" class="secondary recent-modal-close" data-modal-close aria-label="Close" title="Close">&times;</button>
       <div class="recent-modal-header">
         <div class="row recent-modal-title-row">
           <div class="recent-studio-logo-slot recent-studio-logo-slot-modal">
             <img class="recent-studio-logo recent-studio-logo-modal" id="recent-studio-modal-logo" src="" alt="" />
           </div>
           <div>
-            <h2 id="recent-studio-modal-title"></h2>
             <div class="muted" id="recent-studio-modal-count"></div>
           </div>
         </div>
-        <button type="button" class="secondary" data-modal-close>Close</button>
       </div>
       <div id="recent-studio-modal-body"></div>
     </div>
@@ -247,5 +246,5 @@
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{{ STATIC_PREFIX }}js/pages/recent.js"></script>
+  <script src="{{ STATIC_PREFIX }}js/pages/recent.js?v=20260528a"></script>
 {% endblock %}

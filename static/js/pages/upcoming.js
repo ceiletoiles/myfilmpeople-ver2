@@ -3,7 +3,6 @@
   const panels = Array.from(document.querySelectorAll('.upcoming-panel'));
   const modal = document.getElementById('upcoming-studio-modal');
   const modalBody = document.getElementById('upcoming-studio-modal-body');
-  const modalTitle = document.getElementById('upcoming-studio-modal-title');
   const modalCount = document.getElementById('upcoming-studio-modal-count');
   const modalLogo = document.getElementById('upcoming-studio-modal-logo');
   const studioButtons = Array.from(document.querySelectorAll('.upcoming-studio-card'));
@@ -42,14 +41,13 @@
   }
 
   function openModal(button) {
-    if (!modal || !modalBody || !modalTitle || !modalCount || !modalLogo) {
+    if (!modal || !modalBody || !modalCount || !modalLogo) {
       return;
     }
 
     const templateId = button.dataset.studioTemplate || '';
     const template = templateId ? document.getElementById(templateId) : null;
 
-    modalTitle.textContent = button.dataset.studioName || '';
     modalCount.textContent = button.dataset.studioCount ? (button.dataset.studioCount + ' upcoming films') : '';
     modalLogo.src = button.dataset.studioLogo || '';
     modalLogo.alt = button.dataset.studioName || '';
