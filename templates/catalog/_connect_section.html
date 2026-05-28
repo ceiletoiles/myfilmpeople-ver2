@@ -14,7 +14,7 @@
 
   <div class="connect-group">
     <div class="connect-label">External ID</div>
-    <div class="movie-tabs credits-tabs connect-tabs connect-tabs--external" role="tablist" aria-label="Connect external ids">
+    <div class="movie-tabs credits-tabs connect-tabs connect-tabs--external" role="tablist" aria-label="Connect external ids" data-connect-external-tabs>
       {% for tab in external_tabs %}
         <a class="movie-tab-btn credits-tab connect-tab-btn connect-tab-btn--external{% if tab.active %} active{% endif %}" href="{{ tab.url }}" role="tab" aria-selected="{% if tab.active %}true{% else %}false{% endif %}" data-connect-tab>
           <span>{{ tab.label }}</span>
@@ -23,50 +23,52 @@
     </div>
   </div>
 
-  <div class="connect-summary">
-    <strong>{{ people_count }}</strong> {{ entity_label }} with {{ active_external.label }} in the {{ active_role.label }} group
-  </div>
+  <div class="connect-body" data-connect-body>
+    <div class="connect-summary">
+      <strong>{{ people_count }}</strong> {{ entity_label }} with {{ active_external.label }} in the {{ active_role.label }} group
+    </div>
 
-  {% if people %}
-    <div class="connect-grid" role="list">
-      {% for item in people %}
-        <a class="connect-person{% if item.entity_type == 'company' %} connect-person--studio{% endif %}" href="{{ item.external_url }}" target="_blank" rel="noopener noreferrer" role="listitem">
-          {% if item.entity_type == 'company' %}
-            <span class="connect-avatar connect-avatar--studio" aria-hidden="true">
-              {% if item.image_path %}
-                <img class="connect-avatar-img connect-avatar-img--studio" src="https://image.tmdb.org/t/p/w300{{ item.image_path }}" alt="{{ item.name }}" loading="lazy" />
+    {% if people %}
+      <div class="connect-grid" role="list">
+        {% for item in people %}
+          <a class="connect-person{% if item.entity_type == 'company' %} connect-person--studio{% endif %}" href="{{ item.external_url }}" target="_blank" rel="noopener noreferrer" role="listitem">
+            {% if item.entity_type == 'company' %}
+              <span class="connect-avatar connect-avatar--studio" aria-hidden="true">
+                {% if item.image_path %}
+                  <img class="connect-avatar-img connect-avatar-img--studio" src="https://image.tmdb.org/t/p/w300{{ item.image_path }}" alt="{{ item.name }}" loading="lazy" />
+                {% else %}
+                  <img class="connect-avatar-img connect-avatar-img--studio connect-avatar-img--studio-placeholder" src="{% static 'img/placeholder-company.svg' %}" alt="{{ item.name }}" loading="lazy" />
+                {% endif %}
+              </span>
+            {% else %}
+              <span class="connect-avatar" aria-hidden="true">
+                {% if item.image_path %}
+                  <img class="connect-avatar-img{% if item.is_deceased %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ item.image_path }}" alt="{{ item.name }}" loading="lazy" width="185" height="185" />
+                {% else %}
+                  <img class="connect-avatar-img{% if item.is_deceased %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ item.name }}" loading="lazy" width="185" height="185" />
+                {% endif %}
+              </span>
+            {% endif %}
+            <div class="connect-person-text">
+              <div class="connect-person-name-row">
+                <div class="connect-person-name">{{ item.name }}</div>
+                {% if active_role.key == 'crew' %}
+                  <span class="connect-person-role">{{ item.follow_role }}</span>
+                {% endif %}
+              </div>
+              {% if item.entity_type == 'company' %}
+                <div class="connect-studio-media">
+                  <div class="connect-studio-url muted">{{ item.external_url }}</div>
+                </div>
               {% else %}
-                <img class="connect-avatar-img connect-avatar-img--studio connect-avatar-img--studio-placeholder" src="{% static 'img/placeholder-company.svg' %}" alt="{{ item.name }}" loading="lazy" />
-              {% endif %}
-            </span>
-          {% else %}
-            <span class="connect-avatar" aria-hidden="true">
-              {% if item.image_path %}
-                <img class="connect-avatar-img{% if item.is_deceased %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ item.image_path }}" alt="{{ item.name }}" loading="lazy" width="185" height="185" />
-              {% else %}
-                <img class="connect-avatar-img{% if item.is_deceased %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ item.name }}" loading="lazy" width="185" height="185" />
-              {% endif %}
-            </span>
-          {% endif %}
-          <div class="connect-person-text">
-            <div class="connect-person-name-row">
-              <div class="connect-person-name">{{ item.name }}</div>
-              {% if active_role.key == 'crew' %}
-                <span class="connect-person-role">{{ item.follow_role }}</span>
+                <div class="connect-person-username">{{ item.external_display }}</div>
               {% endif %}
             </div>
-            <div class="connect-person-username">{{ item.external_display }}</div>
-            {% if item.entity_type == 'company' %}
-              <div class="connect-studio-media">
-                <a href="{{ item.external_url }}">{{ active_external.label }}</a>
-                <div class="connect-studio-url">{{ item.external_url }}</div>
-              </div>
-            {% endif %}
-          </div>
-        </a>
-      {% endfor %}
-    </div>
-  {% else %}
-    <p class="muted connect-empty">No {{ entity_label }} found for this combination yet.</p>
-  {% endif %}
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted connect-empty">No {{ entity_label }} found for this combination yet.</p>
+    {% endif %}
+  </div>
 </section>
