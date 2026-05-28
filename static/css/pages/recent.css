@@ -228,6 +228,8 @@
 	box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
 	border-radius: 10px;
 	background: white;
+	overscroll-behavior: contain;
+	-webkit-overflow-scrolling: touch;
 }
 
 .recent-modal-close {
@@ -276,10 +278,15 @@
 	max-width: 220px;
 }
 
+body.modal-open {
+	overflow: hidden;
+}
+
 @media (max-width: 720px) {
 	.recent-modal-dialog {
 		width: 100%;
 		padding: 16px;
+		max-height: calc(100vh - 24px);
 	}
 
 	.recent-modal-header {
@@ -320,5 +327,9 @@
 
 	.recent-modal-dialog .recent-info {
 		max-height: 156px;
+	}
+
+	.recent-modal {
+		padding: 12px;
 	}
 }

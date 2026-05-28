@@ -6,6 +6,7 @@
   const modalCount = document.getElementById('upcoming-studio-modal-count');
   const modalLogo = document.getElementById('upcoming-studio-modal-logo');
   const studioButtons = Array.from(document.querySelectorAll('.upcoming-studio-card'));
+  let bodyScrollTop = 0;
 
   if (!tabs.length || !panels.length) {
     return;
@@ -35,6 +36,11 @@
       return;
     }
     modal.hidden = true;
+    document.body.classList.remove('modal-open');
+    document.body.style.top = '';
+    document.body.style.position = '';
+    document.body.style.width = '';
+    window.scrollTo(0, bodyScrollTop);
     if (modalBody) {
       modalBody.innerHTML = '';
     }
@@ -52,6 +58,11 @@
     modalLogo.src = button.dataset.studioLogo || '';
     modalLogo.alt = button.dataset.studioName || '';
     modalBody.innerHTML = template ? template.innerHTML : '<p class="muted">No upcoming movies found for this studio.</p>';
+    bodyScrollTop = window.scrollY || window.pageYOffset || 0;
+    document.body.classList.add('modal-open');
+    document.body.style.position = 'fixed';
+    document.body.style.top = '-' + bodyScrollTop + 'px';
+    document.body.style.width = '100%';
     modal.hidden = false;
   }
 
