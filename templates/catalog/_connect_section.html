@@ -56,6 +56,12 @@
               {% endif %}
             </div>
             <div class="connect-person-username">{{ item.external_display }}</div>
+            {% if item.entity_type == 'company' %}
+              <div class="connect-studio-media">
+                <a href="{{ item.external_url }}">{{ active_external.label }}</a>
+                <div class="connect-studio-url">{{ item.external_url }}</div>
+              </div>
+            {% endif %}
           </div>
         </a>
       {% endfor %}
