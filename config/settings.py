@@ -287,4 +287,4 @@ if not DEBUG:
 
     # Render uses proxies (X-Forwarded-For, X-Forwarded-Proto), so trust proxy headers
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-    SECURE_TRUSTED_ORIGINS = [f"https://{host}" for host in ALLOWED_HOSTS if not host.startswith("*")]
+    CSRF_TRUSTED_ORIGINS = [f"https://{host}" for host in ALLOWED_HOSTS if not host.startswith("*")]
