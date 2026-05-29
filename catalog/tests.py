@@ -23,6 +23,62 @@ from .new_movie_helpers import (
 )
 from .services import get_or_sync_company, get_or_sync_person
 from .views.movie import _build_country_name_lookup, _build_crew_groups, _build_release_groups
+from types import SimpleNamespace
+from unittest.mock import Mock
+
+
+class NewMovieHelpersTests(TestCase):
+	def setUp(self) -> None:
+		self.User = get_user_model()
+		self.user = self.User.objects.create_user(username="nmh-user", password="testpass123")
+
+	def _create_movie(self, mid: int) -> Movie:
+		return Movie.objects.create(tmdb_id=mid, title=f"Test Movie {mid}")
+
+	def test_record_new_movie_arrivals_allows_when_tmdb_empty(self) -> None:
+		mid = 88888888
+		movie = self._create_movie(mid)
+		NewMovieArrival.objects.filter(user=self.user, movie=movie).delete()
+
+		# TMDb returns empty changes payload
+		stub = SimpleNamespace(get_movie_changes=lambda m: {})
+		with patch('catalog.tmdb.TMDbClient.from_settings', return_value=stub):
+			cnt = record_new_movie_arrivals(
+				user=self.user,
+				source_type='person',
+				source_id=1,
+				source_name='Test Person',
+				old_movie_ids=set(),
+				new_movie_ids={mid},
+				role='actor',
+				source_last_sync_at=None,
+			)
+
+		self.assertEqual(cnt, 1)
+		self.assertEqual(NewMovieArrival.objects.filter(user=self.user, movie=movie).count(), 1)
+
+	def test_record_new_movie_arrivals_allows_when_tmdb_raises(self) -> None:
+		mid = 77777777
+		movie = self._create_movie(mid)
+		NewMovieArrival.objects.filter(user=self.user, movie=movie).delete()
+
+		# TMDb client raises an exception
+		bad = Mock()
+		bad.get_movie_changes.side_effect = Exception("boom")
+		with patch('catalog.tmdb.TMDbClient.from_settings', return_value=bad):
+			cnt = record_new_movie_arrivals(
+				user=self.user,
+				source_type='person',
+				source_id=1,
+				source_name='Test Person',
+				old_movie_ids=set(),
+				new_movie_ids={mid},
+				role='actor',
+				source_last_sync_at=None,
+			)
+
+		self.assertEqual(cnt, 1)
+		self.assertEqual(NewMovieArrival.objects.filter(user=self.user, movie=movie).count(), 1)
 
 
 class ConnectPageTests(TestCase):

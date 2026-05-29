@@ -574,6 +574,9 @@ def record_new_movie_arrivals(
 			try:
 				payload = client.get_movie_changes(mid)
 			except Exception:
+				# If TMDb fails, fall back to allowing the id so we don't drop
+				# legitimate notifications due to transient network issues.
+				allowed_ids.add(mid)
 				continue
 			# TMDb returns change groups in 'changes' or 'results'. Be flexible.
 			groups = payload.get("changes") or payload.get("results") or []
@@ -609,7 +612,12 @@ def record_new_movie_arrivals(
 					if latest_time is None or parsed > latest_time:
 						latest_time = parsed
 			# If we found a recent relevant change, allow this movie id.
-			if latest_time is not None:
+			# If no relevant change info was present, allow the id as a safe default
+			# so we don't suppress legitimate updates that TMDb doesn't expose as
+			# granular change groups.
+			if latest_time is None:
+				allowed_ids.add(mid)
+			elif latest_time is not None:
 				from django.utils import timezone as _tz
 				# Ensure naive/aware datetimes are comparable.
 				if latest_time.tzinfo is None:
