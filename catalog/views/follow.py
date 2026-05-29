@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -19,6 +21,7 @@ from ..new_movie_helpers import (
 	extract_movie_release_dates_from_credits,
 	extract_movie_release_dates_from_credits_for_role,
 	extract_movie_release_dates_from_filmography,
+	filter_movie_ids_by_release_date,
 	record_new_movie_arrivals,
 )
 from ..services import (
@@ -336,6 +339,8 @@ def person_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 
 	# Record new arrivals (only if a baseline existed pre-sync).
 	if old_baseline_present:
+		follow_started_at = PersonFollow.objects.filter(user=request.user, person__tmdb_id=tmdb_id).values_list("created_at", flat=True).first()
+		follow_started_date = follow_started_at.date() if follow_started_at else None
 		follows = PersonFollow.objects.filter(user=request.user, person__tmdb_id=tmdb_id)
 		for follow in follows:
 			old_role_movie_ids = extract_movie_ids_from_credits_for_role(old_credits, follow.role or "")
@@ -344,6 +349,16 @@ def person_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				continue
 			old_role_release_dates = extract_movie_release_dates_from_credits_for_role(old_credits, follow.role or "")
 			new_role_release_dates = extract_movie_release_dates_from_credits_for_role(new_credits, follow.role or "")
+			old_role_movie_ids = filter_movie_ids_by_release_date(
+				old_role_movie_ids,
+				old_role_release_dates,
+				not_before=follow_started_date,
+			)
+			new_role_movie_ids = filter_movie_ids_by_release_date(
+				new_role_movie_ids,
+				new_role_release_dates,
+				not_before=follow_started_date,
+			)
 			new_event_meta_by_movie = build_person_comeback_event_meta(
 				old_release_dates=old_role_release_dates,
 				new_release_dates=new_role_release_dates,
@@ -461,6 +476,8 @@ def company_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	# Record new arrivals (only if a baseline existed pre-sync).
 	# This avoids treating the first successful filmography prefetch as "new".
 	if old_baseline_present:
+		follow_started_at = CompanyFollow.objects.filter(user=request.user, company__tmdb_id=tmdb_id).values_list("created_at", flat=True).first()
+		follow_started_date = follow_started_at.date() if follow_started_at else None
 		# For companies, attempt to mark the credit job as 'Production Company' when possible
 		# so the UI shows the specific company role instead of a placeholder.
 		company_event_meta: dict[int, dict] = {}
@@ -475,9 +492,26 @@ def company_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 					mid = movie.get("id")
 					if not isinstance(mid, int):
 						continue
+					rd = movie.get("release_date")
+					if follow_started_date is not None and isinstance(rd, str) and rd.strip():
+						try:
+							if date.fromisoformat(rd.strip()) < follow_started_date:
+								continue
+						except ValueError:
+							pass
 					# Discover payload doesn't include explicit company role; use a sensible
 					# default label that matches TMDb movie page context.
 					company_event_meta.setdefault(mid, {})["credit_job"] = "Production Company"
+		old_movie_ids = filter_movie_ids_by_release_date(
+			old_movie_ids,
+			old_release_dates,
+			not_before=follow_started_date,
+		)
+		new_movie_ids = filter_movie_ids_by_release_date(
+			new_movie_ids,
+			new_release_dates,
+			not_before=follow_started_date,
+		)
 
 		notifications_created = record_new_movie_arrivals(
 			user=request.user,
@@ -572,6 +606,8 @@ def sync_all_followed(request: HttpRequest) -> HttpResponse:
 
 			# Record new arrivals (only if a baseline existed pre-sync).
 			if old_baseline_present:
+				follow_started_at = PersonFollow.objects.filter(user=request.user, person__tmdb_id=pid).values_list("created_at", flat=True).first()
+				follow_started_date = follow_started_at.date() if follow_started_at else None
 				follows = PersonFollow.objects.filter(user=request.user, person__tmdb_id=pid)
 				for follow in follows:
 					old_role_movie_ids = extract_movie_ids_from_credits_for_role(old_credits, follow.role or "")
@@ -580,6 +616,16 @@ def sync_all_followed(request: HttpRequest) -> HttpResponse:
 						continue
 					old_role_release_dates = extract_movie_release_dates_from_credits_for_role(old_credits, follow.role or "")
 					new_role_release_dates = extract_movie_release_dates_from_credits_for_role(new_credits, follow.role or "")
+					old_role_movie_ids = filter_movie_ids_by_release_date(
+						old_role_movie_ids,
+						old_role_release_dates,
+						not_before=follow_started_date,
+					)
+					new_role_movie_ids = filter_movie_ids_by_release_date(
+						new_role_movie_ids,
+						new_role_release_dates,
+						not_before=follow_started_date,
+					)
 					new_event_meta_by_movie = build_person_comeback_event_meta(
 						old_release_dates=old_role_release_dates,
 						new_release_dates=new_role_release_dates,
@@ -665,6 +711,18 @@ def sync_all_followed(request: HttpRequest) -> HttpResponse:
 
 			# Record new arrivals (only if a baseline existed pre-sync).
 			if old_baseline_present:
+				follow_started_at = CompanyFollow.objects.filter(user=request.user, company__tmdb_id=cid).values_list("created_at", flat=True).first()
+				follow_started_date = follow_started_at.date() if follow_started_at else None
+				old_movie_ids = filter_movie_ids_by_release_date(
+					old_movie_ids,
+					old_release_dates,
+					not_before=follow_started_date,
+				)
+				new_movie_ids = filter_movie_ids_by_release_date(
+					new_movie_ids,
+					new_release_dates,
+					not_before=follow_started_date,
+				)
 				notifications_created += record_new_movie_arrivals(
 					user=request.user,
 					source_type="company",

@@ -19,6 +19,7 @@ from .new_movie_helpers import (
 	get_person_comeback_info,
 	get_person_first_release_date,
 	get_person_last_release_date,
+	filter_movie_ids_by_release_date,
 	record_new_movie_arrivals,
 )
 from .services import get_or_sync_company, get_or_sync_person
@@ -79,6 +80,14 @@ class NewMovieHelpersTests(TestCase):
 
 		self.assertEqual(cnt, 1)
 		self.assertEqual(NewMovieArrival.objects.filter(user=self.user, movie=movie).count(), 1)
+
+	def test_filter_movie_ids_by_release_date_keeps_recent_and_undated(self) -> None:
+		movie_ids = {1, 2, 3}
+		release_dates = {1: "2023-01-01", 2: "2026-05-01", 3: ""}
+
+		filtered = filter_movie_ids_by_release_date(movie_ids, release_dates, not_before=date(2025, 1, 1))
+
+		self.assertEqual(filtered, {2, 3})
 
 
 class ConnectPageTests(TestCase):

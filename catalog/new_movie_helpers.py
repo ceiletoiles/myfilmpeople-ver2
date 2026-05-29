@@ -132,6 +132,28 @@ def _parse_iso_date(value: object) -> date | None:
 		return None
 
 
+def filter_movie_ids_by_release_date(
+	movie_ids: set[int],
+	release_dates: dict[int, str] | None,
+	*,
+	not_before: date | None,
+) -> set[int]:
+	"""Keep only movie IDs released on or after `not_before`.
+
+	Movie IDs with no known release date are kept so upcoming or undated titles
+	can still surface.
+	"""
+	if not_before is None:
+		return set(movie_ids)
+	filtered: set[int] = set()
+	release_dates = release_dates or {}
+	for mid in movie_ids:
+		rd = _parse_iso_date(release_dates.get(mid))
+		if rd is None or rd >= not_before:
+			filtered.add(mid)
+	return filtered
+
+
 def _format_gap_label(days: int) -> str:
 	if days >= 365:
 		years = days // 365
