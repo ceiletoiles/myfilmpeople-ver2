@@ -22,7 +22,7 @@ from .new_movie_helpers import (
 	record_new_movie_arrivals,
 )
 from .services import get_or_sync_company, get_or_sync_person
-from .views.movie import _build_country_name_lookup, _build_release_groups
+from .views.movie import _build_country_name_lookup, _build_crew_groups, _build_release_groups
 
 
 class ConnectPageTests(TestCase):
@@ -317,6 +317,31 @@ class NewMovieArrivalMetadataTests(TestCase):
 		arrival = NewMovieArrival.objects.get(user=user, movie=movie, event_type="new")
 		self.assertEqual(arrival.event_meta.get("kind"), "comeback")
 		self.assertEqual(arrival.event_meta.get("gap_label"), "7 years")
+
+
+class MovieCrewGroupingTests(TestCase):
+	def test_build_crew_groups_places_music_jobs_after_cinematography(self) -> None:
+		groups = _build_crew_groups(
+			{
+				"crew": [
+					{"id": 1, "name": "Writer One", "job": "Writer"},
+					{"id": 2, "name": "DoP One", "job": "Director of Photography"},
+					{"id": 3, "name": "Composer One", "job": "Original Music Composer"},
+					{"id": 4, "name": "Theme One", "job": "Theme Music Composer"},
+					{"id": 5, "name": "Score One", "job": "Music"},
+					{"id": 6, "name": "Song One", "job": "Songs"},
+					{"id": 7, "name": "Playback One", "job": "Playback Singer"},
+					{"id": 8, "name": "Voice One", "job": "Vocals"},
+				],
+			}
+		)
+
+		self.assertEqual([group["job"] for group in groups], ["WRITER", "CINEMATOGRAPHY", "ORIGINAL MUSIC COMPOSER"])
+		self.assertEqual(groups[2]["people"][0]["name"], "Composer One")
+		self.assertEqual(
+			[person["name"] for person in groups[2]["people"]],
+			["Composer One", "Theme One", "Score One", "Song One", "Playback One", "Voice One"],
+		)
 
 
 class NewsletterIngestionTests(TestCase):
