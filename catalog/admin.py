@@ -7,6 +7,7 @@ from .models import (
 	CompanyFollow,
 	FollowActivity,
 	Movie,
+	NewMovieArrival,
 	NewsletterIssue,
 	NewsletterItem,
 	NewsletterItemSeen,
@@ -68,6 +69,24 @@ class FollowActivityAdmin(admin.ModelAdmin):
 	list_display = ("user", "action", "entity_type", "entity_name", "role", "created_at")
 	list_filter = ("action", "entity_type", "created_at")
 	search_fields = ("user__username", "entity_name", "role")
+
+
+@admin.register(NewMovieArrival)
+class NewMovieArrivalAdmin(admin.ModelAdmin):
+	list_display = (
+		"user",
+		"movie",
+		"event_type",
+		"source_type",
+		"source_name",
+		"role",
+		"is_seen",
+		"created_at",
+		"seen_at",
+	)
+	list_filter = ("event_type", "source_type", "role", "is_seen")
+	search_fields = ("user__username", "movie__title", "source_name", "role")
+	raw_id_fields = ("user", "movie")
 
 
 @admin.action(description="Parse selected newsletter issues")
