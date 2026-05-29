@@ -153,7 +153,7 @@
 	height: 56px;
 	display: flex;
 	align-items: center;
-	justify-content: flex-start;
+	justify-content: center;
 	flex: 0 0 180px;
 }
 
@@ -314,11 +314,12 @@ body.modal-open {
 	}
 
 	.upcoming-modal {
-		padding: 12px;
+		align-items: center;
+		padding: 18px 12px;
 	}
 
 	.upcoming-modal-dialog {
-		max-height: calc(100vh - 24px);
+		max-height: calc(100dvh - 36px);
 		padding: 16px;
 	}
 }
