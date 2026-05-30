@@ -96,6 +96,7 @@ Environment variables (.env example)
 - TMDB_LANGUAGE=en-US
 - REDIS_URL=redis://127.0.0.1:6379/1
 - REDIS_KEY_PREFIX=myfilmpeople
+- MOVIE_STALE_DELETE_DAYS=5
 
 Key configuration notes
 - [config/settings.py](config/settings.py) reads `.env` via python-dotenv.
@@ -115,6 +116,7 @@ Management commands under `catalog/management/commands/` (examples):
 - `demo_new_arrivals_update` — demo tool: temporarily wipes a cached release_date for a person/company, forces a sync, then records a NewMovieArrival event for a user (useful to test notifications)
 - `demo_comeback_arrival` — similar demo for comeback detection (if present)
 - `publish_dailies_due` — scheduled job helper (if present)
+- `purge_stale_movies` — deletes movies not accessed recently (default window: `MOVIE_STALE_DELETE_DAYS`, 5 days)
 
 Developer workflows
 - Syncing & prefetching: `catalog.services` contains helpers like `get_or_sync_person`, `get_or_sync_company`, and `prefetch_company_filmography` to refresh cached payloads. Use these in the shell for debugging.

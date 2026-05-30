@@ -7,6 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.utils import timezone
 
 from ..services import get_or_sync_movie
 from ..tmdb import TMDbClient, TMDbError
@@ -374,6 +375,8 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		include_credits=include_credits,
 		include_release_dates=include_release_dates,
 	)
+	movie.last_accessed_at = timezone.now()
+	movie.save(update_fields=["last_accessed_at", "updated_at"])
 	client = TMDbClient.from_settings()
 
 	cast = []

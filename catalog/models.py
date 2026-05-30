@@ -46,6 +46,7 @@ class Movie(models.Model):
 	release_date = models.DateField(null=True, blank=True, db_index=True)
 	poster_path = models.CharField(max_length=255, blank=True)
 	backdrop_path = models.CharField(max_length=255, blank=True)
+	last_accessed_at = models.DateTimeField(default=timezone.now, db_index=True)
 
 	tmdb_raw = models.JSONField(default=dict, blank=True)
 	tmdb_credits_raw = models.JSONField(default=dict, blank=True)
@@ -62,6 +63,7 @@ class Movie(models.Model):
 			models.Index(fields=["title", "tmdb_id"]),
 			models.Index(fields=["release_date", "tmdb_id"]),
 			models.Index(fields=["tmdb_last_sync_at", "tmdb_id"]),
+			models.Index(fields=["last_accessed_at", "tmdb_id"]),
 		]
 
 
@@ -141,7 +143,7 @@ class FollowActivity(models.Model):
 	class Meta:
 		ordering = ["-created_at", "-id"]
 		indexes = [
-			models.Index(fields=["user", "created_at"]),
+			models.Index(fields=["user", "created_at"], name="catalog_foll_user_c3d0f8_idx"),
 		]
 
 	def __str__(self) -> str:
