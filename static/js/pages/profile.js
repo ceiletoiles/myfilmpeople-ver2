@@ -236,6 +236,12 @@
   // Badge modal behavior
   function closeBadgeModal(overlay) {
     if (!overlay) return;
+    try {
+      const lvl = overlay.dataset && overlay.dataset.badgeLevel ? overlay.dataset.badgeLevel : null;
+      if (lvl) {
+        try { markBadgeSeen(lvl); } catch (e) { /* ignore */ }
+      }
+    } catch (e) {}
     overlay.remove();
     document.removeEventListener('keydown', escHandler);
   }
@@ -281,6 +287,8 @@
     const openedAt = Date.now();
     const overlay = document.createElement('div');
     overlay.className = 'badge-modal-overlay';
+    // expose level for close handler to mark as seen
+    try { if (level) overlay.dataset.badgeLevel = String(level); } catch (e) {}
     // If the viewer is the badge owner, show 'You earned this badge'
     const currentUsername = (document.body && document.body.dataset && document.body.dataset.currentUsername) ? document.body.dataset.currentUsername.trim().toLowerCase() : '';
     const isOwner = currentUsername && currentUsername === (username || '').trim().toLowerCase();

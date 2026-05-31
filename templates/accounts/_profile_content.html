@@ -47,9 +47,6 @@
                   imgSrc: '{% static unseen_badge.image %}',
                   variant: 'celebration'
                 });
-                if (window.mfpMarkBadgeSeen) {
-                  window.mfpMarkBadgeSeen('{{ unseen_badge.level }}');
-                }
               }
             } catch (e) {}
           });

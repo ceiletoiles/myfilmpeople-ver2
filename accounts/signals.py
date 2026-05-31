@@ -22,7 +22,8 @@ def personfollow_post_save(sender, instance, created, **kwargs):
         badge = next((b for b in FOLLOW_BADGE_LEVELS if follow_count >= int(b["min_count"])), None)
         if badge:
             level = int(badge.get("level", 0))
-            if not BadgeNotification.objects.filter(user=user, level=level).exists():
+            # Only skip creating if an unseen notification for this level already exists.
+            if not BadgeNotification.objects.filter(user=user, level=level, seen=False).exists():
                 BadgeNotification.objects.create(
                     user=user,
                     level=level,
@@ -50,7 +51,8 @@ def companyfollow_post_save(sender, instance, created, **kwargs):
         badge = next((b for b in FOLLOW_BADGE_LEVELS if follow_count >= int(b["min_count"])), None)
         if badge:
             level = int(badge.get("level", 0))
-            if not BadgeNotification.objects.filter(user=user, level=level).exists():
+            # Only skip creating if an unseen notification for this level already exists.
+            if not BadgeNotification.objects.filter(user=user, level=level, seen=False).exists():
                 BadgeNotification.objects.create(
                     user=user,
                     level=level,
