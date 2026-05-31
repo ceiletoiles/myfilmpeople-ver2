@@ -238,6 +238,30 @@ def follow(request: HttpRequest) -> HttpResponse:
 				role=pf.role,
 				created_at=pf.created_at,
 			)
+			# Ensure a server-persisted BadgeNotification exists when crossing thresholds.
+			try:
+				from accounts import views as accounts_views
+			except Exception:
+				accounts_views = None
+			if accounts_views is not None:
+				try:
+					follow_count = PersonFollow.objects.filter(user=request.user).count() + CompanyFollow.objects.filter(user=request.user).count()
+					badge_template = next((b for b in accounts_views.FOLLOW_BADGE_LEVELS if follow_count >= int(b.get("min_count", 0))), None)
+					if badge_template:
+						lvl = int(badge_template.get("level", 0))
+						if not BadgeNotification.objects.filter(user=request.user, level=lvl).exists():
+							try:
+								BadgeNotification.objects.create(
+									user=request.user,
+									level=lvl,
+									min_count=int(badge_template.get("min_count", 0)),
+									label=badge_template.get("label", ""),
+									image=badge_template.get("image", ""),
+								)
+							except Exception:
+								pass
+				except Exception:
+					pass
 		if wants_json:
 			payload: dict[str, object] = {
 				"ok": True,
