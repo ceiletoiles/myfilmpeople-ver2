@@ -28,8 +28,31 @@
 {% block content %}
   <div class="profile-page">
     <div class="profile-summary">
-      <p><strong>Username:</strong> {{ target_user.username }}</p>
-      <p><strong>Followed entities:</strong> {{ follow_count }}</p>
+      <div class="profile-summary-main">
+        <p>@{{ target_user.username }}</p>
+        {% if can_view_email %}
+        <p class="muted">{{ target_user.email|default:'-' }}</p>
+        {% endif %}
+        <p>Followed entities: {{ follow_count }}</p>
+      </div>
+      {% if follow_badge %}
+        <div
+          class="profile-badge js-profile-badge"
+          role="button"
+          tabindex="0"
+          aria-label="Follow badge"
+          data-badge-username="{{ target_user.username }}"
+          data-badge-min-count="{{ follow_badge.min_count }}"
+          data-badge-label="{{ follow_badge.label }}"
+        >
+          <img
+            class="profile-badge-image"
+            src="{% static follow_badge.image %}"
+            alt="{{ follow_badge.label }} badge"
+            loading="lazy"
+          />
+        </div>
+      {% endif %}
     </div>
 
     <div class="profile-separator" aria-hidden="true"></div>

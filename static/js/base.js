@@ -616,6 +616,16 @@
             showPageMessage(data.message);
           }
         }
+        // After DOM updates, show badge modal if server included one
+        try {
+            if (data.badge && typeof window.mfpShowBadgeModal === 'function') {
+            const badge = data.badge;
+            const img = badge.image ? (badge.image.startsWith('/') ? badge.image : ('/static/' + badge.image)) : '';
+            window.mfpShowBadgeModal({ username: data.username || '', minCount: badge.min_count, label: badge.label, imgSrc: img });
+            // Mark server notification as seen (GET accepted by endpoint)
+            try { fetch('/accounts/badge_seen/?level=' + encodeURIComponent(badge.level), {credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest'}}); } catch (e) {}
+          }
+        } catch (e) {}
         return;
       }
 
@@ -634,6 +644,15 @@
       } else {
         showPageMessage('Done.');
       }
+      // Show badge modal if server included one in the response
+      try {
+        if (data.badge && typeof window.mfpShowBadgeModal === 'function') {
+        const badge = data.badge;
+        const img = badge.image ? (badge.image.startsWith('/') ? badge.image : ('/static/' + badge.image)) : '';
+        window.mfpShowBadgeModal({ username: data.username || '', minCount: badge.min_count, label: badge.label, imgSrc: img });
+        try { fetch('/accounts/badge_seen/?level=' + encodeURIComponent(badge.level), {credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest'}}); } catch (e) {}
+        }
+      } catch (e) {}
     } catch (err) {
       showPageMessage('Network error.');
       if (btn) btn.disabled = false;

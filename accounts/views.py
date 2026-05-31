@@ -6,12 +6,14 @@ from django.contrib.auth import login
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils.http import url_has_allowed_host_and_scheme
 from urllib.parse import urlencode
 
 from catalog.models import CompanyFollow, FollowActivity, PersonFollow
+from .models import BadgeNotification
 from catalog.services import (
 	get_or_sync_company_tba_movies_page,
 	get_person_status_key,
@@ -87,6 +89,47 @@ def _normalize_status_key(value: str | None) -> str:
 	return status if status in {"inactive", "deceased", "tba", "upcoming", "idle"} else "all"
 
 
+FOLLOW_BADGE_LEVELS: tuple[dict[str, object], ...] = (
+	{
+		"level": 5,
+		"min_count": 500,
+		"label": "Cinephile Ultimate",
+		"image": "img/badges/cinephile-ultimate-level(gold).png",
+	},
+	{
+		"level": 4,
+		"min_count": 400,
+		"label": "Cinephile Level 4",
+		"image": "img/badges/cinephile-level-4.png",
+	},
+	{
+		"level": 3,
+		"min_count": 300,
+		"label": "Cinephile Level 3",
+		"image": "img/badges/cinephile-level-3.png",
+	},
+	{
+		"level": 2,
+		"min_count": 200,
+		"label": "Cinephile Level 2",
+		"image": "img/badges/cinephile-level-2.png",
+	},
+	{
+		"level": 1,
+		"min_count": 100,
+		"label": "Cinephile Level 1",
+		"image": "img/badges/cinephile-level-1.png",
+	},
+)
+
+
+def _get_follow_badge(follow_count: int) -> dict[str, object] | None:
+	for badge in FOLLOW_BADGE_LEVELS:
+		if follow_count >= int(badge["min_count"]):
+			return badge
+	return None
+
+
 def _annotate_status(follow) -> None:
 	try:
 		follow.status = get_person_status_label(follow.person, followed_role=follow.role)
@@ -160,6 +203,7 @@ def _annotate_company_status(follow) -> None:
 
 @login_required
 def profile(request: HttpRequest) -> HttpResponse:
+	target_user = request.user
 	selected_status = _normalize_status_key(request.GET.get("status"))
 	person_follows = (
 		PersonFollow.objects.select_related("person")
@@ -247,6 +291,17 @@ def profile(request: HttpRequest) -> HttpResponse:
 
 	status_filters = _build_status_filters(request.path, selected_status)
 	selected_status_label = next((f["label"] for f in status_filters if f["key"] == selected_status), "Status")
+	follow_count = len(person_follows) + total_company_count
+	# Check for any server-persisted unseen badge for immediate display on page load
+	unseen_badge = None
+	unseen_notif = BadgeNotification.objects.filter(user=request.user, seen=False).order_by("-level").first()
+	if unseen_notif:
+		unseen_badge = {
+			"level": unseen_notif.level,
+			"min_count": unseen_notif.min_count,
+			"label": unseen_notif.label,
+			"image": unseen_notif.image,
+		}
 	context = {
 		"status_filters": status_filters,
 		"selected_status": selected_status,
@@ -258,7 +313,11 @@ def profile(request: HttpRequest) -> HttpResponse:
 		"follow_activities": follow_activities,
 		"follow_activities_pagination": follow_activities_pagination,
 		"tab_counts": tab_counts,
-		"follow_count": len(person_follows) + total_company_count,
+		"follow_count": follow_count,
+		"follow_badge": _get_follow_badge(follow_count),
+		"unseen_badge": unseen_badge,
+		"target_user": target_user,
+		"can_view_email": True,
 	}
 
 	if request.GET.get("partial") == "1":
@@ -319,6 +378,7 @@ def user_following(request: HttpRequest, username: str) -> HttpResponse:
 
 	status_filters = _build_status_filters(request.path, selected_status)
 	selected_status_label = next((f["label"] for f in status_filters if f["key"] == selected_status), "Status")
+	follow_count = len(person_follows) + len(company_follows)
 
 	return render(
 		request,
@@ -326,6 +386,14 @@ def user_following(request: HttpRequest, username: str) -> HttpResponse:
 		{
 			"target_user": target_user,
 			"is_self": target_user.pk == request.user.pk,
+			"can_view_email": (
+				request.user.is_authenticated
+				and (
+					target_user.pk == request.user.pk
+					or getattr(request.user, "is_staff", False)
+					or getattr(request.user, "is_superuser", False)
+				)
+			),
 			"status_filters": status_filters,
 			"selected_status": selected_status,
 			"selected_status_label": selected_status_label,
@@ -334,6 +402,76 @@ def user_following(request: HttpRequest, username: str) -> HttpResponse:
 			"crew": crew,
 			"companies": company_follows,
 			"tab_counts": tab_counts,
-			"follow_count": len(person_follows) + len(company_follows),
+			"follow_count": follow_count,
+			"follow_badge": _get_follow_badge(follow_count),
 		},
 	)
+
+
+@login_required
+def follow_status(request: HttpRequest) -> JsonResponse:
+	"""Return lightweight follow status for the current user.
+
+	JSON: {
+	  ok: True,
+	  username: str,
+	  follow_count: int,
+	  badge: { level: int, min_count: int, label: str, image: str } | null
+	}
+	"""
+	try:
+		user = request.user
+		person_count = PersonFollow.objects.filter(user=user).count()
+		company_count = CompanyFollow.objects.filter(user=user).count()
+		follow_count = int(person_count + company_count)
+		# Prefer any server-persisted unseen badge notification (best-effort)
+		badge = None
+		try:
+			notif = BadgeNotification.objects.filter(user=user, seen=False).order_by("-level").first()
+			if notif:
+				badge = {
+					"level": notif.level,
+					"min_count": notif.min_count,
+					"label": notif.label,
+					"image": notif.image,
+				}
+		except Exception:
+			# If the BadgeNotification table or model isn't available (e.g. migrations
+			# not yet applied), fall back to computing the badge from counts.
+			badge = _get_follow_badge(follow_count)
+		result = {
+			"ok": True,
+			"username": getattr(user, "username", ""),
+			"follow_count": follow_count,
+			"badge": None,
+		}
+		if badge:
+			result["badge"] = {
+				"level": int(badge.get("level", 0)),
+				"min_count": int(badge.get("min_count", 0)),
+				"label": badge.get("label", ""),
+				"image": badge.get("image", ""),
+			}
+		return JsonResponse(result)
+	except Exception:
+		return JsonResponse({"ok": False}, status=500)
+
+
+@login_required
+def mark_badge_seen(request: HttpRequest) -> JsonResponse:
+	"""Mark a server-persisted badge notification as seen for the current user.
+
+	Expects `level` as POST or GET param.
+	Returns JSON {ok: True}.
+	"""
+	if request.method not in ("POST", "GET"):
+		return JsonResponse({"ok": False, "error": "Invalid method"}, status=400)
+	raw = (request.POST.get("level") or request.GET.get("level") or "").strip()
+	if not raw.isdigit():
+		return JsonResponse({"ok": False, "error": "Invalid level"}, status=400)
+	level = int(raw)
+	try:
+		BadgeNotification.objects.filter(user=request.user, level=level, seen=False).update(seen=True)
+		return JsonResponse({"ok": True})
+	except Exception:
+		return JsonResponse({"ok": False}, status=500)

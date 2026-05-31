@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from ..models import CompanyFollow, PersonFollow
+from accounts.models import BadgeNotification
 from ..models import FollowActivity
 from ..new_movie_helpers import (
 	build_person_comeback_event_meta,
@@ -39,6 +40,7 @@ def _wants_json(request: HttpRequest) -> bool:
 
 
 def _render_person_follow_controls(request: HttpRequest, *, tmdb_id: int) -> str:
+ 
 	hide_self_appearances = _get_session_bool(
 		request.session,
 		SESSION_KEY_HIDE_SELF_APPEARANCES,
@@ -242,12 +244,25 @@ def follow(request: HttpRequest) -> HttpResponse:
 				"entity_type": "person",
 				"tmdb_id": tmdb_id,
 				"role": role,
+				"username": getattr(request.user, "username", ""),
 				"message": f"Now following {person.name} as {role}.",
 			}
 			if ajax_context == "person_detail":
 				payload["controls_target"] = "#person-follow-controls"
 				payload["controls_html"] = _render_person_follow_controls(request, tmdb_id=tmdb_id)
 				payload["status_target"] = "#person-follow-message"
+			# Include any unseen badge so client can show the modal immediately
+			try:
+				notif = BadgeNotification.objects.filter(user=request.user, seen=False).order_by("-level").first()
+				if notif:
+					payload["badge"] = {
+						"level": notif.level,
+						"min_count": notif.min_count,
+						"label": notif.label,
+						"image": notif.image,
+					}
+			except Exception:
+				pass
 			else:
 				messages.success(request, f"Now following {person.name} as {role}.")
 			return JsonResponse(payload)
@@ -295,7 +310,20 @@ def follow(request: HttpRequest) -> HttpResponse:
 				"entity_type": "company",
 				"tmdb_id": tmdb_id,
 				"message": f"Now following {company.name}.",
+				"username": getattr(request.user, "username", ""),
 			}
+			# Include any unseen badge so client can show the modal immediately
+			try:
+				notif = BadgeNotification.objects.filter(user=request.user, seen=False).order_by("-level").first()
+				if notif:
+					payload["badge"] = {
+						"level": notif.level,
+						"min_count": notif.min_count,
+						"label": notif.label,
+						"image": notif.image,
+					}
+			except Exception:
+				pass
 			if ajax_context == "company_detail":
 				payload["controls_target"] = "#company-follow-controls"
 				payload["controls_html"] = _render_company_follow_controls(request, tmdb_id=tmdb_id)

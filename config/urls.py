@@ -34,6 +34,8 @@ urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("signup/", accounts_views.signup, name="signup"),
     path("me/", accounts_views.profile, name="user_profile"),
+    path("accounts/follow_status/", accounts_views.follow_status, name="follow_status"),
+    path("accounts/badge_seen/", accounts_views.mark_badge_seen, name="mark_badge_seen"),
     path(
         "users/<str:username>/following/",
         accounts_views.user_following,

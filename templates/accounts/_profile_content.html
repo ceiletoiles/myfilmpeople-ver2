@@ -3,9 +3,45 @@
 <div class="profile-page" data-profile-shell data-profile-view="overview">
   <section class="profile-section profile-overview" data-profile-section="overview" id="profile-overview">
     <div class="profile-summary">
-      <p><strong>Username:</strong> {{ user.username }}</p>
-      <p><strong>Email:</strong> {{ user.email|default:'-' }}</p>
-      <p><strong>Followed entities:</strong> {{ follow_count }}</p>
+      <div class="profile-summary-main">
+        <p>@{{ user.username }}</p>
+        <p class="muted">{{ user.email|default:'-' }}</p>
+        <p>Followed entities: {{ follow_count }}</p>
+      </div>
+      {% if follow_badge %}
+        <div
+          class="profile-badge js-profile-badge"
+          role="button"
+          tabindex="0"
+          aria-label="Follow badge"
+          data-badge-username="{{ user.username }}"
+          data-badge-min-count="{{ follow_badge.min_count }}"
+          data-badge-label="{{ follow_badge.label }}"
+        >
+          <img
+            class="profile-badge-image"
+            src="{% static follow_badge.image %}"
+            alt="{{ follow_badge.label }} badge"
+            loading="lazy"
+          />
+        </div>
+      {% endif %}
+      {% if unseen_badge %}
+        <script>
+          document.addEventListener('DOMContentLoaded', function () {
+            try {
+              if (window.mfpShowBadgeModal) {
+                window.mfpShowBadgeModal({
+                  username: '{{ user.username }}',
+                  minCount: '{{ unseen_badge.min_count }}',
+                  label: '{{ unseen_badge.label }}',
+                  imgSrc: '{% static unseen_badge.image %}'
+                });
+              }
+            } catch (e) {}
+          });
+        </script>
+      {% endif %}
     </div>
 
     <div class="profile-separator" aria-hidden="true"></div>

@@ -47,8 +47,40 @@
 	white-space: nowrap;
 }
 
-.profile-summary p {
-	margin: 0 0 10px;
+.profile-summary {
+	display: flex;
+	align-items: stretch;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.profile-summary-main {
+	min-width: 0;
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 8px;
+	min-height: clamp(92px, 14vw, 128px);
+}
+
+.profile-summary-main p {
+	margin: 0;
+	font-weight: 400;
+}
+
+.profile-badge {
+	display: inline-flex;
+	align-items: center;
+	margin-top: 0;
+	margin-left: auto;
+}
+
+.profile-badge-image {
+	width: clamp(92px, 14vw, 128px);
+	height: clamp(92px, 14vw, 128px);
+	object-fit: contain;
+	flex: 0 0 clamp(92px, 14vw, 128px);
 }
 
 .profile-activity {
@@ -391,7 +423,7 @@
 
 .following-head {
 	margin-bottom: 10px;
-	font-weight: 700;
+	font-weight: 400;
 	color: #0f172a;
 }
 
@@ -400,6 +432,7 @@
 	min-width: 1ch;
 	margin-right: 6px;
 	color: #0f172a;
+	font-weight: 400;
 }
 
 .following-tabs {
@@ -764,6 +797,19 @@
 }
 
 @media (max-width: 640px) {
+	.profile-summary-main p,
+	.profile-summary-main > p.muted,
+	.following-head,
+	.following-head-count {
+		font-size: 14px;
+		line-height: 1.3;
+	}
+
+	.profile-summary-main > p.muted {
+		font-size: 14px;
+		line-height: 1.3;
+	}
+
 	.tab-row {
 		flex-direction: row;
 		align-items: center;
@@ -886,5 +932,51 @@
 		justify-content: flex-start;
 		font-size: 12px;
 	}
+}
+
+/* Badge modal */
+.badge-modal-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(2,6,23,0.6);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+}
+.badge-modal {
+	background: #fff;
+	border-radius: 12px;
+	padding: 20px;
+	max-width: 420px;
+	width: calc(100% - 32px);
+	box-shadow: 0 20px 40px rgba(2,6,23,0.2);
+	text-align: center;
+}
+.badge-modal img {
+	width: 128px;
+	height: 128px;
+	object-fit: contain;
+	margin-bottom: 12px;
+}
+.badge-modal h3 {
+	margin: 0 0 8px;
+	font-size: 18px;
+	color: #0f172a;
+}
+.badge-modal p {
+	margin: 0 0 12px;
+	color: #334155;
+}
+.badge-modal .badge-modal-close {
+	display: inline-block;
+	margin-top: 8px;
+	padding: 8px 14px;
+	border-radius: 8px;
+	border: 1px solid #e2e8f0;
+	background: #ffffff;
+	cursor: pointer;
+	font-weight: 700;
+	color: #0f172a;
 }
 
