@@ -259,12 +259,7 @@
     overlay.className = 'badge-modal-overlay';
     const baseSentence = `${username} earned this badge`;
     const min = Number(minCount || 0);
-    let detailSentence;
-    if (min >= 500) {
-      detailSentence = `This badge recognizes this user for following more than ${min} people in the film industry.`;
-    } else {
-      detailSentence = `This badge recognizes this user for following at least ${min} people in the film industry.`;
-    }
+    const detailSentence = `A mark of true cinephile dedication, awarded for following ${min} or more people in the film industry.`;
     overlay.innerHTML = `
       <div class="badge-modal" role="dialog" aria-modal="true" aria-label="Badge details">
         <img src="${imgSrc || ''}" alt="${label || 'Badge'}" />
