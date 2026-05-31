@@ -255,11 +255,19 @@ def follow(request: HttpRequest) -> HttpResponse:
 			try:
 				notif = BadgeNotification.objects.filter(user=request.user, seen=False).order_by("-level").first()
 				if notif:
+					# Attach title/description from server badge templates when available
+					try:
+						from accounts import views as accounts_views
+						badge_template = accounts_views._get_follow_badge_for_min_count(notif.min_count)
+					except Exception:
+						badge_template = None
 					payload["badge"] = {
 						"level": notif.level,
 						"min_count": notif.min_count,
 						"label": notif.label,
 						"image": notif.image,
+						"title": badge_template["title"] if (badge_template and isinstance(badge_template, dict)) else notif.label,
+						"description": badge_template["description"] if (badge_template and isinstance(badge_template, dict)) else "",
 					}
 			except Exception:
 				pass
@@ -316,11 +324,18 @@ def follow(request: HttpRequest) -> HttpResponse:
 			try:
 				notif = BadgeNotification.objects.filter(user=request.user, seen=False).order_by("-level").first()
 				if notif:
+					try:
+						from accounts import views as accounts_views
+						badge_template = accounts_views._get_follow_badge_for_min_count(notif.min_count)
+					except Exception:
+						badge_template = None
 					payload["badge"] = {
 						"level": notif.level,
 						"min_count": notif.min_count,
 						"label": notif.label,
 						"image": notif.image,
+						"title": badge_template["title"] if (badge_template and isinstance(badge_template, dict)) else notif.label,
+						"description": badge_template["description"] if (badge_template and isinstance(badge_template, dict)) else "",
 					}
 			except Exception:
 				pass

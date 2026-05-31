@@ -240,6 +240,30 @@
     document.removeEventListener('keydown', escHandler);
   }
 
+  function getCelebrationCopy(level, fallbackDescription) {
+    const key = String(level || '');
+    const copyMap = {
+      '5': 'Top-tier film commitment. You are operating at the highest cinephile level.',
+      '4': 'Major milestone reached. Your taste is sharp and your film instinct is clear.',
+      '3': 'A real cinephile marker. Your dedication is starting to stand out.',
+      '2': 'Real momentum is building. The next tier is getting closer.',
+      '1': 'First milestone unlocked. Your cinephile journey is officially underway.'
+    };
+    return copyMap[key] || 'You have earned this badge.';
+  }
+
+  function getTapCopy(level, fallbackDescription) {
+    const key = String(level || '');
+    const copyMap = {
+      '5': 'A testament to exceptional commitment to cinema, awarded for following 500 or more people in the film industry.',
+      '4': 'A deep connection to the art and craft of filmmaking, earned by following 400 or more people in the film industry.',
+      '3': 'A mark of true cinephile dedication, awarded for following 300 or more people in the film industry.',
+      '2': 'A growing passion for film, recognized through following 200 or more people in the film industry.',
+      '1': 'The first step into the world of cinema, earned by following 100 or more people in the film industry.'
+    };
+    return copyMap[key] || fallbackDescription || 'You have earned this badge.';
+  }
+
   function escHandler(e) {
     if (e.key === 'Escape') {
       const overlay = document.querySelector('.badge-modal-overlay');
@@ -248,7 +272,7 @@
   }
 
   function showBadgeModal(opts) {
-    const { username, minCount, label, imgSrc } = opts || {};
+    const { username, minCount, level, label, title, description, imgSrc, variant, showCelebrationLabel } = opts || {};
     if (!username || !minCount) return;
     // remove existing
     const existing = document.querySelector('.badge-modal-overlay');
@@ -257,14 +281,28 @@
     const openedAt = Date.now();
     const overlay = document.createElement('div');
     overlay.className = 'badge-modal-overlay';
-    const baseSentence = `${username} earned this badge`;
-    const min = Number(minCount || 0);
-    const detailSentence = `A mark of true cinephile dedication, awarded for following ${min} or more people in the film industry.`;
-    overlay.innerHTML = `
+    // If the viewer is the badge owner, show 'You earned this badge'
+    const currentUsername = (document.body && document.body.dataset && document.body.dataset.currentUsername) ? document.body.dataset.currentUsername.trim().toLowerCase() : '';
+    const isOwner = currentUsername && currentUsername === (username || '').trim().toLowerCase();
+    const modalTitle = isOwner ? 'You earned this badge' : `${username} earned this badge`;
+    const celebration = variant === 'celebration' || variant === 'tap';
+    const celebrationTitle = String(level || '').trim() === '5' ? 'Cinephile ultimate level' : `Cinephile level ${String(level || '').trim()}`.trim();
+    const celebrationSentence = variant === 'tap' ? getTapCopy(level, description) : getCelebrationCopy(level, description);
+    const celebrationLabel = showCelebrationLabel !== false;
+    overlay.innerHTML = celebration ? `
+      <div class="badge-modal badge-modal--celebration" role="dialog" aria-modal="true" aria-label="Badge celebration">
+        ${celebrationLabel ? '<p class="badge-modal-eyebrow">Badge celebration</p>' : ''}
+        <img class="badge-modal-image badge-modal-image--celebration" src="${imgSrc || ''}" alt="${label || 'Badge'}" />
+        <h3>${celebrationTitle}</h3>
+        <p class="badge-modal-statement">You’ve earned this badge.</p>
+        <p class="badge-modal-copy">${celebrationSentence}</p>
+        <button class="badge-modal-close" type="button">Close</button>
+      </div>
+    ` : `
       <div class="badge-modal" role="dialog" aria-modal="true" aria-label="Badge details">
         <img src="${imgSrc || ''}" alt="${label || 'Badge'}" />
-        <h3>${baseSentence}</h3>
-        <p>${detailSentence}</p>
+        <h3>${modalTitle}</h3>
+        <p class="badge-modal-copy">${celebrationSentence}</p>
         <button class="badge-modal-close" type="button">Close</button>
       </div>
     `;
@@ -281,8 +319,22 @@
     document.body.appendChild(overlay);
     document.addEventListener('keydown', escHandler);
   }
+
+  async function markBadgeSeen(level) {
+    if (!level) return;
+    try {
+      fetch('/accounts/badge_seen/?level=' + encodeURIComponent(level), {
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+    } catch (e) {
+      // ignore
+    }
+  }
   // Expose a minimal hook so server-rendered templates can trigger the modal on page load.
   try { window.mfpShowBadgeModal = showBadgeModal; } catch (e) { /* ignore */ }
+  try { window.mfpMarkBadgeSeen = markBadgeSeen; } catch (e) { /* ignore */ }
+
   // debounce to avoid double-opening on touch -> click sequence
   let _lastBadgeOpenAt = 0;
   function handleBadgeActivation(badge) {
@@ -290,12 +342,15 @@
     const now = Date.now();
     if (now - _lastBadgeOpenAt < 600) return; // ignore rapid duplicates
     _lastBadgeOpenAt = now;
+    const level = badge.dataset.badgeLevel || '';
     const username = badge.dataset.badgeUsername || '';
     const minCount = badge.dataset.badgeMinCount || '';
     const label = badge.dataset.badgeLabel || '';
+    const title = badge.dataset.badgeTitle || '';
+    const description = badge.dataset.badgeDescription || '';
     const img = badge.querySelector('.profile-badge-image');
     const imgSrc = img ? img.getAttribute('src') : '';
-    showBadgeModal({ username, minCount, label, imgSrc });
+    showBadgeModal({ username, minCount, level, label, title, description, imgSrc, variant: 'tap', showCelebrationLabel: false });
   }
 
   document.addEventListener('click', (event) => {

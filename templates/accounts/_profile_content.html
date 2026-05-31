@@ -4,10 +4,12 @@
   <section class="profile-section profile-overview" data-profile-section="overview" id="profile-overview">
     <div class="profile-summary">
       <div class="profile-summary-main">
-        <p>@{{ user.username }}</p>
-        <p class="muted">{{ user.email|default:'-' }}</p>
-        <p>Followed entities: {{ follow_count }}</p>
-      </div>
+          <p>@{{ target_user.username|default:user.username }}</p>
+          {% if can_view_email %}
+            <p class="muted">{{ target_user.email|default:user.email|default:'-' }}</p>
+          {% endif %}
+          <p>Followed entities: {{ follow_count }}</p>
+        </div>
       {% if follow_badge %}
         <button
           class="profile-badge js-profile-badge"
@@ -15,9 +17,12 @@
           role="button"
           tabindex="0"
           aria-label="Follow badge"
+          data-badge-level="{{ follow_badge.level }}"
           data-badge-username="{{ user.username }}"
           data-badge-min-count="{{ follow_badge.min_count }}"
           data-badge-label="{{ follow_badge.label }}"
+          data-badge-title="{{ follow_badge.title }}"
+          data-badge-description="{{ follow_badge.description }}"
         >
           <img
             class="profile-badge-image"
@@ -35,9 +40,16 @@
                 window.mfpShowBadgeModal({
                   username: '{{ user.username }}',
                   minCount: '{{ unseen_badge.min_count }}',
+                  level: '{{ unseen_badge.level }}',
                   label: '{{ unseen_badge.label }}',
-                  imgSrc: '{% static unseen_badge.image %}'
+                  title: '{{ unseen_badge.title }}',
+                  description: '{{ unseen_badge.description }}',
+                  imgSrc: '{% static unseen_badge.image %}',
+                  variant: 'celebration'
                 });
+                if (window.mfpMarkBadgeSeen) {
+                  window.mfpMarkBadgeSeen('{{ unseen_badge.level }}');
+                }
               }
             } catch (e) {}
           });

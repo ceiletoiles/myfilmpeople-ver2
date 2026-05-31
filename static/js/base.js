@@ -621,7 +621,7 @@
             if (data.badge && typeof window.mfpShowBadgeModal === 'function') {
             const badge = data.badge;
             const img = badge.image ? (badge.image.startsWith('/') ? badge.image : ('/static/' + badge.image)) : '';
-            window.mfpShowBadgeModal({ username: data.username || '', minCount: badge.min_count, label: badge.label, imgSrc: img });
+            window.mfpShowBadgeModal({ username: data.username || '', minCount: badge.min_count, label: badge.label, title: badge.title, description: badge.description, imgSrc: img });
             // Mark server notification as seen (GET accepted by endpoint)
             try { fetch('/accounts/badge_seen/?level=' + encodeURIComponent(badge.level), {credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest'}}); } catch (e) {}
           }
@@ -649,7 +649,7 @@
         if (data.badge && typeof window.mfpShowBadgeModal === 'function') {
         const badge = data.badge;
         const img = badge.image ? (badge.image.startsWith('/') ? badge.image : ('/static/' + badge.image)) : '';
-        window.mfpShowBadgeModal({ username: data.username || '', minCount: badge.min_count, label: badge.label, imgSrc: img });
+        window.mfpShowBadgeModal({ username: data.username || '', minCount: badge.min_count, label: badge.label, title: badge.title, description: badge.description, imgSrc: img });
         try { fetch('/accounts/badge_seen/?level=' + encodeURIComponent(badge.level), {credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest'}}); } catch (e) {}
         }
       } catch (e) {}

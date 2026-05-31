@@ -42,9 +42,12 @@
           role="button"
           tabindex="0"
           aria-label="Follow badge"
+          data-badge-level="{{ follow_badge.level }}"
           data-badge-username="{{ target_user.username }}"
           data-badge-min-count="{{ follow_badge.min_count }}"
           data-badge-label="{{ follow_badge.label }}"
+          data-badge-title="{{ follow_badge.title }}"
+          data-badge-description="{{ follow_badge.description }}"
         >
           <img
             class="profile-badge-image"

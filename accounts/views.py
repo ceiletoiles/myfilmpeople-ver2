@@ -93,41 +93,61 @@ FOLLOW_BADGE_LEVELS: tuple[dict[str, object], ...] = (
 		"level": 5,
 		"min_count": 500,
 		"label": "Cinephile Ultimate",
+		"title": "500+ Follow",
+		"description": "A testament to exceptional commitment to cinema, awarded for following 500 or more people in the film industry.",
 		"image": "img/badges/cinephile-ultimate-level(gold).png",
 	},
 	{
 		"level": 4,
 		"min_count": 400,
 		"label": "Cinephile Level 4",
+		"title": "400+ Follow",
+		"description": "A deep connection to the art and craft of filmmaking, earned by following 400 or more people in the film industry.",
 		"image": "img/badges/cinephile-level-4.png",
 	},
 	{
 		"level": 3,
 		"min_count": 300,
 		"label": "Cinephile Level 3",
+		"title": "300+ Follow",
+		"description": "A mark of true cinephile dedication, awarded for following 300 or more people in the film industry.",
 		"image": "img/badges/cinephile-level-3.png",
 	},
 	{
 		"level": 2,
 		"min_count": 200,
 		"label": "Cinephile Level 2",
+		"title": "200+ Follow",
+		"description": "A growing passion for film, recognized through following 200 or more people in the film industry.",
 		"image": "img/badges/cinephile-level-2.png",
 	},
 	{
 		"level": 1,
 		"min_count": 100,
 		"label": "Cinephile Level 1",
+		"title": "100+ Follow",
+		"description": "The first step into the world of cinema, earned by following 100 or more people in the film industry.",
 		"image": "img/badges/cinephile-level-1.png",
 	},
 )
 
 
-def _get_follow_badge(follow_count: int) -> dict[str, object] | None:
+def _get_follow_badge(follow_count: int, override_level: int | None = None) -> dict[str, object] | None:
+	if override_level is not None:
+		for badge in FOLLOW_BADGE_LEVELS:
+			if int(badge["level"]) == int(override_level):
+				return badge
 	for badge in FOLLOW_BADGE_LEVELS:
 		if follow_count >= int(badge["min_count"]):
 			return badge
 	return None
 
+
+def _get_follow_badge_for_min_count(min_count: int) -> dict[str, object] | None:
+	for badge in FOLLOW_BADGE_LEVELS:
+		if int(badge["min_count"]) == int(min_count):
+			return badge
+	return None
 
 def _annotate_status(follow) -> None:
 	try:
@@ -295,11 +315,14 @@ def profile(request: HttpRequest) -> HttpResponse:
 	unseen_badge = None
 	unseen_notif = BadgeNotification.objects.filter(user=request.user, seen=False).order_by("-level").first()
 	if unseen_notif:
+		badge_template = _get_follow_badge_for_min_count(unseen_notif.min_count)
 		unseen_badge = {
 			"level": unseen_notif.level,
 			"min_count": unseen_notif.min_count,
 			"label": unseen_notif.label,
 			"image": unseen_notif.image,
+			"title": badge_template["title"] if badge_template else unseen_notif.label,
+			"description": badge_template["description"] if badge_template else "",
 		}
 	context = {
 		"status_filters": status_filters,
@@ -428,15 +451,20 @@ def follow_status(request: HttpRequest) -> JsonResponse:
 		try:
 			notif = BadgeNotification.objects.filter(user=user, seen=False).order_by("-level").first()
 			if notif:
+				badge_template = _get_follow_badge_for_min_count(notif.min_count)
 				badge = {
 					"level": notif.level,
 					"min_count": notif.min_count,
 					"label": notif.label,
 					"image": notif.image,
+					"title": badge_template["title"] if badge_template else notif.label,
+					"description": badge_template["description"] if badge_template else "",
 				}
 		except Exception:
 			# If the BadgeNotification table or model isn't available (e.g. migrations
 			# not yet applied), fall back to computing the badge from counts.
+				badge = _get_follow_badge(follow_count)
+		if badge is None:
 			badge = _get_follow_badge(follow_count)
 		result = {
 			"ok": True,
@@ -450,6 +478,8 @@ def follow_status(request: HttpRequest) -> JsonResponse:
 				"min_count": int(badge.get("min_count", 0)),
 				"label": badge.get("label", ""),
 				"image": badge.get("image", ""),
+				"title": badge.get("title", badge.get("label", "")),
+				"description": badge.get("description", ""),
 			}
 		return JsonResponse(result)
 	except Exception:
@@ -474,3 +504,4 @@ def mark_badge_seen(request: HttpRequest) -> JsonResponse:
 		return JsonResponse({"ok": True})
 	except Exception:
 		return JsonResponse({"ok": False}, status=500)
+

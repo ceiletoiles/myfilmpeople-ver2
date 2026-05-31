@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/base.css?v=20260507" />
     {% block extra_css %}{% endblock %}
   </head>
-  <body>
+  <body data-current-username="{{ user.username|default:'' }}">
     {% if user.is_authenticated %}
       <div class="menu-overlay" data-menu-overlay hidden></div>
 
