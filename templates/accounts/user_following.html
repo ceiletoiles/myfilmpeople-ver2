@@ -36,8 +36,9 @@
         <p>Followed entities: {{ follow_count }}</p>
       </div>
       {% if follow_badge %}
-        <div
+        <button
           class="profile-badge js-profile-badge"
+          type="button"
           role="button"
           tabindex="0"
           aria-label="Follow badge"
@@ -51,7 +52,7 @@
             alt="{{ follow_badge.label }} badge"
             loading="lazy"
           />
-        </div>
+        </button>
       {% endif %}
     </div>
 

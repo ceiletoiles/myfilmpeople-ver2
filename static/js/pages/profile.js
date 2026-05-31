@@ -254,6 +254,7 @@
     const existing = document.querySelector('.badge-modal-overlay');
     if (existing) existing.remove();
 
+    const openedAt = Date.now();
     const overlay = document.createElement('div');
     overlay.className = 'badge-modal-overlay';
     const baseSentence = `${username} earned this badge`;
@@ -274,6 +275,7 @@
     `;
 
     overlay.addEventListener('click', function (e) {
+      if (Date.now() - openedAt < 500) return;
       if (e.target === overlay) closeBadgeModal(overlay);
     });
 
@@ -307,6 +309,7 @@
     const badge = target.closest('.js-profile-badge');
     if (!badge) return;
     event.preventDefault();
+    event.stopPropagation();
     handleBadgeActivation(badge);
   });
 
@@ -322,6 +325,7 @@
     const badge = target.closest('.js-profile-badge');
     if (!badge) return;
     event.preventDefault();
+    event.stopPropagation();
     handleBadgeActivation(badge);
   });
 

@@ -74,6 +74,12 @@
 	align-items: center;
 	margin-top: 0;
 	margin-left: auto;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+	touch-action: manipulation;
+	-webkit-tap-highlight-color: transparent;
 }
 
 .profile-badge-image {
@@ -81,6 +87,7 @@
 	height: clamp(92px, 14vw, 128px);
 	object-fit: contain;
 	flex: 0 0 clamp(92px, 14vw, 128px);
+	display: block;
 }
 
 .profile-activity {
