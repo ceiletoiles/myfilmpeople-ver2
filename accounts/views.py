@@ -64,7 +64,7 @@ def _build_status_filters(base_path: str, selected_status: str) -> list[dict[str
 		("all", "Status"),
 		("inactive", "Inactive"),
 		("deceased", "Deceased"),
-		("tba", "Announced"),
+		("announced", "Announced"),
 		("upcoming", "Upcoming"),
 		("idle", "Idle"),
 	]
@@ -85,7 +85,9 @@ def _build_status_filters(base_path: str, selected_status: str) -> list[dict[str
 
 def _normalize_status_key(value: str | None) -> str:
 	status = (value or "").strip().lower()
-	return status if status in {"inactive", "deceased", "tba", "upcoming", "idle"} else "all"
+	if status == "tba":
+		return "announced"
+	return status if status in {"inactive", "deceased", "announced", "upcoming", "idle"} else "all"
 
 
 FOLLOW_BADGE_LEVELS: tuple[dict[str, object], ...] = (
@@ -193,7 +195,7 @@ def _annotate_company_status(follow) -> None:
 			follow.status_key = "upcoming"
 			follow.status = "Upcoming"
 		elif upcoming_no_date > 0:
-			follow.status_key = "tba"
+			follow.status_key = "announced"
 			follow.status = "Announced"
 		else:
 			tba_items: list[dict] = []
@@ -207,7 +209,7 @@ def _annotate_company_status(follow) -> None:
 				tba_items = []
 
 			if tba_items:
-				follow.status_key = "tba"
+				follow.status_key = "announced"
 				follow.status = "Announced"
 			elif latest_past_release is not None and latest_past_release < ten_years_ago:
 				follow.status_key = "inactive"

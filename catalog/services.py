@@ -104,8 +104,8 @@ def get_or_sync_company_tba_movies(
 def get_person_status_label(person: Person, *, followed_role: str | None = None) -> str:
     """Return a clean single-word status label for a person.
 
-    Labels: Deceased, Upcoming, TBA, Inactive, Idle
-    Priority: Deceased > Upcoming > TBA > Inactive > Idle
+    Labels: Deceased, Upcoming, Announced, Inactive, Idle
+    Priority: Deceased > Upcoming > Announced > Inactive > Idle
     """
     credits = person.tmdb_credits_raw or {}
 
@@ -152,7 +152,8 @@ def get_person_status_label(person: Person, *, followed_role: str | None = None)
 
 
 def get_person_status_key(person: Person, *, followed_role: str | None = None) -> str:
-    return get_person_status_label(person, followed_role=followed_role).strip().lower()
+    label = get_person_status_label(person, followed_role=followed_role).strip().lower()
+    return "announced" if label == "announced" else label
 
 
 def extract_person_credited_roles(credits: dict) -> list[str]:
