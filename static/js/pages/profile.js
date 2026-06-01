@@ -292,7 +292,8 @@
     // If the viewer is the badge owner, show 'You earned this badge'
     const currentUsername = (document.body && document.body.dataset && document.body.dataset.currentUsername) ? document.body.dataset.currentUsername.trim().toLowerCase() : '';
     const isOwner = currentUsername && currentUsername === (username || '').trim().toLowerCase();
-    const modalTitle = isOwner ? 'You earned this badge' : `${username} earned this badge`;
+      const modalTitle = isOwner ? 'You earned this badge' : `${username} earned this badge`;
+      const modalStatement = isOwner ? 'You’ve earned this badge.' : `${username} earned this badge`;
     const celebration = variant === 'celebration' || variant === 'tap';
     const celebrationTitle = String(level || '').trim() === '5' ? 'Cinephile ultimate level' : `Cinephile level ${String(level || '').trim()}`.trim();
     const celebrationSentence = variant === 'tap' ? getTapCopy(level, description) : getCelebrationCopy(level, description);
@@ -302,7 +303,7 @@
         ${celebrationLabel ? '<p class="badge-modal-eyebrow">Badge celebration</p>' : ''}
         <img class="badge-modal-image badge-modal-image--celebration" src="${imgSrc || ''}" alt="${label || 'Badge'}" />
         <h3>${celebrationTitle}</h3>
-        <p class="badge-modal-statement">You’ve earned this badge.</p>
+          <p class="badge-modal-statement">${modalStatement}</p>
         <p class="badge-modal-copy">${celebrationSentence}</p>
         <button class="badge-modal-close" type="button">Close</button>
       </div>

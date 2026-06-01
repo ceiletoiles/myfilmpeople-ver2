@@ -18,7 +18,7 @@
           tabindex="0"
           aria-label="Follow badge"
           data-badge-level="{{ follow_badge.level }}"
-          data-badge-username="{{ user.username }}"
+          data-badge-username="{{ target_user.username|default:user.username }}"
           data-badge-min-count="{{ follow_badge.min_count }}"
           data-badge-label="{{ follow_badge.label }}"
           data-badge-title="{{ follow_badge.title }}"
@@ -38,7 +38,7 @@
             try {
               if (window.mfpShowBadgeModal) {
                 window.mfpShowBadgeModal({
-                  username: '{{ user.username }}',
+                  username: '{{ target_user.username|default:user.username }}',
                   minCount: '{{ unseen_badge.min_count }}',
                   level: '{{ unseen_badge.level }}',
                   label: '{{ unseen_badge.label }}',

@@ -127,7 +127,7 @@ FOLLOW_BADGE_LEVELS: tuple[dict[str, object], ...] = (
 		"label": "Cinephile Level 1",
 		"title": "100+ Follow",
 		"description": "The first step into the world of cinema, earned by following 100 or more people in the film industry.",
-		"image": "img/badges/cinephile-level-1.png",
+		"image": "img/badges/cinephile-level-1-ver-2.png",
 	},
 )
 
