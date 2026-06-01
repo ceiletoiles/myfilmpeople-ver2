@@ -141,7 +141,7 @@ def get_person_status_label(person: Person, *, followed_role: str | None = None)
             return "Upcoming"
 
     if has_tba:
-        return "TBA"
+        return "Announced"
 
     # Inactive (use existing comeback detection which respects thresholds)
     comeback = get_person_comeback_info(credits, followed_role=followed_role)

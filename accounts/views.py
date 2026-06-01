@@ -64,7 +64,7 @@ def _build_status_filters(base_path: str, selected_status: str) -> list[dict[str
 		("all", "Status"),
 		("inactive", "Inactive"),
 		("deceased", "Deceased"),
-		("tba", "TBA"),
+		("tba", "Announced"),
 		("upcoming", "Upcoming"),
 		("idle", "Idle"),
 	]
@@ -194,7 +194,7 @@ def _annotate_company_status(follow) -> None:
 			follow.status = "Upcoming"
 		elif upcoming_no_date > 0:
 			follow.status_key = "tba"
-			follow.status = "TBA"
+			follow.status = "Announced"
 		else:
 			tba_items: list[dict] = []
 			try:
@@ -208,7 +208,7 @@ def _annotate_company_status(follow) -> None:
 
 			if tba_items:
 				follow.status_key = "tba"
-				follow.status = "TBA"
+				follow.status = "Announced"
 			elif latest_past_release is not None and latest_past_release < ten_years_ago:
 				follow.status_key = "inactive"
 				follow.status = "Inactive"
