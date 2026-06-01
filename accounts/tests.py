@@ -38,8 +38,8 @@ class CompanyStatusTests(TestCase):
 		], False, False)):
 			_annotate_company_status(follow)
 
-		self.assertEqual(follow.status_key, "tba")
-		self.assertEqual(follow.status, "TBA")
+		self.assertEqual(follow.status_key, "announced")
+		self.assertEqual(follow.status, "Announced")
 
 	def test_company_status_stays_inactive_when_no_tba_titles_exist(self) -> None:
 		follow = self._make_follow(
