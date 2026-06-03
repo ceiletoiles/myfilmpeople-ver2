@@ -1,41 +1,16 @@
 from django.db import migrations, models
 
 
-APPLY_STATUS_SQL = """
-SET @col_exists := (
-  SELECT COUNT(*)
-  FROM information_schema.COLUMNS
-  WHERE TABLE_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'catalog_personfollow'
-    AND COLUMN_NAME = 'status'
-);
-SET @sql := IF(
-  @col_exists = 1,
-  'ALTER TABLE `catalog_personfollow` MODIFY COLUMN `status` varchar(20) NOT NULL DEFAULT ''''',
-  'ALTER TABLE `catalog_personfollow` ADD COLUMN `status` varchar(20) NOT NULL DEFAULT '''' AFTER `name`'
-);
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-"""
-
-REVERSE_STATUS_SQL = """
-SET @col_exists := (
-  SELECT COUNT(*)
-  FROM information_schema.COLUMNS
-  WHERE TABLE_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'catalog_personfollow'
-    AND COLUMN_NAME = 'status'
-);
-SET @sql := IF(
-  @col_exists = 1,
-  'ALTER TABLE `catalog_personfollow` DROP COLUMN `status`',
-  'SELECT 1'
-);
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-"""
+def forwards(apps, schema_editor):
+	person_follow = apps.get_model("catalog", "PersonFollow")
+	table_name = person_follow._meta.db_table
+	with schema_editor.connection.cursor() as cursor:
+		existing_columns = {column.name for column in schema_editor.connection.introspection.get_table_description(cursor, table_name)}
+	if "status" in existing_columns:
+		return
+	field = models.CharField(blank=True, default="", max_length=20)
+	field.set_attributes_from_name("status")
+	schema_editor.add_field(person_follow, field)
 
 
 class Migration(migrations.Migration):
@@ -45,9 +20,7 @@ class Migration(migrations.Migration):
 
 	operations = [
 		migrations.SeparateDatabaseAndState(
-			database_operations=[
-				migrations.RunSQL(APPLY_STATUS_SQL, reverse_sql=REVERSE_STATUS_SQL),
-			],
+			database_operations=[migrations.RunPython(forwards, migrations.RunPython.noop)],
 			state_operations=[
 				migrations.AddField(
 					model_name="personfollow",

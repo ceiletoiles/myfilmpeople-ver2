@@ -1,41 +1,16 @@
 from django.db import migrations, models
 
 
-ADD_STATUS_KEY_SQL = """
-SET @col_exists := (
-  SELECT COUNT(*)
-  FROM information_schema.COLUMNS
-  WHERE TABLE_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'catalog_companyfollow'
-    AND COLUMN_NAME = 'status_key'
-);
-SET @sql := IF(
-  @col_exists = 0,
-  'ALTER TABLE `catalog_companyfollow` ADD COLUMN `status_key` varchar(20) NOT NULL DEFAULT '''' AFTER `status`',
-  'SELECT 1'
-);
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-"""
-
-DROP_STATUS_KEY_SQL = """
-SET @col_exists := (
-  SELECT COUNT(*)
-  FROM information_schema.COLUMNS
-  WHERE TABLE_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'catalog_companyfollow'
-    AND COLUMN_NAME = 'status_key'
-);
-SET @sql := IF(
-  @col_exists = 1,
-  'ALTER TABLE `catalog_companyfollow` DROP COLUMN `status_key`',
-  'SELECT 1'
-);
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-"""
+def forwards(apps, schema_editor):
+	company_follow = apps.get_model("catalog", "CompanyFollow")
+	table_name = company_follow._meta.db_table
+	with schema_editor.connection.cursor() as cursor:
+		existing_columns = {column.name for column in schema_editor.connection.introspection.get_table_description(cursor, table_name)}
+	if "status_key" in existing_columns:
+		return
+	field = models.CharField(blank=True, default="", max_length=20)
+	field.set_attributes_from_name("status_key")
+	schema_editor.add_field(company_follow, field)
 
 
 class Migration(migrations.Migration):
@@ -45,9 +20,7 @@ class Migration(migrations.Migration):
 
 	operations = [
 		migrations.SeparateDatabaseAndState(
-			database_operations=[
-				migrations.RunSQL(ADD_STATUS_KEY_SQL, reverse_sql=DROP_STATUS_KEY_SQL),
-			],
+			database_operations=[migrations.RunPython(forwards, migrations.RunPython.noop)],
 			state_operations=[
 				migrations.AddField(
 					model_name="companyfollow",
