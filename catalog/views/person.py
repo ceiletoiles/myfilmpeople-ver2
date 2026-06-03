@@ -22,7 +22,7 @@ from ..new_movie_helpers import (
 	get_person_comeback_info,
 	record_new_movie_arrivals,
 )
-from ..services import get_or_sync_person
+from ..services import get_or_sync_person, get_person_status_label
 from ..tmdb import TMDbClient
 from ._shared import (
 	SESSION_KEY_HIDE_SELF_APPEARANCES,
@@ -84,6 +84,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	is_followed = follows_qs.exists()
 	follow_roles = sorted(set(follows_qs.values_list("role", flat=True))) if is_followed else []
 	follow_roles_set = set(follow_roles)
+	follow_role_statuses: list[dict[str, str]] = []
 	note_text = (
 		(follows_qs.order_by("-updated_at").values_list("notes", flat=True).first() or "")
 		if is_followed
@@ -200,6 +201,14 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		)
 
 	credits = person.tmdb_credits_raw or {}
+	if is_followed:
+		follow_role_statuses = [
+			{
+				"role": role,
+				"status": get_person_status_label(person, followed_role=role),
+			}
+			for role in follow_roles
+		]
 	comeback_info = None
 	active_info = None
 	if is_followed:
@@ -750,6 +759,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"person": person,
 			"is_followed": is_followed,
 			"follow_roles": follow_roles,
+			"follow_role_statuses": follow_role_statuses,
 			"role_options": role_options,
 			"role_options_remaining": role_options_remaining,
 			"shared_followed_people": shared_followed_people,

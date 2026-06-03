@@ -57,8 +57,8 @@
 {% if follow_roles %}
 
   <div class="person-follow-summary">
-    {% for r in follow_roles %}
-      <strong>{{ r }}</strong>{% if not forloop.last %}, {% endif %}
+    {% for item in follow_role_statuses %}
+      <strong>{{ item.role }}</strong>{% if item.status %} <span class="person-role-status muted">| {{ item.status|lower }}</span>{% endif %}{% if not forloop.last %}, {% endif %}
     {% endfor %}
   </div>
 

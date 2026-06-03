@@ -619,6 +619,29 @@ class RelatedLinksTests(TestCase):
 		self.assertIn("related_links", response.context)
 		self.assertTrue(any(link["label"] == "TMDb" for link in response.context["related_links"]))
 
+	@patch("catalog.views.person.get_person_status_label", return_value="Upcoming")
+	@patch("catalog.views.person.get_or_sync_person")
+	def test_person_detail_shows_status_beside_followed_role(self, mock_get_person, _mock_status_label) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="status-user", password="pw")
+		person = Person.objects.create(
+			tmdb_id=100,
+			name="Status Person",
+			profile_path="/profile.jpg",
+			tmdb_raw={"name": "Status Person"},
+			tmdb_credits_raw={"cast": []},
+			tmdb_last_sync_at=timezone.now(),
+		)
+		PersonFollow.objects.create(user=user, person=person, name=person.name, role="Actor")
+		mock_get_person.return_value = person
+
+		client = self.client
+		client.force_login(user)
+		response = client.get(reverse("person_detail", args=[person.tmdb_id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Actor | upcoming")
+
 	def test_build_person_related_links_includes_imdb_and_socials(self) -> None:
 		raw = {
 			"homepage": "https://example.com",
