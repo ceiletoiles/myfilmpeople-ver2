@@ -72,6 +72,10 @@ class PersonFollow(models.Model):
 	person = models.ForeignKey(Person, on_delete=models.CASCADE)
 	# Denormalized snapshot for easier querying without joins.
 	name = models.CharField(max_length=255, blank=True)
+	# Cached status label for display / filtering when annotated.
+	status = models.CharField(max_length=20, blank=True, default="")
+	# Cached status key for display / filtering when annotated.
+	status_key = models.CharField(max_length=20, blank=True, default="")
 	# Free-text role (e.g. "Director", "Actor", "Producer", "Writer").
 	role = models.CharField(max_length=100)
 	notes = models.TextField(blank=True)
@@ -96,6 +100,10 @@ class CompanyFollow(models.Model):
 	company = models.ForeignKey(Company, on_delete=models.CASCADE)
 	# Denormalized snapshot for easier querying without joins.
 	name = models.CharField(max_length=255, blank=True)
+	# Cached status label for display / filtering when annotated.
+	status = models.CharField(max_length=20, blank=True, default="")
+	# Cached status key for filtering / state tracking when annotated.
+	status_key = models.CharField(max_length=20, blank=True, default="")
 	notes = models.TextField(blank=True)
 
 	created_at = models.DateTimeField(auto_now_add=True)

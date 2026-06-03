@@ -45,9 +45,14 @@
             <a href="{% url 'company_detail' company.tmdb_raw.parent_company.id %}">{{ company.tmdb_raw.parent_company.name }}</a>
           </div>
         {% endif %}
-        {% if company.tmdb_raw.homepage %}
+        {% if company.tmdb_raw.homepage or company_status_label %}
           <div class="company-homepage">
-            <a href="{{ company.tmdb_raw.homepage }}" target="_blank" rel="noreferrer">Homepage</a>{% if company_status_label %} <span class="company-status muted">| {{ company_status_label|lower }}</span>{% endif %}
+            {% if company.tmdb_raw.homepage %}
+              <a href="{{ company.tmdb_raw.homepage }}" target="_blank" rel="noreferrer">Homepage</a>
+            {% endif %}
+            {% if company_status_label %}
+              {% if company.tmdb_raw.homepage %} <span class="company-status muted">| {{ company_status_label|lower }}</span>{% else %}<span class="company-status muted">{{ company_status_label|lower }}</span>{% endif %}
+            {% endif %}
           </div>
         {% endif %}
 

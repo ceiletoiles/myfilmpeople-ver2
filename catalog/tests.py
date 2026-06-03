@@ -746,6 +746,61 @@ class RelatedLinksTests(TestCase):
 			html=True,
 		)
 
+	@patch("catalog.views.company.get_or_sync_company")
+	def test_company_detail_shows_status_without_homepage(self, mock_get_company) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="company-no-homepage-user", password="pw")
+		company = Company.objects.create(
+			tmdb_id=89,
+			name="No Homepage Studio",
+			logo_path="/logo.png",
+			tmdb_raw={
+				"name": "No Homepage Studio",
+				"discover_movies_pages": {
+					"1": {
+						"results": [
+							{"id": 1, "title": "Future Project", "release_date": "2099-01-01"}
+						]
+					}
+				},
+				"tba_movies": [],
+				"tba_scan_meta": {"scan_page": 1, "discover_total_pages": 1},
+			},
+			tmdb_last_sync_at=timezone.now(),
+		)
+		CompanyFollow.objects.create(user=user, company=company, name=company.name)
+		mock_get_company.return_value = company
+
+		client = self.client
+		client.force_login(user)
+		response = client.get(reverse("company_detail", args=[company.tmdb_id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(
+			response,
+			'<div class="company-homepage"><span class="company-status muted">upcoming</span></div>',
+			html=True,
+		)
+
+	@patch("catalog.views.company.TMDbClient.from_settings")
+	def test_company_detail_does_not_expose_status_for_non_followed_company(self, mock_from_settings) -> None:
+		client = mock_from_settings.return_value
+		client.get_company.return_value = {
+			"id": 90,
+			"name": "Public Studio",
+			"logo_path": "/logo.png",
+			"homepage": "https://public.example",
+		}
+		client.discover_movies_by_company.return_value = {"results": [], "total_pages": 1, "total_results": 0}
+
+		user = get_user_model().objects.create_user(username="public-company-user", password="pw")
+		self.client.force_login(user)
+
+		response = self.client.get(reverse("company_detail", args=[90]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.context["company_status_label"], "")
+
 	@patch("catalog.services.TMDbClient.from_settings")
 	def test_get_or_sync_person_caches_external_ids(self, mock_from_settings) -> None:
 		client = mock_from_settings.return_value

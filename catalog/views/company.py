@@ -418,15 +418,17 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		# No cached company data — perform a short live scan to detect TBA titles.
 		has_tba = _live_tba_scan(max_scan_int)
 
-	if isinstance(company.tmdb_raw, dict) and company.tmdb_raw.get("discover_movies_pages"):
-		company_status_label = _get_company_status_label(company=company, has_tba_hint=has_tba)
-	else:
-		fallback_results = filmography_items if filmography_items else None
-		company_status_label = _get_company_status_label(
-			company=company,
-			fallback_results=fallback_results,
-			has_tba_hint=has_tba,
-		)
+	company_status_label = ""
+	if is_followed:
+		if isinstance(company.tmdb_raw, dict) and company.tmdb_raw.get("discover_movies_pages"):
+			company_status_label = _get_company_status_label(company=company, has_tba_hint=has_tba)
+		else:
+			fallback_results = filmography_items if filmography_items else None
+			company_status_label = _get_company_status_label(
+				company=company,
+				fallback_results=fallback_results,
+				has_tba_hint=has_tba,
+			)
 
 	return render(
 		request,
