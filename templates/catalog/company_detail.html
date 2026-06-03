@@ -47,7 +47,7 @@
         {% endif %}
         {% if company.tmdb_raw.homepage %}
           <div class="company-homepage">
-            <a href="{{ company.tmdb_raw.homepage }}" target="_blank" rel="noreferrer">Homepage</a>
+            <a href="{{ company.tmdb_raw.homepage }}" target="_blank" rel="noreferrer">Homepage</a>{% if company_status_label %} <span class="company-status muted">| {{ company_status_label|lower }}</span>{% endif %}
           </div>
         {% endif %}
 

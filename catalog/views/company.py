@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from types import SimpleNamespace
 
 from django.contrib import messages
@@ -24,11 +25,48 @@ from ..services import (
 	get_or_sync_company_tba_movies_page,
 )
 from ..tmdb import TMDbClient, TMDbError
-from ._shared import _countdown_text, _parse_iso_date
+from ._shared import _add_years_safe, _countdown_text, _parse_iso_date
 
 
 @login_required
 def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
+	def _get_company_status_label(*, company, fallback_results: list[dict] | None = None, has_tba_hint: bool = False) -> str:
+		today = timezone.now().date()
+		ten_years_ago = _add_years_safe(today, -10)
+		tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+		payloads: list[dict] = []
+		pages = tmdb_raw.get("discover_movies_pages")
+		if isinstance(pages, dict):
+			payloads = [payload for payload in pages.values() if isinstance(payload, dict)]
+		elif fallback_results is not None:
+			payloads = [{"results": fallback_results}]
+
+		upcoming_with_date = 0
+		upcoming_no_date = 0
+		latest_past_release: date | None = None
+
+		for payload in payloads:
+			for movie in (payload.get("results") or []):
+				if not isinstance(movie, dict):
+					continue
+				release_date_str = (movie.get("release_date") or "").strip()
+				release_dt = _parse_iso_date(release_date_str)
+				if release_dt is not None and release_dt > today:
+					upcoming_with_date += 1
+				elif not release_date_str:
+					upcoming_no_date += 1
+				elif release_dt is not None and release_dt <= today:
+					if latest_past_release is None or release_dt > latest_past_release:
+						latest_past_release = release_dt
+
+		if upcoming_with_date > 0:
+			return "Upcoming"
+		if upcoming_no_date > 0 or has_tba_hint:
+			return "Announced"
+		if latest_past_release is not None and latest_past_release < ten_years_ago:
+			return "Inactive"
+		return "Idle"
+
 	def _safe_get_or_sync_company_filmography_page(company, page: int) -> dict:
 		try:
 			return get_or_sync_company_filmography_page(company, page=page)
@@ -380,6 +418,16 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		# No cached company data — perform a short live scan to detect TBA titles.
 		has_tba = _live_tba_scan(max_scan_int)
 
+	if isinstance(company.tmdb_raw, dict) and company.tmdb_raw.get("discover_movies_pages"):
+		company_status_label = _get_company_status_label(company=company, has_tba_hint=has_tba)
+	else:
+		fallback_results = filmography_items if filmography_items else None
+		company_status_label = _get_company_status_label(
+			company=company,
+			fallback_results=fallback_results,
+			has_tba_hint=has_tba,
+		)
+
 	return render(
 		request,
 		"catalog/company_detail.html",
@@ -397,6 +445,7 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"total_results": total_results,
 			"upcoming_total_pages": upcoming_total_pages,
 			"upcoming_total_pages_plus": upcoming_total_pages_plus,
+			"company_status_label": company_status_label,
 			"is_followed": is_followed,
 			"note_text": note_text,
 			"related_links": related_links,

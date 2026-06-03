@@ -640,7 +640,11 @@ class RelatedLinksTests(TestCase):
 		response = client.get(reverse("person_detail", args=[person.tmdb_id]))
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, "Actor | upcoming")
+		self.assertContains(
+			response,
+			'<strong>Actor</strong> <span class="person-role-status muted">| upcoming</span>',
+			html=True,
+		)
 
 	def test_build_person_related_links_includes_imdb_and_socials(self) -> None:
 		raw = {
@@ -704,6 +708,43 @@ class RelatedLinksTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertIn("alternative_names", response.context)
 		self.assertEqual(response.context["alternative_names"], ["Example Studios", "Example Motion Pictures"])
+
+	@patch("catalog.views.company.get_or_sync_company")
+	def test_company_detail_shows_status_beside_homepage(self, mock_get_company) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="company-status-user", password="pw")
+		company = Company.objects.create(
+			tmdb_id=88,
+			name="Status Studio",
+			logo_path="/logo.png",
+			tmdb_raw={
+				"name": "Status Studio",
+				"homepage": "https://status.example",
+				"discover_movies_pages": {
+					"1": {
+						"results": [
+							{"id": 1, "title": "Future Project", "release_date": "2099-01-01"}
+						]
+					}
+				},
+				"tba_movies": [],
+				"tba_scan_meta": {"scan_page": 1, "discover_total_pages": 1},
+			},
+			tmdb_last_sync_at=timezone.now(),
+		)
+		CompanyFollow.objects.create(user=user, company=company, name=company.name)
+		mock_get_company.return_value = company
+
+		client = self.client
+		client.force_login(user)
+		response = client.get(reverse("company_detail", args=[company.tmdb_id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(
+			response,
+			'<a href="https://status.example" target="_blank" rel="noreferrer">Homepage</a> <span class="company-status muted">| upcoming</span>',
+			html=True,
+		)
 
 	@patch("catalog.services.TMDbClient.from_settings")
 	def test_get_or_sync_person_caches_external_ids(self, mock_from_settings) -> None:
