@@ -4,7 +4,7 @@ MyFilmPeople is a server-rendered Django application that centers discovery arou
 
 This README is an expanded, practical guide covering features, architecture, development setup (Windows-focused), common workflows, and useful management commands.
 
-**Status:** actively maintained demo / small production-ready app (uses TMDb API and MySQL)
+**Status:** actively maintained demo / small production-ready app (uses TMDb API; local development defaults to MySQL, production can use any PostgreSQL URL such as Supabase)
 
 **Repository layout (high level)**
 - [config](config): Django project settings and URL routing
@@ -42,6 +42,7 @@ Tech stack & main dependencies
 - Python 3.11+ (test with the virtualenv in this repo)
 - Django 5.1.6
 - MySQL (utf8mb4) using PyMySQL driver
+- PostgreSQL in production via `DATABASE_URL` (Supabase, Neon, Render, etc.)
 - Requests for TMDb API calls
 - python-dotenv for loading a local `.env`
 - Optional Redis caching via `django-redis`
@@ -91,12 +92,15 @@ Environment variables (.env example)
 - DB_PASSWORD=password
 - DB_HOST=127.0.0.1
 - DB_PORT=3306
+- DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/postgres?sslmode=require
 - TMDB_API_KEY=your_tmdb_api_key
 - TMDB_API_READ_ACCESS_TOKEN=your_tmdb_read_token
 - TMDB_LANGUAGE=en-US
 - REDIS_URL=redis://127.0.0.1:6379/1
 - REDIS_KEY_PREFIX=myfilmpeople
 - MOVIE_STALE_DELETE_DAYS=5
+
+Note: this is a Django project, so there is no `main.py`. Put `DATABASE_URL` in your environment or `.env`, and Django reads it from [config/settings.py](config/settings.py).
 
 Key configuration notes
 - [config/settings.py](config/settings.py) reads `.env` via python-dotenv.
@@ -107,10 +111,21 @@ Database & caching behaviour
 - The app stores cached TMDb payloads for followed people and companies in JSON fields on the corresponding models. These cached payloads are refreshed during sync operations (manual or scheduled).
 - Redis is used as Django's cache backend when configured. The cache is treated as an optimization and the app is resilient to Redis failures (caching failures are ignored and treated as cache-misses).
 
+Migrating from Render PostgreSQL to Supabase
+1. Create a new Supabase project and copy the PostgreSQL connection string from the Supabase dashboard.
+2. Set the Supabase string as `DATABASE_URL` in your production environment. Keep `sslmode=require` in the URL.
+3. Back up the current Render database before switching.
+4. Restore that backup into Supabase, then run `python manage.py migrate --noinput` against the Supabase database.
+5. Smoke test login, home page, search, and a few detail pages before pointing your domain at the new deployment.
+
+For PostgreSQL backups/restores, see the scripts in `deploy/`.
+
 Common management commands (developer-focused)
 - `python manage.py migrate` — apply migrations
 - `python manage.py createsuperuser` — create admin user
 - `python manage.py test` — run tests
+- `deploy/backup_postgres.sh` — back up a PostgreSQL database with `pg_dump`
+- `deploy/restore_postgres.sh` — restore a PostgreSQL backup with `pg_restore`
 
 Management commands under `catalog/management/commands/` (examples):
 - `demo_new_arrivals_update` — demo tool: temporarily wipes a cached release_date for a person/company, forces a sync, then records a NewMovieArrival event for a user (useful to test notifications)
@@ -138,7 +153,7 @@ Testing and running automated checks
 Deployment notes
 - Production should run with `DEBUG=0` and a secure `SECRET_KEY`.
 - Use a suitable WSGI server (Gunicorn / Daphne for ASGI) behind a reverse proxy.
-- Configure a managed MySQL and (optionally) Redis instance. Ensure `ALLOWED_HOSTS` is set appropriately.
+- Configure a managed database and (optionally) Redis instance. Use `DATABASE_URL` for hosted PostgreSQL providers such as Supabase. Ensure `ALLOWED_HOSTS` is set appropriately.
 - Media/static: collect static files to `STATIC_ROOT` and serve media from `MEDIA_ROOT` via your webserver or object storage in production.
 
 Where to look in the codebase (quick pointers)
@@ -151,6 +166,7 @@ Where to look in the codebase (quick pointers)
 Troubleshooting
 - Django import errors: ensure virtualenv is active and packages from `requirements.txt` are installed
 - MySQL connection issues: validate `DB_HOST`/`DB_USER`/`DB_PASSWORD` and make sure the database uses `utf8mb4`
+- PostgreSQL connection issues: confirm `DATABASE_URL` is set, includes `sslmode=require`, and that the database user has permission to create tables and run migrations
 - TMDb 401/403: confirm `TMDB_API_KEY` and `TMDB_API_READ_ACCESS_TOKEN` values
 
 

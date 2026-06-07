@@ -2,7 +2,7 @@ Deployment checklist and commands
 
 1) Prepare environment
 - Ensure environment variables are set (use .env on staging only for convenience). See .env.example.
-- Ensure SECRET_KEY, ALLOWED_HOSTS, DB_*, REDIS_URL, TMDB_API_KEY are configured.
+- Ensure SECRET_KEY, ALLOWED_HOSTS, DATABASE_URL, REDIS_URL, TMDB_API_KEY are configured.
 
 2) Apply database migrations
 ```bash
@@ -23,13 +23,13 @@ python manage.py collectstatic --noinput
 - Run `curl --fail -I https://example.com/` to confirm 200/301
 - Check logs: `journalctl -u gunicorn -n 200 --no-pager` or container logs
 
-6) Backup DB before migration (MySQL example):
+6) Backup DB before migration (PostgreSQL example):
 ```bash
-mysqldump -u $DB_USER -p$DB_PASSWORD -h $DB_HOST $DB_NAME > /backups/myfilmpeople-$(date +%Y%m%d-%H%M).sql
+FILE=/backups/myfilmpeople-$(date +%Y%m%d-%H%M).dump ./backup_postgres.sh
 ```
 
 7) Rollback plan
-- Restore DB: `mysql -u $DB_USER -p$DB_PASSWORD -h $DB_HOST $DB_NAME < /backups/previous.sql`
+- Restore DB: `FILE=/backups/previous.dump ./restore_postgres.sh`
 - Re-deploy previous release (from Git tag or previous image)
 - If using migrations that are not reversible, have an export of important tables and manual remediation steps documented
 

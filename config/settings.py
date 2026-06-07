@@ -100,10 +100,10 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
-# Render supports PostgreSQL through DATABASE_URL environment variable
+# Hosted PostgreSQL deployments can be configured through DATABASE_URL.
 
 if os.getenv("DATABASE_URL"):
-    # Render deployment: use PostgreSQL via DATABASE_URL
+    # Production / hosted PostgreSQL: use DATABASE_URL.
     DATABASES = {
         "default": dj_database_url.config(
             default=os.getenv("DATABASE_URL"),
