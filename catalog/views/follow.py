@@ -225,7 +225,11 @@ def follow(request: HttpRequest) -> HttpResponse:
 			user=request.user,
 			person=person,
 			role=role,
-			defaults={"name": person.name or ""},
+			defaults={
+				"name": person.name or "",
+				"status": "",
+				"status_key": "",
+			},
 		)
 		if not created and (pf.name or "") != (person.name or ""):
 			pf.name = person.name or ""
@@ -324,7 +328,11 @@ def follow(request: HttpRequest) -> HttpResponse:
 		cf, created = CompanyFollow.objects.get_or_create(
 			user=request.user,
 			company=company,
-			defaults={"name": company.name or ""},
+			defaults={
+				"name": company.name or "",
+				"status": "",
+				"status_key": "",
+			},
 		)
 		if not created and (cf.name or "") != (company.name or ""):
 			cf.name = company.name or ""

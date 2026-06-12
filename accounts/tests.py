@@ -9,6 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from catalog.models import Company, CompanyFollow, FollowActivity, Person
+from catalog.models import PersonFollow
 from .models import EmailVerification
 
 from .views import _annotate_company_status
@@ -132,10 +133,12 @@ class ProfileActivityTests(TestCase):
 
 		response = self.client.post(reverse("follow"), {"entity_type": "person", "tmdb_id": person.tmdb_id, "role": "Actor"})
 		self.assertEqual(response.status_code, 302)
+		self.assertEqual(PersonFollow.objects.get(user=self.user, person=person, role="Actor").status_key, "")
 		response = self.client.post(reverse("person_unfollow", args=[person.tmdb_id]), {"role": "Actor"})
 		self.assertEqual(response.status_code, 302)
 		response = self.client.post(reverse("follow"), {"entity_type": "company", "tmdb_id": company.tmdb_id})
 		self.assertEqual(response.status_code, 302)
+		self.assertEqual(CompanyFollow.objects.get(user=self.user, company=company).status_key, "")
 		response = self.client.post(reverse("company_unfollow", args=[company.tmdb_id]))
 		self.assertEqual(response.status_code, 302)
 

@@ -13,6 +13,7 @@ from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
 from django.db import transaction
+from django.db.utils import OperationalError, ProgrammingError
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -78,7 +79,11 @@ def _send_signup_verification_email(user, otp_code: str) -> None:
 def _get_or_create_email_verification(user):
 	from .models import EmailVerification
 
-	ev, _ = EmailVerification.objects.get_or_create(user=user)
+	try:
+		ev, _ = EmailVerification.objects.get_or_create(user=user)
+	except (OperationalError, ProgrammingError):
+		logger.exception("EmailVerification storage is unavailable for user %s", getattr(user, "pk", None))
+		return None
 	return ev
 
 
@@ -204,9 +209,10 @@ def signup_verify(request: HttpRequest) -> HttpResponse:
 				user.is_active = True
 				user.save(update_fields=["is_active"])
 				ev = _get_or_create_email_verification(user)
-				ev.email_verified = True
-				ev.verified_via_signup = True
-				ev.save(update_fields=["email_verified", "verified_via_signup"])
+				if ev is not None:
+					ev.email_verified = True
+					ev.verified_via_signup = True
+					ev.save(update_fields=["email_verified", "verified_via_signup"])
 				_clear_pending_signup(request)
 				login(request, user)
 				messages.success(request, "Your email is verified.")
@@ -221,9 +227,10 @@ def signup_verify(request: HttpRequest) -> HttpResponse:
 			else:
 				# Mark existing user's email as verified and redirect to profile
 				ev = _get_or_create_email_verification(user)
-				ev.email_verified = True
-				ev.verified_via_signup = False
-				ev.save(update_fields=["email_verified", "verified_via_signup"])
+				if ev is not None:
+					ev.email_verified = True
+					ev.verified_via_signup = False
+					ev.save(update_fields=["email_verified", "verified_via_signup"])
 				_clear_pending_signup(request)
 				return redirect("user_profile")
 		form.add_error("otp_code", "That code is not valid.")
@@ -539,8 +546,9 @@ def profile(request: HttpRequest) -> HttpResponse:
 	if target_user and request.user.is_authenticated and target_user.pk == request.user.pk:
 		try:
 			ev = _get_or_create_email_verification(target_user)
-			context["email_verified"] = bool(ev.email_verified)
-			context["show_email_verification_link"] = not ev.email_verified and not ev.verified_via_signup
+			if ev is not None:
+				context["email_verified"] = bool(ev.email_verified)
+				context["show_email_verification_link"] = not ev.email_verified and not ev.verified_via_signup
 		except Exception:
 			context["email_verified"] = False
 
