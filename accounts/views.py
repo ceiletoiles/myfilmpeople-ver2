@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+import json
 from datetime import date, timedelta
 from urllib.parse import urlencode
 
@@ -19,6 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
+import requests
 
 from catalog.models import CompanyFollow, FollowActivity, PersonFollow
 from catalog.services import (
@@ -73,6 +75,33 @@ def _send_signup_verification_email(user, otp_code: str) -> None:
 		f"It expires in {SIGNUP_OTP_EXPIRY_MINUTES} minutes.\n\n"
 		"If you did not request this account, you can ignore this email."
 	)
+	brevo_api_key = (getattr(settings, "BREVO_API_KEY", "") or "").strip()
+	if brevo_api_key:
+		sender_email = settings.DEFAULT_FROM_EMAIL
+		sender_name = sender_email
+		if "<" in sender_email and ">" in sender_email:
+			name_part, email_part = sender_email.split("<", 1)
+			sender_name = name_part.strip() or email_part.rstrip(">").strip()
+			sender_email = email_part.rstrip(">").strip()
+		payload = {
+			"sender": {"name": sender_name, "email": sender_email},
+			"to": [{"email": user.email, "name": user.username}],
+			"subject": subject,
+			"textContent": message,
+		}
+		response = requests.post(
+			"https://api.brevo.com/v3/smtp/email",
+			headers={
+				"accept": "application/json",
+				"content-type": "application/json",
+				"api-key": brevo_api_key,
+			},
+			data=json.dumps(payload),
+			timeout=getattr(settings, "EMAIL_TIMEOUT", 10),
+		)
+		response.raise_for_status()
+		return
+
 	send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=False)
 
 
@@ -132,13 +161,22 @@ def signup(request: HttpRequest) -> HttpResponse:
 			try:
 				with transaction.atomic():
 					user.save()
-					_send_signup_verification_email(user, otp_code)
 			except Exception:
-				logger.exception("Failed to send signup verification email for %s", form.cleaned_data.get("email"))
-				messages.error(request, "We could not send a verification code right now. Please try again.")
+				logger.exception("Failed to create signup user for %s", form.cleaned_data.get("email"))
+				messages.error(request, "We could not create your account right now. Please try again.")
 			else:
 				_store_pending_signup(request, user.id, next_url, otp_code, purpose="new_account")
-				messages.success(request, "We sent a verification code to your email.")
+				try:
+					_send_signup_verification_email(user, otp_code)
+				except Exception:
+					logger.exception("Failed to send signup verification email for %s", form.cleaned_data.get("email"))
+					messages.error(
+						request,
+						"We created your account, but could not send a verification code right now. "
+						"Please use resend from the verification page.",
+					)
+				else:
+					messages.success(request, "We sent a verification code to your email.")
 				return redirect("signup_verify")
 	else:
 		form = SignupForm()

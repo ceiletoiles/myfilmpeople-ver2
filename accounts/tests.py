@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.core import mail
 from django.contrib.auth import get_user_model
@@ -157,6 +157,49 @@ class ProfileActivityTests(TestCase):
 
 
 class SignupVerificationTests(TestCase):
+	@patch("accounts.views.requests.post")
+	def test_signup_uses_brevo_api_when_available(self, mock_post) -> None:
+		mock_response = Mock()
+		mock_response.raise_for_status.return_value = None
+		mock_post.return_value = mock_response
+
+		with self.settings(BREVO_API_KEY="brevo-test-key"):
+			response = self.client.post(
+				reverse("signup"),
+				{
+					"username": "brevousr",
+					"email": "brevousr@example.com",
+					"password1": "pass12345!",
+					"password2": "pass12345!",
+				},
+			)
+
+		self.assertRedirects(response, reverse("signup_verify"))
+		mock_post.assert_called_once()
+		args, kwargs = mock_post.call_args
+		self.assertEqual(args[0], "https://api.brevo.com/v3/smtp/email")
+		self.assertEqual(kwargs["headers"]["api-key"], "brevo-test-key")
+		self.assertEqual(kwargs["timeout"], 10)
+
+	@patch("accounts.views._send_signup_verification_email", side_effect=TimeoutError("smtp timeout"))
+	def test_signup_creates_user_even_if_email_send_fails(self, _mock_send_email) -> None:
+		response = self.client.post(
+			reverse("signup"),
+			{
+				"username": "timeoutuser",
+				"email": "timeoutuser@example.com",
+				"password1": "pass12345!",
+				"password2": "pass12345!",
+			},
+		)
+
+		self.assertRedirects(response, reverse("signup_verify"))
+		User = get_user_model()
+		user = User.objects.get(username="timeoutuser")
+		self.assertFalse(user.is_active)
+		self.assertEqual(len(mail.outbox), 0)
+		self.assertTrue(self.client.session.get("pending_signup_verification"))
+
 	def test_signup_sends_verification_code_and_activates_after_submit(self) -> None:
 		response = self.client.post(
 			reverse("signup"),
