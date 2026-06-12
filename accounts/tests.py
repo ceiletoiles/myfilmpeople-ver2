@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import json
 import re
+from datetime import timedelta
+from urllib.parse import parse_qs, urlparse
 from unittest.mock import Mock, patch
 
-from django.core import mail
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from catalog.models import Company, CompanyFollow, FollowActivity, Person
 from catalog.models import PersonFollow
-from .models import EmailVerification
+from .models import EmailVerification, PasswordResetRequestLog, PasswordResetToken
 
 from .views import _annotate_company_status
 
@@ -157,7 +160,7 @@ class ProfileActivityTests(TestCase):
 
 
 class SignupVerificationTests(TestCase):
-	@patch("accounts.views.requests.post")
+	@patch("accounts.email_services.requests.post")
 	def test_signup_uses_brevo_api_when_available(self, mock_post) -> None:
 		mock_response = Mock()
 		mock_response.raise_for_status.return_value = None
@@ -181,43 +184,48 @@ class SignupVerificationTests(TestCase):
 		self.assertEqual(kwargs["headers"]["api-key"], "brevo-test-key")
 		self.assertEqual(kwargs["timeout"], 10)
 
-	@patch("accounts.views._send_signup_verification_email", side_effect=TimeoutError("smtp timeout"))
-	def test_signup_creates_user_even_if_email_send_fails(self, _mock_send_email) -> None:
-		response = self.client.post(
-			reverse("signup"),
-			{
-				"username": "timeoutuser",
-				"email": "timeoutuser@example.com",
-				"password1": "pass12345!",
-				"password2": "pass12345!",
-			},
-		)
+	@patch("accounts.email_services.requests.post", side_effect=TimeoutError("smtp timeout"))
+	def test_signup_creates_user_even_if_email_send_fails(self, _mock_post) -> None:
+		with self.settings(BREVO_API_KEY="brevo-test-key"):
+			response = self.client.post(
+				reverse("signup"),
+				{
+					"username": "timeoutuser",
+					"email": "timeoutuser@example.com",
+					"password1": "pass12345!",
+					"password2": "pass12345!",
+				},
+			)
 
 		self.assertRedirects(response, reverse("signup_verify"))
 		User = get_user_model()
 		user = User.objects.get(username="timeoutuser")
 		self.assertFalse(user.is_active)
-		self.assertEqual(len(mail.outbox), 0)
 		self.assertTrue(self.client.session.get("pending_signup_verification"))
 
-	def test_signup_sends_verification_code_and_activates_after_submit(self) -> None:
-		response = self.client.post(
-			reverse("signup"),
-			{
-				"username": "newuser",
-				"email": "newuser@example.com",
-				"password1": "pass12345!",
-				"password2": "pass12345!",
-			},
-		)
+	@patch("accounts.email_services.requests.post")
+	def test_signup_sends_verification_code_and_activates_after_submit(self, mock_post) -> None:
+		mock_response = Mock()
+		mock_response.raise_for_status.return_value = None
+		mock_post.return_value = mock_response
+
+		with self.settings(BREVO_API_KEY="brevo-test-key"):
+			response = self.client.post(
+				reverse("signup"),
+				{
+					"username": "newuser",
+					"email": "newuser@example.com",
+					"password1": "pass12345!",
+					"password2": "pass12345!",
+				},
+			)
 
 		self.assertRedirects(response, reverse("signup_verify"))
 		User = get_user_model()
 		user = User.objects.get(username="newuser")
 		self.assertFalse(user.is_active)
-		self.assertEqual(len(mail.outbox), 1)
-
-		match = re.search(r"(\d{6})", mail.outbox[0].body)
+		payload = json.loads(mock_post.call_args.kwargs["data"])
+		match = re.search(r"(\d{6})", payload["textContent"])
 		self.assertIsNotNone(match)
 		otp_code = match.group(1)
 
@@ -256,7 +264,64 @@ class SignupVerificationTests(TestCase):
 		EmailVerification.objects.create(user=user, email_verified=False, verified_via_signup=False)
 		self.client.force_login(user)
 
-		response = self.client.get(reverse("trigger_email_verification"))
+		mock_response = Mock()
+		mock_response.raise_for_status.return_value = None
+		with self.settings(BREVO_API_KEY="brevo-test-key"), patch("accounts.email_services.requests.post", return_value=mock_response) as mock_post:
+			response = self.client.get(reverse("trigger_email_verification"))
 
 		self.assertRedirects(response, reverse("signup_verify"))
-		self.assertEqual(len(mail.outbox), 1)
+		mock_post.assert_called_once()
+
+
+class PasswordResetTests(TestCase):
+	@patch("accounts.email_services.requests.post")
+	def test_password_reset_request_sends_brevo_email_and_stores_hashed_token(self, mock_post) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="reset-user", email="reset@example.com", password="pass12345!")
+		mock_response = Mock()
+		mock_response.raise_for_status.return_value = None
+		mock_post.return_value = mock_response
+
+		with self.settings(BREVO_API_KEY="brevo-test-key"):
+			response = self.client.post(reverse("password_reset_request"), {"email": "reset@example.com"})
+
+		self.assertRedirects(response, reverse("password_reset_request"))
+		self.assertEqual(PasswordResetRequestLog.objects.filter(action="request", user=user, success=True).count(), 1)
+		token = PasswordResetToken.objects.get(user=user)
+		self.assertEqual(len(token.token_hash), 64)
+		payload = json.loads(mock_post.call_args.kwargs["data"])
+		reset_url = re.search(r'href="([^"]+)"', payload["htmlContent"]).group(1)
+		token_from_email = parse_qs(urlparse(reset_url).query)["token"][0]
+		self.assertNotEqual(token.token_hash, token_from_email)
+
+		second_token = PasswordResetToken.objects.create(
+			user=user,
+			token_hash="b" * 64,
+			expires_at=timezone.now() + timedelta(minutes=15),
+		)
+
+		response = self.client.get(reverse("password_reset_confirm"), {"token": token_from_email})
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Reset password")
+
+		reset_response = self.client.post(
+			reverse("password_reset_confirm"),
+			{
+				"token": token_from_email,
+				"new_password1": "Newpass123!x",
+				"new_password2": "Newpass123!x",
+			},
+		)
+		self.assertRedirects(reset_response, reverse("login"))
+		user.refresh_from_db()
+		self.assertTrue(user.check_password("Newpass123!x"))
+		token.refresh_from_db()
+		self.assertIsNotNone(token.used_at)
+		second_token.refresh_from_db()
+		self.assertIsNotNone(second_token.used_at)
+
+	def test_password_reset_request_is_generic_for_missing_email(self) -> None:
+		response = self.client.post(reverse("password_reset_request"), {"email": "missing@example.com"})
+
+		self.assertRedirects(response, reverse("password_reset_request"))
+		self.assertEqual(PasswordResetRequestLog.objects.filter(action="request", success=False).count(), 1)

@@ -21,6 +21,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import include, path
 
 from accounts import views as accounts_views
+from accounts import password_reset_views as password_reset_views
 from catalog import views as catalog_views
 
 urlpatterns = [
@@ -36,6 +37,8 @@ urlpatterns = [
     path("signup/verify/", accounts_views.signup_verify, name="signup_verify"),
     path("me/verify_email/", accounts_views.trigger_email_verification, name="trigger_email_verification"),
     path("me/", accounts_views.profile, name="user_profile"),
+    path("forgot-password/", password_reset_views.password_reset_request, name="password_reset_request"),
+    path("reset-password/", password_reset_views.password_reset_confirm, name="password_reset_confirm"),
     path("accounts/follow_status/", accounts_views.follow_status, name="follow_status"),
     path("accounts/badge_seen/", accounts_views.mark_badge_seen, name="mark_badge_seen"),
     path(

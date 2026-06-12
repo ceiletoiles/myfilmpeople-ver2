@@ -23,6 +23,18 @@ services:
         sync: false
       - key: EMAIL_TIMEOUT
         value: "10"
+      - key: PASSWORD_RESET_TOKEN_EXPIRY_MINUTES
+        value: "15"
+      - key: PASSWORD_RESET_REQUEST_LIMIT_PER_EMAIL
+        value: "3"
+      - key: PASSWORD_RESET_REQUEST_LIMIT_PER_IP
+        value: "10"
+      - key: PASSWORD_RESET_VERIFY_LIMIT_PER_IP
+        value: "20"
+      - key: PASSWORD_RESET_VERIFY_LIMIT_PER_TOKEN
+        value: "5"
+      - key: PASSWORD_RESET_LOOKBACK_MINUTES
+        value: "15"
       - key: REDIS_URL
         fromService:
           type: redis

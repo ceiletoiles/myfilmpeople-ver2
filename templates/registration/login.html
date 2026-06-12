@@ -46,6 +46,11 @@
           No account?
           <a class="auth-link" href="{% url 'signup' %}{% if request.GET.next %}?next={{ request.GET.next|urlencode }}{% endif %}">Sign up</a>
         </p>
+
+        <p class="auth-switch muted">
+          Forgot your password?
+          <a class="auth-link" href="{% url 'password_reset_request' %}">Reset it</a>
+        </p>
       </div>
     </div>
   </section>

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import secrets
-import json
 from datetime import date, timedelta
 from urllib.parse import urlencode
 
@@ -12,7 +11,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth import login
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.decorators import login_required
-from django.core.mail import send_mail
 from django.db import transaction
 from django.db.utils import OperationalError, ProgrammingError
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -20,7 +18,6 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
-import requests
 
 from catalog.models import CompanyFollow, FollowActivity, PersonFollow
 from catalog.services import (
@@ -29,6 +26,7 @@ from catalog.services import (
 	get_person_status_label,
 )
 from catalog.views._shared import _parse_iso_date, _add_years_safe
+from .email_services import send_email_via_brevo
 from .forms import SignupForm, SignupVerificationForm
 from .models import BadgeNotification
 
@@ -75,34 +73,13 @@ def _send_signup_verification_email(user, otp_code: str) -> None:
 		f"It expires in {SIGNUP_OTP_EXPIRY_MINUTES} minutes.\n\n"
 		"If you did not request this account, you can ignore this email."
 	)
-	brevo_api_key = (getattr(settings, "BREVO_API_KEY", "") or "").strip()
-	if brevo_api_key:
-		sender_email = settings.DEFAULT_FROM_EMAIL
-		sender_name = sender_email
-		if "<" in sender_email and ">" in sender_email:
-			name_part, email_part = sender_email.split("<", 1)
-			sender_name = name_part.strip() or email_part.rstrip(">").strip()
-			sender_email = email_part.rstrip(">").strip()
-		payload = {
-			"sender": {"name": sender_name, "email": sender_email},
-			"to": [{"email": user.email, "name": user.username}],
-			"subject": subject,
-			"textContent": message,
-		}
-		response = requests.post(
-			"https://api.brevo.com/v3/smtp/email",
-			headers={
-				"accept": "application/json",
-				"content-type": "application/json",
-				"api-key": brevo_api_key,
-			},
-			data=json.dumps(payload),
-			timeout=getattr(settings, "EMAIL_TIMEOUT", 10),
-		)
-		response.raise_for_status()
-		return
-
-	send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=False)
+	send_email_via_brevo(
+		subject=subject,
+		text_content=message,
+		to_email=user.email,
+		to_name=user.username,
+		allow_smtp_fallback=True,
+	)
 
 
 def _get_or_create_email_verification(user):
