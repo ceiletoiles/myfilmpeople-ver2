@@ -93,6 +93,12 @@ Environment variables (.env example)
 - DB_HOST=127.0.0.1
 - DB_PORT=3306
 - DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/postgres?sslmode=require
+- DEFAULT_FROM_EMAIL=MyFilmPeople <no-reply@yourdomain.com>
+- EMAIL_HOST=smtp-relay.brevo.com
+- EMAIL_PORT=587
+- EMAIL_HOST_USER=your-brevo-smtp-user
+- EMAIL_HOST_PASSWORD=your-brevo-smtp-key
+- EMAIL_USE_TLS=1
 - TMDB_API_KEY=your_tmdb_api_key
 - TMDB_API_READ_ACCESS_TOKEN=your_tmdb_read_token
 - TMDB_LANGUAGE=en-US
@@ -105,6 +111,7 @@ Note: this is a Django project, so there is no `main.py`. Put `DATABASE_URL` in 
 Key configuration notes
 - [config/settings.py](config/settings.py) reads `.env` via python-dotenv.
 - TMDb caching TTL and person comeback/inactivity thresholds are configurable via environment variables `TMDB_CACHE_TTL_HOURS`, `TMDB_PERSON_COMEBACK_THRESHOLD_YEARS`, and `TMDB_PERSON_INACTIVE_THRESHOLD_YEARS`.
+- Signup email verification uses Django's SMTP backend; set the Brevo SMTP values above in production. In local development without those values, mail is written to the console.
 - Optional `CORS_PROXIES` environment variable provides fallback proxy prefixes for environments where direct TMDb requests may be blocked.
 
 Database & caching behaviour

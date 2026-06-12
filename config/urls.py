@@ -33,6 +33,8 @@ urlpatterns = [
     ),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("signup/", accounts_views.signup, name="signup"),
+    path("signup/verify/", accounts_views.signup_verify, name="signup_verify"),
+    path("me/verify_email/", accounts_views.trigger_email_verification, name="trigger_email_verification"),
     path("me/", accounts_views.profile, name="user_profile"),
     path("accounts/follow_status/", accounts_views.follow_status, name="follow_status"),
     path("accounts/badge_seen/", accounts_views.mark_badge_seen, name="mark_badge_seen"),

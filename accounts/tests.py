@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 from unittest.mock import patch
 
+from django.core import mail
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -148,3 +150,32 @@ class ProfileActivityTests(TestCase):
 		)
 		self.assertEqual(activities[0].summary, "Followed Logged Person as Actor")
 		self.assertEqual(activities[2].summary, "Followed Logged Studio")
+
+
+class SignupVerificationTests(TestCase):
+	def test_signup_sends_verification_code_and_activates_after_submit(self) -> None:
+		response = self.client.post(
+			reverse("signup"),
+			{
+				"username": "newuser",
+				"email": "newuser@example.com",
+				"password1": "pass12345!",
+				"password2": "pass12345!",
+			},
+		)
+
+		self.assertRedirects(response, reverse("signup_verify"))
+		User = get_user_model()
+		user = User.objects.get(username="newuser")
+		self.assertFalse(user.is_active)
+		self.assertEqual(len(mail.outbox), 1)
+
+		match = re.search(r"(\d{6})", mail.outbox[0].body)
+		self.assertIsNotNone(match)
+		otp_code = match.group(1)
+
+		verify_response = self.client.post(reverse("signup_verify"), {"otp_code": otp_code})
+		self.assertRedirects(verify_response, reverse("home"))
+		user.refresh_from_db()
+		self.assertTrue(user.is_active)
+		self.assertTrue(self.client.session.get("_auth_user_id"))

@@ -1,53 +1,231 @@
 from __future__ import annotations
 
+import logging
+import secrets
+from datetime import date, timedelta
+from urllib.parse import urlencode
+
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import login
 from django.contrib.auth import get_user_model
+from django.contrib.auth import login
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.decorators import login_required
+from django.core.mail import send_mail
+from django.db import transaction
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
-from urllib.parse import urlencode
 
 from catalog.models import CompanyFollow, FollowActivity, PersonFollow
-from .models import BadgeNotification
 from catalog.services import (
 	get_or_sync_company_tba_movies_page,
 	get_person_status_key,
 	get_person_status_label,
 )
-from django.utils import timezone
-from datetime import date
 from catalog.views._shared import _parse_iso_date, _add_years_safe
+from .forms import SignupForm, SignupVerificationForm
+from .models import BadgeNotification
 
-from .forms import SignupForm
+
+
+logger = logging.getLogger(__name__)
+PENDING_SIGNUP_SESSION_KEY = "pending_signup_verification"
+SIGNUP_OTP_LENGTH = 6
+SIGNUP_OTP_EXPIRY_MINUTES = 10
+
+
+def _generate_signup_otp() -> str:
+	return f"{secrets.randbelow(10 ** SIGNUP_OTP_LENGTH):0{SIGNUP_OTP_LENGTH}d}"
+
+
+def _get_pending_signup(request: HttpRequest) -> dict[str, object] | None:
+	payload = request.session.get(PENDING_SIGNUP_SESSION_KEY)
+	return payload if isinstance(payload, dict) else None
+
+
+
+def _store_pending_signup(request: HttpRequest, user_id: int, next_url: str | None, otp_code: str, purpose: str = "new_account") -> None:
+	# purpose: 'new_account' or 'verify_email'
+	request.session[PENDING_SIGNUP_SESSION_KEY] = {
+		"user_id": user_id,
+		"otp_hash": make_password(otp_code),
+		"expires_at": int((timezone.now() + timedelta(minutes=SIGNUP_OTP_EXPIRY_MINUTES)).timestamp()),
+		"next_url": next_url or "",
+		"purpose": purpose,
+	}
+	request.session.modified = True
+
+
+def _clear_pending_signup(request: HttpRequest) -> None:
+	request.session.pop(PENDING_SIGNUP_SESSION_KEY, None)
+	request.session.modified = True
+
+
+def _send_signup_verification_email(user, otp_code: str) -> None:
+	subject = "Verify your MyFilmPeople account"
+	message = (
+		f"Hi {user.username},\n\n"
+		f"Your MyFilmPeople verification code is {otp_code}.\n"
+		f"It expires in {SIGNUP_OTP_EXPIRY_MINUTES} minutes.\n\n"
+		"If you did not request this account, you can ignore this email."
+	)
+	send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=False)
+
+
+@login_required
+def trigger_email_verification(request: HttpRequest) -> HttpResponse:
+	"""Send a verification OTP for the logged-in user's email and redirect to the verification page."""
+	user = request.user
+	if not user.email:
+		messages.error(request, "You do not have an email address on file.")
+		return redirect("user_profile")
+	otp_code = _generate_signup_otp()
+	try:
+		_send_signup_verification_email(user, otp_code)
+	except Exception:
+		logger.exception("Failed to send verification email for user %s", user.pk)
+		messages.error(request, "Could not send verification email right now.")
+		return redirect("user_profile")
+
+	_store_pending_signup(request, user.id, None, otp_code, purpose="verify_email")
+	messages.success(request, "We sent a verification code to your email.")
+	return redirect("signup_verify")
 
 
 def signup(request: HttpRequest) -> HttpResponse:
 	if request.user.is_authenticated:
 		return redirect("home")
 
+	if request.method == "GET" and _get_pending_signup(request):
+		return redirect("signup_verify")
+
 	next_url = (request.POST.get("next") or request.GET.get("next") or "").strip() or None
+	if next_url and not url_has_allowed_host_and_scheme(
+		next_url,
+		allowed_hosts={request.get_host()},
+		require_https=request.is_secure(),
+	):
+		next_url = None
 
 	if request.method == "POST":
 		form = SignupForm(request.POST)
 		if form.is_valid():
-			user = form.save()
-			login(request, user)
-			messages.success(request, "Account created.")
-			if next_url and url_has_allowed_host_and_scheme(
-				next_url,
-				allowed_hosts={request.get_host()},
-				require_https=request.is_secure(),
-			):
-				return redirect(next_url)
-			return redirect(settings.LOGIN_REDIRECT_URL)
+			user = form.save(commit=False)
+			user.is_active = False
+			otp_code = _generate_signup_otp()
+			try:
+				with transaction.atomic():
+					user.save()
+					_send_signup_verification_email(user, otp_code)
+			except Exception:
+				logger.exception("Failed to send signup verification email for %s", form.cleaned_data.get("email"))
+				messages.error(request, "We could not send a verification code right now. Please try again.")
+			else:
+				_store_pending_signup(request, user.id, next_url, otp_code, purpose="new_account")
+				messages.success(request, "We sent a verification code to your email.")
+				return redirect("signup_verify")
 	else:
 		form = SignupForm()
 
 	return render(request, "accounts/signup.html", {"form": form, "next": next_url})
+
+
+def signup_verify(request: HttpRequest) -> HttpResponse:
+	pending = _get_pending_signup(request)
+	if not pending:
+		messages.info(request, "Create an account first so we can send you a verification code.")
+		return redirect("signup")
+
+	# If an authenticated user hits this endpoint, only allow them through
+	# when they're verifying their own existing account (purpose == 'verify_email').
+	if request.user.is_authenticated:
+		p_purpose = (pending.get("purpose") or "new_account").strip()
+		if p_purpose != "verify_email" or int(pending.get("user_id") or 0) != int(request.user.pk):
+			return redirect("home")
+
+	User = get_user_model()
+	purpose = (pending.get("purpose") or "new_account").strip()
+	if purpose == "new_account":
+		user = User.objects.filter(pk=pending.get("user_id"), is_active=False).first()
+		if user is None:
+			_clear_pending_signup(request)
+			messages.error(request, "Your verification session expired. Please sign up again.")
+			return redirect("signup")
+	else:
+		# verify_email flow: accept existing user account (may already be active)
+		user = User.objects.filter(pk=pending.get("user_id")).first()
+		if user is None:
+			_clear_pending_signup(request)
+			messages.error(request, "Your verification session expired. Please try again from your profile.")
+			return redirect("signup")
+
+	expires_at = int(pending.get("expires_at") or 0)
+	if expires_at and timezone.now().timestamp() > expires_at:
+		_clear_pending_signup(request)
+		if purpose == "new_account":
+			# For signup flows, remove the temporary user we created.
+			user.delete()
+			messages.error(request, "Your verification code expired. Please sign up again.")
+			return redirect("signup")
+		else:
+			# For existing-user verification, just ask them to resend from profile.
+			messages.error(request, "Your verification code expired. Please request a new one from your profile.")
+			return redirect("user_profile")
+	if request.method == "POST" and request.POST.get("action") == "resend":
+		otp_code = _generate_signup_otp()
+		try:
+			with transaction.atomic():
+				_send_signup_verification_email(user, otp_code)
+		except Exception:
+			logger.exception("Failed to resend signup verification email for user %s", user.pk)
+			messages.error(request, "We could not resend the verification code just now.")
+		else:
+			_store_pending_signup(request, user.id, pending.get("next_url") or None, otp_code, purpose=purpose)
+			messages.success(request, "We sent a new verification code.")
+		return redirect("signup_verify")
+
+	form = SignupVerificationForm(request.POST or None)
+	if request.method == "POST" and form.is_valid():
+		otp_code = form.cleaned_data["otp_code"]
+		if check_password(otp_code, str(pending.get("otp_hash") or "")):
+			# Handle both new-account activation and existing-user email verification.
+			if purpose == "new_account":
+				user.is_active = True
+				user.save(update_fields=["is_active"])
+				_clear_pending_signup(request)
+				login(request, user)
+				messages.success(request, "Your email is verified.")
+				next_url = (pending.get("next_url") or "").strip()
+				if next_url and url_has_allowed_host_and_scheme(
+					next_url,
+					allowed_hosts={request.get_host()},
+					require_https=request.is_secure(),
+				):
+					return redirect(next_url)
+				return redirect(settings.LOGIN_REDIRECT_URL)
+			else:
+				# Mark existing user's email as verified and redirect to profile
+				from .models import EmailVerification
+				ev, _ = EmailVerification.objects.get_or_create(user=user)
+				ev.email_verified = True
+				ev.save(update_fields=["email_verified"])
+				_clear_pending_signup(request)
+				messages.success(request, "Your email address is now verified.")
+				return redirect("user_profile")
+		form.add_error("otp_code", "That code is not valid.")
+
+	return render(
+		request,
+		"accounts/signup_verify.html",
+		{
+			"form": form,
+			"email": user.email,
+			"expires_minutes": SIGNUP_OTP_EXPIRY_MINUTES,
+		},
+	)
 
 
 def _role_category(role: str) -> str:
@@ -341,8 +519,18 @@ def profile(request: HttpRequest) -> HttpResponse:
 		"follow_badge": _get_follow_badge(follow_count),
 		"unseen_badge": unseen_badge,
 		"target_user": target_user,
+		"email_verified": False,
 		"can_view_email": True,
 	}
+
+	# Expose email verified flag for own-profile UI. Use get_or_create defensively.
+	if target_user and request.user.is_authenticated and target_user.pk == request.user.pk:
+		try:
+			from .models import EmailVerification
+			ev, _ = EmailVerification.objects.get_or_create(user=target_user)
+			context["email_verified"] = bool(ev.email_verified)
+		except Exception:
+			context["email_verified"] = False
 
 	if request.GET.get("partial") == "1":
 		return JsonResponse(

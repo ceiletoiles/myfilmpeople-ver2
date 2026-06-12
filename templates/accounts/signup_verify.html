@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block title %}Verify email - MyFilmPeople{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/auth.css" />
+{% endblock %}
+
+{% block content %}
+  <section class="auth-shell auth-shell-signup">
+    <div class="auth-hero">
+      <p class="auth-eyebrow">Check your inbox</p>
+      <h1>Enter the verification code we sent to your email.</h1>
+      <p class="auth-copy">
+        We sent a 6-digit code to {{ email }}. Enter it below to activate your account and finish signup.
+      </p>
+
+      <div class="auth-feature-grid">
+        <div class="auth-feature">
+          <span class="auth-feature-kicker">Fast</span>
+          <p>The code expires in {{ expires_minutes }} minutes.</p>
+        </div>
+        <div class="auth-feature">
+          <span class="auth-feature-kicker">Secure</span>
+          <p>Your account stays inactive until you verify the email address.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="auth-panel">
+      <div class="auth-panel-card">
+        <h2>Verify email</h2>
+        <p class="muted">Type the code from the email we just sent.</p>
+
+        <form class="auth-form" method="post">
+          {% csrf_token %}
+          {{ form.as_p }}
+          <button type="submit">Verify code</button>
+        </form>
+
+        <form class="auth-form" method="post" style="margin-top: 1rem;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="resend" />
+          <button type="submit" class="secondary">Resend code</button>
+        </form>
+
+        <p class="auth-switch muted">
+          Need to start over?
+          <a class="auth-link" href="{% url 'signup' %}">Back to signup</a>
+        </p>
+      </div>
+    </div>
+  </section>
+{% endblock %}

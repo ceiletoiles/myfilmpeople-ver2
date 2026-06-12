@@ -6,7 +6,19 @@
       <div class="profile-summary-main">
           <p>@{{ target_user.username|default:user.username }}</p>
           {% if can_view_email %}
-            <p class="muted">{{ target_user.email|default:user.email|default:'-' }}</p>
+            <p class="muted">
+              {{ target_user.email|default:user.email|default:'-' }}
+              {% if target_user.pk == user.pk %}
+                {% if not email_verified %}
+                  <form method="post" action="{% url 'trigger_email_verification' %}" style="display:inline">
+                    {% csrf_token %}
+                    <button type="submit" class="auth-link">Verify</button>
+                  </form>
+                {% else %}
+                  <small class="muted">Verified</small>
+                {% endif %}
+              {% endif %}
+            </p>
           {% endif %}
           <p>Followed entities: {{ follow_count }}</p>
         </div>

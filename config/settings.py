@@ -185,6 +185,27 @@ LOGIN_URL = "home"
 LOGIN_REDIRECT_URL = "home"
 LOGOUT_REDIRECT_URL = "home"
 
+# Email delivery for signup OTPs.
+# Brevo works through Django's standard SMTP backend. In development we fall
+# back to console output unless explicit email credentials are configured.
+if any(arg == "test" for arg in sys.argv):
+    EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+elif os.getenv("EMAIL_HOST") or os.getenv("BREVO_SMTP_HOST"):
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+EMAIL_HOST = os.getenv("EMAIL_HOST", os.getenv("BREVO_SMTP_HOST", ""))
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", os.getenv("BREVO_SMTP_PORT", "587")))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", os.getenv("BREVO_SMTP_USER", ""))
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", os.getenv("BREVO_SMTP_PASSWORD", ""))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", os.getenv("BREVO_SMTP_USE_TLS", "1")) == "1"
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", os.getenv("BREVO_SMTP_USE_SSL", "0")) == "1"
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL",
+    os.getenv("BREVO_FROM_EMAIL", "MyFilmPeople <no-reply@myfilmpeople.local>"),
+)
+
 # TMDb
 TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")
 TMDB_API_READ_ACCESS_TOKEN = os.getenv("TMDB_API_READ_ACCESS_TOKEN", "")
