@@ -36,6 +36,10 @@ class EmailVerification(models.Model):
 	"""
 	user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="email_verification")
 	email_verified = models.BooleanField(default=False)
+	verified_via_signup = models.BooleanField(
+		default=False,
+		help_text="True when the account was created through the email-OTP signup flow.",
+	)
 
 	def __str__(self) -> str:  # pragma: no cover - convenience
 		return f"EmailVerification(user={self.user_id}, verified={self.email_verified})"

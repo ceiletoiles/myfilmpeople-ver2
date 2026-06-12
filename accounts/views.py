@@ -75,10 +75,18 @@ def _send_signup_verification_email(user, otp_code: str) -> None:
 	send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=False)
 
 
-@login_required
+def _get_or_create_email_verification(user):
+	from .models import EmailVerification
+
+	ev, _ = EmailVerification.objects.get_or_create(user=user)
+	return ev
+
+
 def trigger_email_verification(request: HttpRequest) -> HttpResponse:
 	"""Send a verification OTP for the logged-in user's email and redirect to the verification page."""
 	user = request.user
+	if not user.is_authenticated:
+		return redirect("login")
 	if not user.email:
 		messages.error(request, "You do not have an email address on file.")
 		return redirect("user_profile")
@@ -195,6 +203,10 @@ def signup_verify(request: HttpRequest) -> HttpResponse:
 			if purpose == "new_account":
 				user.is_active = True
 				user.save(update_fields=["is_active"])
+				ev = _get_or_create_email_verification(user)
+				ev.email_verified = True
+				ev.verified_via_signup = True
+				ev.save(update_fields=["email_verified", "verified_via_signup"])
 				_clear_pending_signup(request)
 				login(request, user)
 				messages.success(request, "Your email is verified.")
@@ -208,12 +220,11 @@ def signup_verify(request: HttpRequest) -> HttpResponse:
 				return redirect(settings.LOGIN_REDIRECT_URL)
 			else:
 				# Mark existing user's email as verified and redirect to profile
-				from .models import EmailVerification
-				ev, _ = EmailVerification.objects.get_or_create(user=user)
+				ev = _get_or_create_email_verification(user)
 				ev.email_verified = True
-				ev.save(update_fields=["email_verified"])
+				ev.verified_via_signup = False
+				ev.save(update_fields=["email_verified", "verified_via_signup"])
 				_clear_pending_signup(request)
-				messages.success(request, "Your email address is now verified.")
 				return redirect("user_profile")
 		form.add_error("otp_code", "That code is not valid.")
 
@@ -521,14 +532,15 @@ def profile(request: HttpRequest) -> HttpResponse:
 		"target_user": target_user,
 		"email_verified": False,
 		"can_view_email": True,
+		"show_email_verification_link": False,
 	}
 
 	# Expose email verified flag for own-profile UI. Use get_or_create defensively.
 	if target_user and request.user.is_authenticated and target_user.pk == request.user.pk:
 		try:
-			from .models import EmailVerification
-			ev, _ = EmailVerification.objects.get_or_create(user=target_user)
+			ev = _get_or_create_email_verification(target_user)
 			context["email_verified"] = bool(ev.email_verified)
+			context["show_email_verification_link"] = not ev.email_verified and not ev.verified_via_signup
 		except Exception:
 			context["email_verified"] = False
 

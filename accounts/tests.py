@@ -9,6 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from catalog.models import Company, CompanyFollow, FollowActivity, Person
+from .models import EmailVerification
 
 from .views import _annotate_company_status
 
@@ -179,3 +180,37 @@ class SignupVerificationTests(TestCase):
 		user.refresh_from_db()
 		self.assertTrue(user.is_active)
 		self.assertTrue(self.client.session.get("_auth_user_id"))
+
+	def test_profile_hides_verify_link_for_signup_verified_users(self) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="signup-user", email="signup@example.com", password="pass12345!")
+		EmailVerification.objects.create(user=user, email_verified=True, verified_via_signup=True)
+		self.client.force_login(user)
+
+		response = self.client.get(reverse("user_profile"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertNotContains(response, "Verify email")
+		self.assertNotContains(response, "Verified")
+
+	def test_profile_shows_verify_link_for_legacy_unverified_users(self) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="legacy-user", email="legacy@example.com", password="pass12345!")
+		EmailVerification.objects.create(user=user, email_verified=False, verified_via_signup=False)
+		self.client.force_login(user)
+
+		response = self.client.get(reverse("user_profile"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Verify email")
+
+	def test_profile_verify_link_triggers_email_verification_flow(self) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="legacy-user-2", email="legacy2@example.com", password="pass12345!")
+		EmailVerification.objects.create(user=user, email_verified=False, verified_via_signup=False)
+		self.client.force_login(user)
+
+		response = self.client.get(reverse("trigger_email_verification"))
+
+		self.assertRedirects(response, reverse("signup_verify"))
+		self.assertEqual(len(mail.outbox), 1)
