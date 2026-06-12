@@ -243,8 +243,10 @@ CACHES = {
     }
 }
 
-# Use Redis for session storage (survives deployments & restarts)
-SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+# Use the database-backed session store with cache acceleration.
+# This keeps critical auth flows working even if Redis is slow or temporarily
+# unavailable, while still benefiting from the configured cache when it is up.
+SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
 SESSION_CACHE_ALIAS = "default"
 
 
