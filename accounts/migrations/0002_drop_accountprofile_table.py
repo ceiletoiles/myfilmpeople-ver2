@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
         # defines that model.
         migrations.RunSQL(
             sql="""
-            DROP TABLE IF EXISTS "accounts_accountprofile";
+            DROP TABLE IF EXISTS accounts_accountprofile;
             """,
             reverse_sql=migrations.RunSQL.noop,
         ),
