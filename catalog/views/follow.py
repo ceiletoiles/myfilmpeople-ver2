@@ -320,7 +320,7 @@ def follow(request: HttpRequest) -> HttpResponse:
 			prefetch_company_filmography(
 				company,
 				force=True,
-				max_pages=None if max_pages_int <= 0 else max_pages_int,
+				max_pages=1 if max_pages_int <= 0 else max_pages_int,
 			)
 		except Exception:
 			# Non-fatal: following should still succeed even if TMDb is temporarily unavailable.
@@ -547,7 +547,7 @@ def company_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		fetched_pages = prefetch_company_filmography(
 			company,
 			force=True,
-			max_pages=None if max_pages_int <= 0 else max_pages_int,
+			max_pages=1 if max_pages_int <= 0 else max_pages_int,
 		)
 	except Exception:
 		pass
@@ -800,7 +800,7 @@ def sync_all_followed(request: HttpRequest) -> HttpResponse:
 				prefetch_company_filmography(
 					company,
 					force=True,
-					max_pages=None if max_pages_int <= 0 else max_pages_int,
+					max_pages=1 if max_pages_int <= 0 else max_pages_int,
 				)
 			except Exception:
 				pass

@@ -444,6 +444,14 @@ def get_or_sync_company_tba_movies_page(
     cached = tmdb_raw.get("tba_movies")
     cached_movies = [m for m in cached if isinstance(m, dict)] if isinstance(cached, list) else []
 
+    if cached_movies and not force:
+        start = (page - 1) * page_size
+        end = start + page_size
+        items = cached_movies[start:end]
+        has_prev = page > 1
+        has_next = len(cached_movies) > end
+        return items, has_prev, has_next
+
     if force or _is_stale(company.tmdb_last_sync_at):
         meta = {"sort_by": COMPANY_TBA_SORT_BY, "scan_page": 0, "discover_total_pages": None}
         tba_movies: list[dict[str, Any]] = []
@@ -810,7 +818,7 @@ def get_or_sync_company_movies_page(
 
     key = str(page)
     cached = pages.get(key)
-    if isinstance(cached, dict) and not force and not _is_stale(company.tmdb_last_sync_at):
+    if isinstance(cached, dict) and not force:
         return cached
 
     client = TMDbClient.from_settings()

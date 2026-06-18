@@ -736,7 +736,7 @@ def company_sync_start(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		max_pages_int = int(max_pages)
 	except (TypeError, ValueError):
 		max_pages_int = 0
-	max_company_pages = None if max_pages_int <= 0 else max_pages_int
+	max_company_pages = 1 if max_pages_int <= 0 else max_pages_int
 
 	thread = threading.Thread(
 		target=_run_company_sync_job,
@@ -894,7 +894,7 @@ def sync_all_followed_start(request: HttpRequest) -> HttpResponse:
 		max_pages_int = int(max_pages)
 	except (TypeError, ValueError):
 		max_pages_int = 0
-	max_company_pages = None if max_pages_int <= 0 else max_pages_int
+	max_company_pages = 1 if max_pages_int <= 0 else max_pages_int
 
 	thread = threading.Thread(
 		target=_run_sync_all_followed_job,

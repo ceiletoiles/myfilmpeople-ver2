@@ -2,17 +2,12 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
 
 from ..models import CompanyFollow, PersonFollow
-from ..services import (
-	get_or_sync_company,
-	prefetch_company_filmography,
-)
 from ._shared import _add_months_safe, _add_years_safe, _normalize_role, _parse_iso_date, _role_category
 
 
@@ -251,27 +246,12 @@ def recent(request: HttpRequest) -> HttpResponse:
 		role_items.sort(key=lambda r: r["release_dt"], reverse=True)  # Most recent first
 		recent_by_role[role] = role_items
 
-	# Studios recent (based on cached company filmography)
-	try:
-		max_pages = getattr(settings, "TMDB_COMPANY_FILMOGRAPHY_PREFETCH_MAX_PAGES", 0)
-		max_pages_int = int(max_pages)
-	except (TypeError, ValueError):
-		max_pages_int = 0
-
 	studio_summaries: list[dict] = []
 	studio_cards: list[dict] = []
 
 	for follow in company_follows:
-		company_id = follow.company.tmdb_id
-		company = get_or_sync_company(company_id)
-		try:
-			prefetch_company_filmography(
-				company,
-				max_pages=None if max_pages_int <= 0 else max_pages_int,
-			)
-		except Exception:  # noqa: BLE001
-			# Non-fatal: show whatever is cached already.
-			pass
+		company = follow.company
+		company_id = company.tmdb_id
 
 		tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
 		pages = tmdb_raw.get("discover_movies_pages")
