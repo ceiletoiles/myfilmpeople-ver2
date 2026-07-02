@@ -533,14 +533,6 @@ def extract_movie_release_dates_from_filmography(filmography: dict) -> dict[int,
 			if not isinstance(mid, int):
 				continue
 			rd = _norm_date_str(movie.get("release_date"))
-			if not rd:
-				year = movie.get("year")
-				if isinstance(year, int) and year > 0:
-					rd = f"{year:04d}-01-01"
-				elif isinstance(year, str):
-					year_s = year.strip()
-					if len(year_s) == 4 and year_s.isdigit():
-						rd = f"{int(year_s):04d}-01-01"
 			if rd or mid not in by_id:
 				by_id[mid] = rd
 	return by_id

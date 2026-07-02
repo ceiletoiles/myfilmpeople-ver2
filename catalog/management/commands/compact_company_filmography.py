@@ -9,7 +9,7 @@ from catalog.services import compact_company_filmography_pages
 
 
 class Command(BaseCommand):
-	help = "Compact stored company filmography pages to id/title/year only."
+	help = "Normalize stored company filmography pages to the current compact shape."
 
 	def add_arguments(self, parser) -> None:
 		parser.add_argument(
@@ -35,6 +35,26 @@ class Command(BaseCommand):
 				continue
 
 			compact_pages = compact_company_filmography_pages(pages)
+			# Legacy rows may only have `year`; promote that to a real release_date
+			# so the current views can read the current DB shape consistently.
+			for payload in compact_pages.values():
+				if not isinstance(payload, dict):
+					continue
+				results = payload.get("results") or []
+				if not isinstance(results, list):
+					continue
+				for item in results:
+					if not isinstance(item, dict):
+						continue
+					if str(item.get("release_date") or "").strip():
+						continue
+					year = item.get("year")
+					if isinstance(year, int) and year > 0:
+						item["release_date"] = f"{year:04d}-01-01"
+					elif isinstance(year, str):
+						year_s = year.strip()
+						if len(year_s) == 4 and year_s.isdigit():
+							item["release_date"] = f"{int(year_s):04d}-01-01"
 			if compact_pages == pages:
 				continue
 

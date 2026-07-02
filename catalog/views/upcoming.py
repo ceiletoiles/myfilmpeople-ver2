@@ -6,7 +6,6 @@ from django.shortcuts import render
 from django.utils import timezone
 
 from ..models import CompanyFollow, PersonFollow
-from ..services import hydrate_company_movie_results
 from ._shared import _countdown_text, _normalize_role, _parse_iso_date, _role_category
 
 
@@ -224,7 +223,7 @@ def upcoming(request: HttpRequest) -> HttpResponse:
 		for payload in pages.values():
 			if not isinstance(payload, dict):
 				continue
-			for m in hydrate_company_movie_results([movie for movie in (payload.get("results") or []) if isinstance(movie, dict)]):
+			for m in [movie for movie in (payload.get("results") or []) if isinstance(movie, dict)]:
 				if not isinstance(m, dict):
 					continue
 				mid = m.get("id")
@@ -234,8 +233,7 @@ def upcoming(request: HttpRequest) -> HttpResponse:
 					continue
 				seen_movie_ids.add(mid)
 
-				release_value = m.get("release_date") or m.get("year")
-				release_date_str = str(release_value or "").strip()
+				release_date_str = str(m.get("release_date") or "").strip()
 				release_dt = _parse_iso_date(release_date_str)
 				if release_dt is None or release_dt <= today:
 					continue

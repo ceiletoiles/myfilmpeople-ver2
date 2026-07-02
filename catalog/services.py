@@ -96,6 +96,12 @@ def compact_company_movie(movie: dict[str, Any]) -> dict[str, Any]:
     year = _company_movie_year(movie)
     if year is not None:
         compact["year"] = year
+    release_date = str(movie.get("release_date") or "").strip()
+    if release_date:
+        compact["release_date"] = release_date
+    poster_path = str(movie.get("poster_path") or "").strip()
+    if poster_path:
+        compact["poster_path"] = poster_path
     return compact
 
 

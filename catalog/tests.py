@@ -745,8 +745,46 @@ class RelatedLinksTests(TestCase):
 		self.assertIsInstance(pages, dict)
 		self.assertEqual(
 			pages["1"]["results"][0],
-			{"id": 1280115, "title": "Way of the Warrior Kid", "year": 2026},
+			{
+				"id": 1280115,
+				"title": "Way of the Warrior Kid",
+				"year": 2026,
+				"release_date": "2026-11-19",
+				"poster_path": "/poster.jpg",
+			},
 		)
+
+	def test_home_page_uses_cached_company_filmography_without_tmdb_hydration(self) -> None:
+		user = get_user_model().objects.create_user(username="home-company-user", password="pw")
+		self.client.force_login(user)
+		company = Company.objects.create(
+			tmdb_id=4123,
+			name="Cached Studio",
+			logo_path="",
+			tmdb_raw={
+				"discover_movies_pages": {
+					"1": {
+						"results": [
+							{
+								"id": 1,
+								"title": "Future Film",
+								"year": 2099,
+								"release_date": "2099-01-01",
+								"poster_path": "/poster.jpg",
+							}
+						],
+					}
+				},
+			},
+			tmdb_last_sync_at=timezone.now(),
+		)
+		CompanyFollow.objects.create(user=user, company=company, name=company.name)
+
+		with patch("catalog.tmdb.TMDbClient.from_settings", side_effect=AssertionError("TMDb should not be called")):
+			response = self.client.get(reverse("home"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Cached Studio")
 
 	@patch("catalog.views.company.get_or_sync_company")
 	def test_company_detail_shows_status_beside_homepage(self, mock_get_company) -> None:
@@ -908,7 +946,16 @@ class RelatedLinksTests(TestCase):
 		raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
 		pages = raw.get("discover_movies_pages") or {}
 
-		self.assertEqual(pages["1"]["results"][0], {"id": 123, "title": "Example Film", "year": 2026})
+		self.assertEqual(
+			pages["1"]["results"][0],
+			{
+				"id": 123,
+				"title": "Example Film",
+				"year": 2026,
+				"release_date": "2026-01-02",
+				"poster_path": "/poster.jpg",
+			},
+		)
 
 	def test_compact_person_credits_command_compacts_existing_rows(self) -> None:
 		person = Person.objects.create(

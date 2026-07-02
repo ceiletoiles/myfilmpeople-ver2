@@ -5,7 +5,6 @@ from django.shortcuts import render
 
 from ..models import CompanyFollow, PersonFollow
 from ..new_movie_helpers import get_person_comeback_info
-from ..services import hydrate_company_movie_results
 from django.utils import timezone
 from datetime import date
 from ._shared import _role_category, _parse_iso_date, _add_years_safe
@@ -49,11 +48,10 @@ def home(request: HttpRequest) -> HttpResponse:
 			for payload in (pages.values() or []):
 				if not isinstance(payload, dict):
 					continue
-				for m in hydrate_company_movie_results([movie for movie in (payload.get("results") or []) if isinstance(movie, dict)]):
+				for m in [movie for movie in (payload.get("results") or []) if isinstance(movie, dict)]:
 					if not isinstance(m, dict):
 						continue
-					release_value = m.get("release_date") or m.get("year")
-					release_date_str = str(release_value or "").strip()
+					release_date_str = str(m.get("release_date") or "").strip()
 					release_dt = _parse_iso_date(release_date_str)
 					if release_dt is not None and release_dt > today:
 						upcoming_with_date += 1
