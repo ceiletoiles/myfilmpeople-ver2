@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import secrets
-from datetime import date, timedelta
+from datetime import timedelta
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -21,10 +21,10 @@ from django.utils.http import url_has_allowed_host_and_scheme
 
 from catalog.models import CompanyFollow, FollowActivity, PersonFollow
 from catalog.services import (
-	get_person_status_key,
-	get_person_status_label,
+	get_company_status_snapshot,
+	get_person_deathday,
+	get_person_status_snapshot,
 )
-from catalog.views._shared import _parse_iso_date, _add_years_safe
 from .email_services import send_email_via_brevo
 from .forms import SignupForm, SignupVerificationForm
 from .models import BadgeNotification
@@ -363,8 +363,9 @@ def _get_follow_badge_for_min_count(min_count: int) -> dict[str, object] | None:
 
 def _annotate_status(follow) -> None:
 	try:
-		follow.status = get_person_status_label(follow.person, followed_role=follow.role)
-		follow.status_key = get_person_status_key(follow.person, followed_role=follow.role)
+		status, status_key = get_person_status_snapshot(follow.person, followed_role=follow.role)
+		follow.status = status
+		follow.status_key = status_key
 	except Exception:
 		follow.status = ""
 		follow.status_key = ""
@@ -375,53 +376,9 @@ def _annotate_company_status(follow) -> None:
 	Keys: upcoming, tba, inactive, idle
 	"""
 	try:
-		company = follow.company
-		today = timezone.now().date()
-		ten_years_ago = _add_years_safe(today, -10)
-		tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-		pages = tmdb_raw.get("discover_movies_pages") or {}
-
-		upcoming_with_date = 0
-		upcoming_no_date = 0
-		latest_past_release: date | None = None
-
-		for payload in (pages.values() or []):
-			if not isinstance(payload, dict):
-				continue
-			for m in (payload.get("results") or []):
-				if not isinstance(m, dict):
-					continue
-				release_date_str = (m.get("release_date") or "").strip()
-				release_dt = _parse_iso_date(release_date_str)
-				if release_dt is not None and release_dt > today:
-					upcoming_with_date += 1
-				elif not release_date_str:
-					upcoming_no_date += 1
-				elif release_dt is not None and release_dt <= today:
-					if latest_past_release is None or release_dt > latest_past_release:
-						latest_past_release = release_dt
-
-		if upcoming_with_date > 0:
-			follow.status_key = "upcoming"
-			follow.status = "Upcoming"
-		elif upcoming_no_date > 0:
-			follow.status_key = "announced"
-			follow.status = "Announced"
-		else:
-			cached_tba_movies = tmdb_raw.get("tba_movies")
-			has_cached_tba = isinstance(cached_tba_movies, list) and any(
-				isinstance(item, dict) for item in cached_tba_movies
-			)
-
-			if has_cached_tba:
-				follow.status_key = "announced"
-				follow.status = "Announced"
-			elif latest_past_release is not None and latest_past_release < ten_years_ago:
-				follow.status_key = "inactive"
-				follow.status = "Inactive"
-			else:
-				follow.status_key = "idle"
-				follow.status = "Idle"
+		status, status_key = get_company_status_snapshot(follow.company)
+		follow.status = status
+		follow.status_key = status_key
 	except Exception:
 		follow.status = ""
 		follow.status_key = ""
@@ -433,11 +390,13 @@ def profile(request: HttpRequest) -> HttpResponse:
 	selected_status = _normalize_status_key(request.GET.get("status"))
 	person_follows = (
 		PersonFollow.objects.select_related("person")
+		.defer("person__tmdb_credits_raw")
 		.filter(user=request.user)
 		.order_by("role", "person__name")
 	)
 	company_follows = (
 		CompanyFollow.objects.select_related("company")
+		.defer("company__tmdb_raw")
 		.filter(user=request.user)
 		.order_by("company__name")
 	)
@@ -448,6 +407,7 @@ def profile(request: HttpRequest) -> HttpResponse:
 	crew = [f for f in person_follows if _role_category(f.role) == "crew"]
 
 	for f in directors + actors + crew:
+		f.person_deathday = get_person_deathday(f.person)
 		_annotate_status(f)
 
 	# Annotate company follows with status
@@ -460,6 +420,7 @@ def profile(request: HttpRequest) -> HttpResponse:
 	# do not limit to 50 anymore — show everything unless pagination is requested.
 	activities_qs = (
 		FollowActivity.objects.select_related("person", "company")
+		.defer("person__tmdb_raw", "person__tmdb_credits_raw", "company__tmdb_raw")
 		.filter(user=request.user)
 		.order_by("-created_at", "-id")
 	)
@@ -584,11 +545,13 @@ def user_following(request: HttpRequest, username: str) -> HttpResponse:
 
 	person_follows = (
 		PersonFollow.objects.select_related("person")
+		.defer("person__tmdb_credits_raw")
 		.filter(user=target_user)
 		.order_by("role", "person__name")
 	)
 	company_follows = (
 		CompanyFollow.objects.select_related("company")
+		.defer("company__tmdb_raw")
 		.filter(user=target_user)
 		.order_by("company__name")
 	)
@@ -598,6 +561,7 @@ def user_following(request: HttpRequest, username: str) -> HttpResponse:
 	crew = [f for f in person_follows if _role_category(f.role) == "crew"]
 
 	for f in directors + actors + crew:
+		f.person_deathday = get_person_deathday(f.person)
 		_annotate_status(f)
 
 	# Annotate company follows with status
@@ -682,7 +646,7 @@ def follow_status(request: HttpRequest) -> JsonResponse:
 		except Exception:
 			# If the BadgeNotification table or model isn't available (e.g. migrations
 			# not yet applied), fall back to computing the badge from counts.
-				badge = _get_follow_badge(follow_count)
+			badge = _get_follow_badge(follow_count)
 		if badge is None:
 			badge = _get_follow_badge(follow_count)
 		result = {

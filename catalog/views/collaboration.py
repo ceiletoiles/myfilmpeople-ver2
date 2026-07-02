@@ -11,6 +11,7 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 
 from ..models import Person, PersonFollow
+from ..services import get_person_known_for_department
 from ..tmdb import TMDbClient
 from ._shared import _parse_iso_date
 
@@ -67,7 +68,7 @@ def _get_frequent_collaborators(
 	from itertools import combinations
 
 	# Get all followed people for this user
-	followed = PersonFollow.objects.filter(user_id=user_id).select_related("person")
+	followed = PersonFollow.objects.filter(user_id=user_id).select_related("person").defer("person__tmdb_raw")
 	followed_people = [pf.person for pf in followed]
 
 	if len(followed_people) < 2:
@@ -250,7 +251,7 @@ def _build_collaboration_results(
 				"tmdb_id": person_obj.tmdb_id,
 				"name": person_obj.name,
 				"profile_path": getattr(person_obj, "profile_path", "") or "",
-				"known_for_department": str((getattr(person_obj, "tmdb_raw", {}) or {}).get("known_for_department") or "").strip(),
+				"known_for_department": get_person_known_for_department(person_obj),
 				"followed": pid in followed_ids,
 			}
 		)

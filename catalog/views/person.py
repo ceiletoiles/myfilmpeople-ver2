@@ -23,7 +23,8 @@ from ..new_movie_helpers import (
 	record_new_movie_arrivals,
 )
 from ..services import get_or_sync_person, get_person_status_label
-from ..tmdb import TMDbClient
+from ..rate_limit import rate_limit
+from ..tmdb import TMDbClient, TMDbError
 from ._shared import (
 	SESSION_KEY_HIDE_SELF_APPEARANCES,
 	_countdown_text,
@@ -70,6 +71,7 @@ def _calculate_age(birthday: date | None, deathday: date | None = None) -> int |
 	return age if age >= 0 else None
 
 
+@rate_limit(limit=25, window_seconds=60, bucket_name="person_detail")
 @login_required
 def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	hide_self_appearances = _get_session_bool(
@@ -99,7 +101,11 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		old_credits = getattr(old_person, "tmdb_credits_raw", None) or {}
 		old_baseline_present = isinstance(old_credits.get("cast"), list) or isinstance(old_credits.get("crew"), list)
 
-		person = get_or_sync_person(tmdb_id)
+		try:
+			person = get_or_sync_person(tmdb_id)
+		except TMDbError:
+			messages.error(request, "TMDb data is temporarily unavailable. Please try again soon.")
+			return redirect("search")
 		person_raw = person.tmdb_raw if isinstance(person.tmdb_raw, dict) else {}
 		if not isinstance(person_raw.get("external_ids"), dict):
 			client = TMDbClient.from_settings()
@@ -184,8 +190,8 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				external_ids = client.get_person_external_ids(tmdb_id)
 			except Exception:
 				external_ids = {}
-		except Exception as exc:  # noqa: BLE001
-			messages.error(request, f"TMDb error: {exc}")
+		except Exception:  # noqa: BLE001
+			messages.error(request, "TMDb data is temporarily unavailable. Please try again soon.")
 			return redirect("search")
 		if isinstance(raw, dict):
 			raw = {**raw, "external_ids": external_ids}
@@ -795,7 +801,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			raw = client.get_person(tmdb_id)
 			credits = client.get_person_credits(tmdb_id)
 		except Exception as exc:  # noqa: BLE001
-			messages.error(request, f"TMDb error: {exc}")
+			messages.error(request, "TMDb data is temporarily unavailable. Please try again soon.")
 			return redirect("search")
 		person = SimpleNamespace(
 			tmdb_id=tmdb_id,
@@ -1185,6 +1191,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	)
 
 
+@rate_limit(limit=20, window_seconds=60, bucket_name="person_toggle_self_appearances")
 @login_required
 def person_toggle_self_appearances(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	if request.method != "POST":

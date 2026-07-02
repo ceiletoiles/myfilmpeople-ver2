@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from difflib import SequenceMatcher
 import hashlib
 import json
+import logging
 
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
@@ -14,10 +15,13 @@ from django.shortcuts import render
 from django.urls import reverse
 
 from ..models import CompanyFollow, PersonFollow
+from ..services import get_person_known_for_department
+from ..rate_limit import rate_limit
 from ..tmdb import TMDbClient
 
 
 MAX_SEARCH_RESULTS = 50
+logger = logging.getLogger(__name__)
 
 
 def _fuzzy_ratio(a: str, b: str) -> float:
@@ -335,6 +339,7 @@ def _movie_result_from_tmdb_raw(raw: dict[str, object]) -> dict:
 	}
 
 
+@rate_limit(limit=60, window_seconds=60, bucket_name="search_suggest")
 @login_required
 def search_suggest(request: HttpRequest) -> JsonResponse:
 	"""Lightweight JSON suggestions for the Search page.
@@ -411,6 +416,7 @@ def search_suggest(request: HttpRequest) -> JsonResponse:
 	return JsonResponse(payload)
 
 
+@rate_limit(limit=30, window_seconds=60, bucket_name="search_page")
 @login_required
 def search(request: HttpRequest) -> HttpResponse:
 	query = (request.GET.get("q") or "").strip()
@@ -522,6 +528,7 @@ def search(request: HttpRequest) -> HttpResponse:
 	for word in query_norm.split():
 		people_q &= Q(person__name__icontains=word)
 	follow_people_qs = PersonFollow.objects.select_related("person").filter(people_q).order_by("person__name", "role")
+	follow_people_qs = follow_people_qs.defer("person__tmdb_raw", "person__tmdb_credits_raw")
 	seen_people: set[int] = set()
 	for f in follow_people_qs:
 		person = getattr(f, "person", None)
@@ -529,8 +536,7 @@ def search(request: HttpRequest) -> HttpResponse:
 		if not person or pid <= 0 or pid in seen_people:
 			continue
 		seen_people.add(pid)
-		tmdb_raw = getattr(person, "tmdb_raw", {}) or {}
-		known_for_department = str((tmdb_raw.get("known_for_department") if isinstance(tmdb_raw, dict) else "") or "").strip()
+		known_for_department = get_person_known_for_department(person)
 		if not known_for_department:
 			known_for_department = str(getattr(f, "role", "") or "").strip()
 		following_people_results.append(
@@ -549,7 +555,7 @@ def search(request: HttpRequest) -> HttpResponse:
 	company_q = Q(user=request.user)
 	for word in query_norm.split():
 		company_q &= Q(company__name__icontains=word)
-	follow_company_qs = CompanyFollow.objects.select_related("company").filter(company_q).order_by("company__name")
+	follow_company_qs = CompanyFollow.objects.select_related("company").defer("company__tmdb_raw").filter(company_q).order_by("company__name")
 	seen_companies: set[int] = set()
 	for f in follow_company_qs:
 		company = getattr(f, "company", None)
@@ -557,7 +563,6 @@ def search(request: HttpRequest) -> HttpResponse:
 		if not company or cid <= 0 or cid in seen_companies:
 			continue
 		seen_companies.add(cid)
-		tmdb_raw = getattr(company, "tmdb_raw", {}) or {}
 		following_company_results.append(
 			{
 				"id": cid,

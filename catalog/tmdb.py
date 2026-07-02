@@ -19,6 +19,23 @@ class TMDbError(RuntimeError):
     pass
 
 
+def _redact_sensitive_text(value: object) -> str:
+	text = str(value or "")
+	if not text:
+		return ""
+	redacted = text
+	for token in ("api_key=", "access_token=", "Authorization: Bearer "):
+		if token in redacted:
+			parts = redacted.split(token, 1)
+			head = parts[0]
+			tail = parts[1]
+			if token.endswith("Bearer "):
+				redacted = head + token + "[REDACTED]" + tail.split(" ", 1)[-1]
+			else:
+				redacted = head + token + "[REDACTED]" + tail.split("&", 1)[-1]
+	return redacted
+
+
 @dataclass(frozen=True)
 class TMDbClient:
     api_key: str
@@ -144,10 +161,10 @@ class TMDbClient:
                         ) from exc
                     # Fall through to proxy attempts.
             if not (self.cors_proxies and should_try_proxies(resp.status_code)):
-                raise TMDbError(f"TMDb error {resp.status_code}: {resp.text}")
+                raise TMDbError(f"TMDb error {resp.status_code}: {_redact_sensitive_text(resp.text)}")
         except requests.RequestException as exc:
             if not self.cors_proxies:
-                raise TMDbError(f"TMDb request failed: {exc}") from exc
+                raise TMDbError(f"TMDb request failed: {_redact_sensitive_text(exc)}") from exc
 
         # 2) Fallback through proxies (works reliably only when using api_key, not bearer token)
         if not self.api_key and self.read_access_token:
@@ -164,7 +181,7 @@ class TMDbClient:
                 proxied_resp = requests.get(proxied_url, timeout=proxy_timeout_seconds)
                 if proxied_resp.status_code >= 400:
                     last_error = TMDbError(
-                        f"Proxy {proxy} returned {proxied_resp.status_code}: {proxied_resp.text}"
+                        f"Proxy {proxy} returned {proxied_resp.status_code}: {_redact_sensitive_text(proxied_resp.text)}"
                     )
                     continue
                 try:
@@ -182,7 +199,7 @@ class TMDbClient:
                 last_error = exc
                 continue
 
-        raise TMDbError(f"TMDb request failed via all proxies. Last error: {last_error}")
+        raise TMDbError("TMDb request failed via all proxies. Please check network/proxy configuration.")
 
     def cache_key_for(self, path: str, params: dict[str, Any] | None = None) -> str:
         """Compute the Django cache key for a given TMDb path and params.

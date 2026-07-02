@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import logging
 from urllib.parse import quote
 
 import requests
 
 from django.conf import settings
 from django.http import HttpRequest, JsonResponse
+
+from ..rate_limit import rate_limit
+
+
+logger = logging.getLogger(__name__)
 
 
 def _query_params_with_api_key(request: HttpRequest, *, api_key: str) -> dict[str, object]:
@@ -48,6 +54,7 @@ def _json_or_error_text(resp: requests.Response) -> tuple[object | None, str | N
 		return None, (resp.text or "")
 
 
+@rate_limit(limit=60, window_seconds=60, bucket_name="tmdb_proxy")
 def tmdb_proxy(request: HttpRequest, endpoint: str) -> JsonResponse:
 	"""Proxy TMDb API responses through Django.
 
@@ -154,7 +161,8 @@ def tmdb_proxy(request: HttpRequest, endpoint: str) -> JsonResponse:
 				continue
 			return JsonResponse(proxied_data, safe=isinstance(proxied_data, dict))
 		except requests.RequestException as exc:
-			last_error = str(exc)
+			last_error = "proxy request failed"
+			logger.warning("TMDb proxy request failed for %s: %s", endpoint, exc)
 			continue
 
 	return JsonResponse(

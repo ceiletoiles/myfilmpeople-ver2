@@ -308,6 +308,262 @@ def get_person_status_key(person: Person, *, followed_role: str | None = None) -
     return "announced" if label == "announced" else label
 
 
+def _cache_stamp(obj: object) -> str:
+    stamp = getattr(obj, "tmdb_last_sync_at", None) or getattr(obj, "updated_at", None)
+    if hasattr(stamp, "isoformat"):
+        try:
+            return stamp.isoformat()
+        except Exception:
+            return ""
+    return str(stamp or "")
+
+
+def _seed_person_summary_cache(person: Person) -> None:
+    try:
+        raw = person.tmdb_raw if isinstance(person.tmdb_raw, dict) else {}
+        credits = person.tmdb_credits_raw if isinstance(person.tmdb_credits_raw, dict) else {}
+        stamp = _cache_stamp(person)
+        cache.set(f"person:deathday:v1:{int(person.pk)}:{stamp}", str(raw.get("deathday") or "").strip(), 5 * 60)
+        cache.set(
+            f"person:dept:v1:{int(person.pk)}:{stamp}",
+            str(raw.get("known_for_department") or "").strip(),
+            5 * 60,
+        )
+        default_status = get_person_status_label(person)
+        role_statuses = {}
+        for role in ("Actor", "Director", "Crew"):
+            role_statuses[role.lower()] = {
+                "status": get_person_status_label(person, followed_role=role),
+                "status_key": get_person_status_key(person, followed_role=role),
+            }
+        cache.set(
+            f"person:summary:v1:{int(person.pk)}:{stamp}",
+            {
+                "default": {
+                    "status": default_status,
+                    "status_key": "announced" if default_status.strip().lower() == "announced" else default_status.strip().lower(),
+                },
+                "roles": role_statuses,
+            },
+            5 * 60,
+        )
+    except Exception:
+        pass
+
+
+def _seed_company_summary_cache(company: Company) -> None:
+    try:
+        raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+        stamp = _cache_stamp(company)
+        cache.set(f"company:homepage:v1:{int(company.pk)}:{stamp}", str(raw.get("homepage") or "").strip(), 5 * 60)
+        status, status_key = get_company_status_snapshot(company)
+        cache.set(
+            f"company:status:v2:{int(company.pk)}:{stamp}:0",
+            {"status": status, "status_key": status_key},
+            5 * 60,
+        )
+    except Exception:
+        pass
+
+
+def _load_person_tmdb_raw(person: Person) -> dict[str, Any]:
+    raw = person.__dict__.get("tmdb_raw")
+    if isinstance(raw, dict):
+        return raw
+    try:
+        raw = Person.objects.only("tmdb_raw").filter(pk=person.pk).values_list("tmdb_raw", flat=True).first()
+    except Exception:
+        raw = {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _load_person_tmdb_credits_raw(person: Person) -> dict[str, Any]:
+    credits = person.__dict__.get("tmdb_credits_raw")
+    if isinstance(credits, dict):
+        return credits
+    try:
+        credits = (
+            Person.objects.only("tmdb_credits_raw")
+            .filter(pk=person.pk)
+            .values_list("tmdb_credits_raw", flat=True)
+            .first()
+        )
+    except Exception:
+        credits = {}
+    return credits if isinstance(credits, dict) else {}
+
+
+def get_person_deathday(person: Person) -> str:
+    cache_key = f"person:deathday:v1:{int(person.pk)}:{_cache_stamp(person)}"
+    try:
+        cached = cache.get(cache_key)
+        if isinstance(cached, str):
+            return cached
+    except Exception:
+        pass
+    raw = _load_person_tmdb_raw(person)
+    deathday = str(raw.get("deathday") or "").strip()
+    try:
+        cache.set(cache_key, deathday, 5 * 60)
+    except Exception:
+        pass
+    return deathday
+
+
+def get_person_known_for_department(person: Person) -> str:
+    cache_key = f"person:dept:v1:{int(person.pk)}:{_cache_stamp(person)}"
+    try:
+        cached = cache.get(cache_key)
+        if isinstance(cached, str):
+            return cached
+    except Exception:
+        pass
+    raw = _load_person_tmdb_raw(person)
+    dept = str(raw.get("known_for_department") or "").strip()
+    try:
+        cache.set(cache_key, dept, 5 * 60)
+    except Exception:
+        pass
+    return dept
+
+
+def get_person_status_snapshot(person: Person, *, followed_role: str | None = None) -> tuple[str, str]:
+    cache_key = f"person:summary:v1:{int(person.pk)}:{_cache_stamp(person)}"
+    try:
+        cached = cache.get(cache_key)
+        if isinstance(cached, dict):
+            if followed_role:
+                role_cache = cached.get("roles")
+                if isinstance(role_cache, dict):
+                    role_value = role_cache.get((followed_role or "").strip().lower())
+                    if isinstance(role_value, dict):
+                        status = str(role_value.get("status") or "")
+                        status_key = str(role_value.get("status_key") or "")
+                        if status or status_key:
+                            return status, status_key
+            default_value = cached.get("default")
+            if isinstance(default_value, dict):
+                status = str(default_value.get("status") or "")
+                status_key = str(default_value.get("status_key") or "")
+            else:
+                status = ""
+                status_key = ""
+            if status or status_key:
+                return status, status_key
+    except Exception:
+        pass
+    raw = _load_person_tmdb_raw(person)
+    credits = _load_person_tmdb_credits_raw(person)
+    temp_person = person
+    if isinstance(raw, dict):
+        temp_person = Person(
+            tmdb_id=person.tmdb_id,
+            name=person.name,
+            profile_path=person.profile_path,
+            tmdb_raw=raw,
+            tmdb_credits_raw=credits,
+            tmdb_last_sync_at=person.tmdb_last_sync_at,
+        )
+    status = get_person_status_label(temp_person, followed_role=followed_role)
+    status_key = "announced" if status.strip().lower() == "announced" else status.strip().lower()
+    _seed_person_summary_cache(temp_person)
+    return status, status_key
+
+
+def _load_company_tmdb_raw(company: Company) -> dict[str, Any]:
+    raw = company.__dict__.get("tmdb_raw")
+    if isinstance(raw, dict):
+        return raw
+    try:
+        raw = Company.objects.only("tmdb_raw").filter(pk=company.pk).values_list("tmdb_raw", flat=True).first()
+    except Exception:
+        raw = {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def get_company_homepage(company: Company) -> str:
+    cache_key = f"company:homepage:v1:{int(company.pk)}:{_cache_stamp(company)}"
+    try:
+        cached = cache.get(cache_key)
+        if isinstance(cached, str):
+            return cached
+    except Exception:
+        pass
+    raw = _load_company_tmdb_raw(company)
+    homepage = str(raw.get("homepage") or "").strip()
+    try:
+        cache.set(cache_key, homepage, 5 * 60)
+    except Exception:
+        pass
+    return homepage
+
+
+def get_company_status_snapshot(company: Company, *, fallback_results: list[dict] | None = None, has_tba_hint: bool = False) -> tuple[str, str]:
+    cache_key = f"company:status:v3:{int(company.pk)}:{_cache_stamp(company)}:{int(bool(has_tba_hint))}"
+    try:
+        cached = cache.get(cache_key)
+        if isinstance(cached, dict):
+            status = str(cached.get("status") or "")
+            status_key = str(cached.get("status_key") or "")
+            if status or status_key:
+                return status, status_key
+    except Exception:
+        pass
+
+    today = timezone.now().date()
+    ten_years_ago = today - timedelta(days=365 * 10)
+    raw = _load_company_tmdb_raw(company)
+    payloads: list[dict[str, Any]] = []
+    pages = raw.get("discover_movies_pages")
+    if isinstance(pages, dict):
+        payloads = [payload for payload in pages.values() if isinstance(payload, dict)]
+    elif fallback_results is not None:
+        payloads = [{"results": fallback_results}]
+
+    upcoming_with_date = 0
+    upcoming_no_date = 0
+    latest_past_release: date | None = None
+    has_cached_tba_movies = False
+
+    tba_movies = raw.get("tba_movies")
+    if isinstance(tba_movies, list) and any(isinstance(movie, dict) for movie in tba_movies):
+        has_cached_tba_movies = True
+
+    for payload in payloads:
+        for movie in (payload.get("results") or []):
+            if not isinstance(movie, dict):
+                continue
+            release_date_str = str(movie.get("release_date") or "").strip()
+            release_dt = None
+            if len(release_date_str) == 10 and release_date_str[4] == "-":
+                try:
+                    release_dt = date.fromisoformat(release_date_str)
+                except ValueError:
+                    release_dt = None
+            if release_dt is not None and release_dt > today:
+                upcoming_with_date += 1
+            elif not release_date_str:
+                upcoming_no_date += 1
+            elif release_dt is not None and release_dt <= today:
+                if latest_past_release is None or release_dt > latest_past_release:
+                    latest_past_release = release_dt
+
+    if upcoming_with_date > 0:
+        result = ("Upcoming", "upcoming")
+    elif upcoming_no_date > 0 or has_tba_hint or has_cached_tba_movies:
+        result = ("Announced", "announced")
+    elif latest_past_release is not None and latest_past_release < ten_years_ago:
+        result = ("Inactive", "inactive")
+    else:
+        result = ("Idle", "idle")
+
+    try:
+        cache.set(cache_key, {"status": result[0], "status_key": result[1]}, 5 * 60)
+    except Exception:
+        pass
+    return result
+
+
 def extract_person_credited_roles(credits: dict) -> list[str]:
     roles: set[str] = set()
     cast_items = credits.get("cast", []) or []
@@ -412,6 +668,7 @@ def get_or_sync_company_filmography_page(
     company.tmdb_last_sync_at = timezone.now()
     company.tmdb_last_sync_source = "sync" if force else "ttl"
     company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
+    _seed_company_summary_cache(company)
     # Keep the short-lived cache consistent with DB writes.
     try:
         cache.set(f"db:company:v1:{int(company.tmdb_id)}", company, timeout=5 * 60)
@@ -692,6 +949,7 @@ def get_or_sync_company_tba_movies_page(
     company.tmdb_last_sync_at = timezone.now()
     company.tmdb_last_sync_source = "sync" if force else "ttl"
     company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
+    _seed_company_summary_cache(company)
 
     start = (page - 1) * page_size
     end = start + page_size
@@ -792,6 +1050,7 @@ def get_or_sync_person(tmdb_id: int, *, force: bool = False) -> Person:
             "tmdb_last_sync_source",
             "updated_at",
         ])
+        _seed_person_summary_cache(person)
         tmdb_raw = person.tmdb_raw if isinstance(person.tmdb_raw, dict) else {}
         has_credited_roles = isinstance(tmdb_raw.get("credited_roles"), list)
         has_external_ids = isinstance(tmdb_raw.get("external_ids"), dict)
@@ -844,6 +1103,7 @@ def get_or_sync_person_images(tmdb_id: int, *, force: bool = False) -> Person:
         person.tmdb_last_sync_at = timezone.now()
         person.tmdb_last_sync_source = "sync" if force else "ttl"
         person.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
+        _seed_person_summary_cache(person)
     return person
 
 
@@ -952,6 +1212,7 @@ def get_or_sync_company(tmdb_id: int, *, force: bool = False) -> Company:
             "tmdb_last_sync_source",
             "updated_at",
         ])
+        _seed_company_summary_cache(company)
     try:
         cache.set(cache_key, company, timeout=5 * 60)
     except Exception:
@@ -993,6 +1254,7 @@ def get_or_sync_company_movies_page(
     company.tmdb_last_sync_at = timezone.now()
     company.tmdb_last_sync_source = "sync" if force else "ttl"
     company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
+    _seed_company_summary_cache(company)
     return payload
 
 

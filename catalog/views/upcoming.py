@@ -101,6 +101,7 @@ def upcoming(request: HttpRequest) -> HttpResponse:
 
 	follows = (
 		PersonFollow.objects.select_related("person")
+		.defer("person__tmdb_raw")
 		.filter(user=request.user)
 		.order_by("role", "person__name")
 	)

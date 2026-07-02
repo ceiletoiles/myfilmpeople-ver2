@@ -3,13 +3,15 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from ..services import get_or_sync_movie, purge_stale_movies
+from ..rate_limit import rate_limit
 from ..tmdb import TMDbClient, TMDbError
 from ..related_links import build_movie_related_links
 
@@ -362,6 +364,7 @@ def _build_release_groups(tmdb_raw: dict[str, Any], country_name_lookup: dict[st
 	return release_groups
 
 
+@rate_limit(limit=20, window_seconds=60, bucket_name="movie_detail")
 @login_required
 def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	tab = (request.GET.get("tab") or "cast").strip().lower()
@@ -370,11 +373,15 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 
 	include_credits = True
 	include_release_dates = True
-	movie = get_or_sync_movie(
-		tmdb_id,
-		include_credits=include_credits,
-		include_release_dates=include_release_dates,
-	)
+	try:
+		movie = get_or_sync_movie(
+			tmdb_id,
+			include_credits=include_credits,
+			include_release_dates=include_release_dates,
+		)
+	except TMDbError:
+		messages.error(request, "TMDb data is temporarily unavailable. Please try again soon.")
+		return redirect("search")
 	movie.last_accessed_at = timezone.now()
 	movie.save(update_fields=["last_accessed_at", "updated_at"])
 	try:
@@ -478,6 +485,7 @@ def _movie_card_payload(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 	return out
 
 
+@rate_limit(limit=30, window_seconds=60, bucket_name="movie_similar")
 @login_required
 def movie_similar(request: HttpRequest, tmdb_id: int) -> JsonResponse:
 	# Fetch similar movies on-demand from TMDb (do not persist into DB).
@@ -494,12 +502,11 @@ def movie_similar(request: HttpRequest, tmdb_id: int) -> JsonResponse:
 
 	seen: set[int] = set()
 	filtered: list[dict[str, Any]] = []
-	movie = get_or_sync_movie(tmdb_id)
 	for item in results:
 		mid = item.get("id")
 		if not isinstance(mid, int):
 			continue
-		if mid == movie.tmdb_id or mid in seen:
+		if mid == tmdb_id or mid in seen:
 			continue
 		seen.add(mid)
 		filtered.append(item)
@@ -509,9 +516,13 @@ def movie_similar(request: HttpRequest, tmdb_id: int) -> JsonResponse:
 	return JsonResponse({"movies": _movie_card_payload(filtered)})
 
 
+@rate_limit(limit=30, window_seconds=60, bucket_name="movie_related")
 @login_required
 def movie_related(request: HttpRequest, tmdb_id: int) -> JsonResponse:
-	movie = get_or_sync_movie(tmdb_id)
+	try:
+		movie = get_or_sync_movie(tmdb_id)
+	except TMDbError:
+		return JsonResponse({"movies": []})
 	tmdb_raw = movie.tmdb_raw if isinstance(movie.tmdb_raw, dict) else {}
 
 	belongs = tmdb_raw.get("belongs_to_collection")

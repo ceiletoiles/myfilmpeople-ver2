@@ -104,9 +104,9 @@
             {% for f in directors %}
               <a class="following-row" href="{% url 'person_detail' f.person.tmdb_id %}">
                 {% if f.person.profile_path %}
-                  <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" />
+                  <img class="person-thumb{% if f.person_deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" />
                 {% else %}
-                  <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
+                  <img class="person-thumb{% if f.person_deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
                 {% endif %}
                 <span class="entity-name">{{ f.person.name }}</span>
                 {% if f.status %}
@@ -124,9 +124,9 @@
             {% for f in actors %}
               <a class="following-row" href="{% url 'person_detail' f.person.tmdb_id %}">
                 {% if f.person.profile_path %}
-                  <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" />
+                  <img class="person-thumb{% if f.person_deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" />
                 {% else %}
-                  <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
+                  <img class="person-thumb{% if f.person_deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
                 {% endif %}
                 <span class="entity-name">{{ f.person.name }}</span>
                 {% if f.status %}
@@ -144,9 +144,9 @@
             {% for f in crew %}
               <a class="following-row" href="{% url 'person_detail' f.person.tmdb_id %}">
                 {% if f.person.profile_path %}
-                  <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" />
+                  <img class="person-thumb{% if f.person_deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w185{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" />
                 {% else %}
-                  <img class="person-thumb{% if f.person.tmdb_raw.deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
+                  <img class="person-thumb{% if f.person_deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" />
                 {% endif %}
                 <span class="entity-copy">
                   <span class="entity-name">{{ f.person.name }}</span>

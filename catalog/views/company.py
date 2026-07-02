@@ -25,10 +25,12 @@ from ..services import (
 	get_or_sync_company_tba_movies_page,
 	hydrate_company_movie_results,
 )
+from ..rate_limit import rate_limit
 from ..tmdb import TMDbClient, TMDbError
 from ._shared import _add_years_safe, _countdown_text, _parse_iso_date
 
 
+@rate_limit(limit=25, window_seconds=60, bucket_name="company_detail")
 @login_required
 def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	def _get_company_status_label(*, company, fallback_results: list[dict] | None = None, has_tba_hint: bool = False) -> str:
@@ -93,7 +95,11 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 
 	if follow:
 		# Followed => store + serve from DB (refresh if stale).
-		company = get_or_sync_company(tmdb_id)
+		try:
+			company = get_or_sync_company(tmdb_id)
+		except TMDbError:
+			messages.error(request, "TMDb data is temporarily unavailable. Please try again soon.")
+			return redirect("search")
 		# Keep denormalized follow snapshot fresh.
 		CompanyFollow.objects.filter(user=request.user, company__tmdb_id=tmdb_id).update(name=company.name)
 
@@ -163,8 +169,8 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				if filmography_mode == "filmography"
 				else {}
 			)
-		except Exception as exc:  # noqa: BLE001
-			messages.error(request, f"TMDb error: {exc}")
+		except Exception:  # noqa: BLE001
+			messages.error(request, "TMDb data is temporarily unavailable. Please try again soon.")
 			return redirect("search")
 
 		if isinstance(raw, dict):

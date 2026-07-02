@@ -9,6 +9,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 
 from ..models import CompanyFollow, Person, PersonFollow
+from ..services import get_company_homepage, get_person_deathday
 
 
 ROLE_TABS = [
@@ -105,14 +106,14 @@ def connect(request: HttpRequest) -> HttpResponse:
 	if role_key == "studio":
 		follows_qs = (
 			CompanyFollow.objects.select_related("company")
+			.defer("company__tmdb_raw")
 			.filter(user=request.user)
 			.order_by("company__name")
 		)
 		studio_people: list[dict[str, object]] = []
 		for follow in follows_qs:
 			company = follow.company
-			raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-			homepage = str(raw.get("homepage") or "").strip()
+			homepage = get_company_homepage(company)
 			if not homepage:
 				continue
 			studio_people.append(
@@ -160,7 +161,7 @@ def connect(request: HttpRequest) -> HttpResponse:
 					"person": person,
 					"name": person.name,
 					"image_path": person.profile_path,
-					"is_deceased": bool((person.tmdb_raw if isinstance(person.tmdb_raw, dict) else {}).get("deathday")),
+					"is_deceased": bool(get_person_deathday(person)),
 					"follow_role": follow.role,
 					"primary_role": primary_role,
 					"external_value": value,

@@ -49,6 +49,7 @@ def _render_person_follow_controls(request: HttpRequest, *, tmdb_id: int) -> str
 	follows_qs = PersonFollow.objects.select_related("person").filter(
 		user=request.user, person__tmdb_id=tmdb_id
 	)
+	follows_qs = follows_qs.defer("person__tmdb_raw")
 	follow_roles = sorted(set(follows_qs.values_list("role", flat=True))) if follows_qs.exists() else []
 	follow_roles_set = set(follow_roles)
 	note_text = (
@@ -77,7 +78,7 @@ def _render_person_follow_controls(request: HttpRequest, *, tmdb_id: int) -> str
 
 def _render_company_follow_controls(request: HttpRequest, *, tmdb_id: int) -> str:
 	company = get_or_sync_company(tmdb_id)
-	follow = CompanyFollow.objects.filter(user=request.user, company__tmdb_id=tmdb_id).first()
+	follow = CompanyFollow.objects.filter(user=request.user, company__tmdb_id=tmdb_id).defer("company__tmdb_raw").first()
 	is_followed = bool(follow)
 	note_text = follow.notes if follow else ""
 	return render_to_string(
@@ -866,7 +867,7 @@ def person_unfollow(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	qs = PersonFollow.objects.filter(user=request.user, person__tmdb_id=tmdb_id)
 
 	if role:
-		follows = list(qs.filter(role=role).select_related("person"))
+		follows = list(qs.filter(role=role).select_related("person").defer("person__tmdb_raw"))
 		deleted_count = len(follows)
 		for follow in follows:
 			_record_follow_activity(
@@ -905,7 +906,7 @@ def person_unfollow(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				)
 		return redirect("person_detail", tmdb_id=tmdb_id)
 
-	follows = list(qs.select_related("person"))
+	follows = list(qs.select_related("person").defer("person__tmdb_raw"))
 	deleted_count = len(follows)
 	for follow in follows:
 		_record_follow_activity(
@@ -949,7 +950,7 @@ def company_unfollow(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	wants_json = _wants_json(request)
 	ajax_context = (request.POST.get("ajax_context") or "").strip().lower()
 
-	follow = CompanyFollow.objects.filter(user=request.user, company__tmdb_id=tmdb_id).select_related("company").first()
+	follow = CompanyFollow.objects.filter(user=request.user, company__tmdb_id=tmdb_id).select_related("company").defer("company__tmdb_raw").first()
 	if follow:
 		_record_follow_activity(
 			user=request.user,

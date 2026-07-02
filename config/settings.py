@@ -267,7 +267,7 @@ def _split_csv_env(value: str) -> list[str]:
 CORS_PROXIES = _split_csv_env(
     os.getenv(
         "CORS_PROXIES",
-        "https://api.allorigins.win/raw?url=,https://corsproxy.io/?,https://cors-anywhere.herokuapp.com/,https://api.codetabs.com/v1/proxy?quest=,https://yacdn.org/proxy/",
+        "https://api.allorigins.win/raw?url=,https://corsproxy.io/?,https://cors-anywhere.herokuapp.com/,https://api.codetabs.com/v1/proxy?quest=",
     )
 )
 
