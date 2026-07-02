@@ -174,15 +174,11 @@ class TMDbClient:
             )
 
         full_url = build_full_url()
-        last_error: Exception | None = None
         for proxy in self.cors_proxies:
             proxied_url = apply_proxy(proxy, full_url)
             try:
                 proxied_resp = requests.get(proxied_url, timeout=proxy_timeout_seconds)
                 if proxied_resp.status_code >= 400:
-                    last_error = TMDbError(
-                        f"Proxy {proxy} returned {proxied_resp.status_code}: {_redact_sensitive_text(proxied_resp.text)}"
-                    )
                     continue
                 try:
                     payload = proxied_resp.json()
@@ -192,11 +188,9 @@ class TMDbClient:
                         except Exception:
                             pass
                     return payload
-                except ValueError as exc:
-                    last_error = exc
+                except ValueError:
                     continue
-            except requests.RequestException as exc:
-                last_error = exc
+            except requests.RequestException:
                 continue
 
         raise TMDbError("TMDb request failed via all proxies. Please check network/proxy configuration.")

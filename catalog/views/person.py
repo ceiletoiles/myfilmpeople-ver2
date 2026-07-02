@@ -800,7 +800,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		try:
 			raw = client.get_person(tmdb_id)
 			credits = client.get_person_credits(tmdb_id)
-		except Exception as exc:  # noqa: BLE001
+		except Exception:  # noqa: BLE001
 			messages.error(request, "TMDb data is temporarily unavailable. Please try again soon.")
 			return redirect("search")
 		person = SimpleNamespace(

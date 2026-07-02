@@ -321,7 +321,6 @@ def _cache_stamp(obj: object) -> str:
 def _seed_person_summary_cache(person: Person) -> None:
     try:
         raw = person.tmdb_raw if isinstance(person.tmdb_raw, dict) else {}
-        credits = person.tmdb_credits_raw if isinstance(person.tmdb_credits_raw, dict) else {}
         stamp = _cache_stamp(person)
         cache.set(f"person:deathday:v1:{int(person.pk)}:{stamp}", str(raw.get("deathday") or "").strip(), 5 * 60)
         cache.set(
