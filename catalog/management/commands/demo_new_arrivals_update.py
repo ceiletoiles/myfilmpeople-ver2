@@ -208,6 +208,7 @@ class Command(BaseCommand):
 			for item in payload.get("results", []) or []:
 				if isinstance(item, dict) and item.get("id") == mid:
 					item["release_date"] = ""
+					item["year"] = ""
 
 		company.tmdb_raw = raw
 		company.save(update_fields=["tmdb_raw", "updated_at"])

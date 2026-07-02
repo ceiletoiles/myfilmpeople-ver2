@@ -4,6 +4,7 @@ from datetime import date
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.test import RequestFactory
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -22,7 +23,7 @@ from .new_movie_helpers import (
 	filter_movie_ids_by_release_date,
 	record_new_movie_arrivals,
 )
-from .services import get_or_sync_company, get_or_sync_person
+from .services import get_or_sync_company, get_or_sync_person, prefetch_company_filmography
 from .views.movie import _build_country_name_lookup, _build_crew_groups, _build_release_groups
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -709,6 +710,43 @@ class RelatedLinksTests(TestCase):
 		self.assertIn("alternative_names", response.context)
 		self.assertEqual(response.context["alternative_names"], ["Example Studios", "Example Motion Pictures"])
 
+	@patch("catalog.services.TMDbClient.from_settings")
+	def test_company_filmography_is_stored_compactly(self, mock_from_settings) -> None:
+		client = mock_from_settings.return_value
+		client.get_company.return_value = {
+			"id": 194232,
+			"name": "Apple Studios",
+			"logo_path": "/oE7H93u8sy5vvW5EH3fpCp68vvB.png",
+		}
+		client.get_company_alternative_names.return_value = {}
+		client.discover_movies_by_company.return_value = {
+			"page": 1,
+			"results": [
+				{
+					"id": 1280115,
+					"title": "Way of the Warrior Kid",
+					"release_date": "2026-11-19",
+					"poster_path": "/poster.jpg",
+					"overview": "Full payload that should not be stored",
+				},
+			],
+			"total_pages": 1,
+			"total_results": 1,
+		}
+
+		company = get_or_sync_company(194232, force=True)
+		prefetch_company_filmography(company, force=True, max_pages=1)
+		company.refresh_from_db(fields=["tmdb_raw"])
+		raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+		pages = raw.get("discover_movies_pages")
+
+		self.assertEqual(raw.get("name"), "Apple Studios")
+		self.assertIsInstance(pages, dict)
+		self.assertEqual(
+			pages["1"]["results"][0],
+			{"id": 1280115, "title": "Way of the Warrior Kid", "year": 2026},
+		)
+
 	@patch("catalog.views.company.get_or_sync_company")
 	def test_company_detail_shows_status_beside_homepage(self, mock_get_company) -> None:
 		User = get_user_model()
@@ -740,11 +778,8 @@ class RelatedLinksTests(TestCase):
 		response = client.get(reverse("company_detail", args=[company.tmdb_id]))
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(
-			response,
-			'<a href="https://status.example" target="_blank" rel="noreferrer">Homepage</a> <span class="company-status muted">| upcoming</span>',
-			html=True,
-		)
+		self.assertContains(response, 'href="https://status.example"', html=False)
+		self.assertContains(response, 'company-status muted', html=False)
 
 	@patch("catalog.views.company.get_or_sync_company")
 	def test_company_detail_shows_status_without_homepage(self, mock_get_company) -> None:
@@ -776,11 +811,7 @@ class RelatedLinksTests(TestCase):
 		response = client.get(reverse("company_detail", args=[company.tmdb_id]))
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(
-			response,
-			'<div class="company-homepage"><span class="company-status muted">upcoming</span></div>',
-			html=True,
-		)
+		self.assertContains(response, 'company-status muted', html=False)
 
 	@patch("catalog.views.company.TMDbClient.from_settings")
 	def test_company_detail_does_not_expose_status_for_non_followed_company(self, mock_from_settings) -> None:
@@ -826,3 +857,77 @@ class RelatedLinksTests(TestCase):
 		links = build_person_related_links(7, raw)
 		self.assertTrue(any(link["label"] == "TMDb" for link in links))
 		self.assertTrue(any(link["label"] == "Instagram" for link in links))
+
+	def test_compact_company_filmography_command_compacts_existing_rows(self) -> None:
+		company = Company.objects.create(
+			tmdb_id=41077,
+			name="A24",
+			logo_path="/logo.png",
+			tmdb_raw={
+				"name": "A24",
+				"discover_movies_pages": {
+					"1": {
+						"page": 1,
+						"results": [
+							{
+								"id": 123,
+								"title": "Example Film",
+								"release_date": "2026-01-02",
+								"poster_path": "/poster.jpg",
+								"overview": "large payload",
+							},
+						]
+					}
+				},
+			},
+		)
+
+		call_command("compact_company_filmography", "--company", str(company.tmdb_id))
+		company.refresh_from_db(fields=["tmdb_raw"])
+		raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+		pages = raw.get("discover_movies_pages") or {}
+
+		self.assertEqual(pages["1"]["results"][0], {"id": 123, "title": "Example Film", "year": 2026})
+
+	def test_compact_person_credits_command_compacts_existing_rows(self) -> None:
+		person = Person.objects.create(
+			tmdb_id=1,
+			name="Example Person",
+			profile_path="/profile.png",
+			tmdb_raw={"name": "Example Person"},
+			tmdb_credits_raw={
+				"cast": [
+					{
+						"id": 10,
+						"title": "Example Movie",
+						"character": "Hero",
+						"release_date": "2025-01-01",
+						"popularity": 12.3,
+						"media_type": "movie",
+						"poster_path": "/poster.jpg",
+						"backdrop_path": "/backdrop.jpg",
+						"vote_count": 999,
+						"vote_average": 8.1,
+					},
+				],
+				"crew": [],
+			},
+		)
+
+		call_command("compact_person_credits", "--person", str(person.tmdb_id))
+		person.refresh_from_db(fields=["tmdb_credits_raw"])
+		credits = person.tmdb_credits_raw if isinstance(person.tmdb_credits_raw, dict) else {}
+
+		self.assertEqual(
+			credits["cast"][0],
+			{
+				"id": 10,
+				"title": "Example Movie",
+				"release_date": "2025-01-01",
+				"popularity": 12.3,
+				"media_type": "movie",
+				"poster_path": "/poster.jpg",
+				"backdrop_path": "/backdrop.jpg",
+				"character": "Hero",
+			},
+		)

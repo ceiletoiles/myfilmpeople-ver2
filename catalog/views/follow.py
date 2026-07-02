@@ -31,6 +31,7 @@ from ..services import (
 	prefetch_company_filmography,
 )
 from ._shared import SESSION_KEY_HIDE_SELF_APPEARANCES, _get_session_bool, _person_role_options_from_credits
+from ._shared import _parse_iso_date
 
 
 def _wants_json(request: HttpRequest) -> bool:
@@ -595,11 +596,9 @@ def company_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 						continue
 					rd = movie.get("release_date")
 					if follow_started_date is not None and isinstance(rd, str) and rd.strip():
-						try:
-							if date.fromisoformat(rd.strip()) < follow_started_date:
+							parsed_rd = _parse_iso_date(rd.strip())
+							if parsed_rd is not None and parsed_rd < follow_started_date:
 								continue
-						except ValueError:
-							pass
 					# Discover payload doesn't include explicit company role; use a sensible
 					# default label that matches TMDb movie page context.
 					company_event_meta.setdefault(mid, {})["credit_job"] = "Production Company"

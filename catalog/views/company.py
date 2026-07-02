@@ -23,6 +23,7 @@ from ..services import (
 	get_or_sync_company,
 	get_or_sync_company_filmography_page,
 	get_or_sync_company_tba_movies_page,
+	hydrate_company_movie_results,
 )
 from ..tmdb import TMDbClient, TMDbError
 from ._shared import _add_years_safe, _countdown_text, _parse_iso_date
@@ -49,7 +50,8 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			for movie in (payload.get("results") or []):
 				if not isinstance(movie, dict):
 					continue
-				release_date_str = (movie.get("release_date") or "").strip()
+				release_value = movie.get("release_date") or movie.get("year")
+				release_date_str = str(release_value or "").strip()
 				release_dt = _parse_iso_date(release_date_str)
 				if release_dt is not None and release_dt > today:
 					upcoming_with_date += 1
@@ -210,7 +212,7 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		# Dated filmography: query already excludes null dates.
 		movies_all = discover_page.get("results") or []
 		today = timezone.now().date()
-		movies = [m for m in list(movies_all) if isinstance(m, dict)]
+		movies = hydrate_company_movie_results([m for m in list(movies_all) if isinstance(m, dict)])
 		for m in movies:
 			release_dt = _parse_iso_date(str(m.get("release_date") or ""))
 			m["countdown_text"] = (
@@ -231,7 +233,7 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			if follow:
 				discover_page = _safe_get_or_sync_company_filmography_page(company, page)
 				movies_all = discover_page.get("results") or []
-				movies = [m for m in list(movies_all) if isinstance(m, dict)]
+				movies = hydrate_company_movie_results([m for m in list(movies_all) if isinstance(m, dict)])
 				for m in movies:
 					release_dt = _parse_iso_date(str(m.get("release_date") or ""))
 					m["countdown_text"] = (
@@ -249,7 +251,7 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 					extra_params={"release_date.gte": COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE},
 				)
 				movies_all = discover_page.get("results") or []
-				movies = [m for m in list(movies_all) if isinstance(m, dict)]
+				movies = hydrate_company_movie_results([m for m in list(movies_all) if isinstance(m, dict)])
 				for m in movies:
 					release_dt = _parse_iso_date(str(m.get("release_date") or ""))
 					m["countdown_text"] = (

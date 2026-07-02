@@ -122,6 +122,12 @@ def _person_role_options_from_credits(credits_raw: dict) -> list[str]:
 def _parse_iso_date(value: str | None) -> date | None:
 	if not value:
 		return None
+	value = value.strip()
+	if len(value) == 4 and value.isdigit():
+		try:
+			return date(int(value), 1, 1)
+		except ValueError:
+			return None
 	try:
 		return date.fromisoformat(value)
 	except ValueError:

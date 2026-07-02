@@ -202,6 +202,14 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 
 	credits = person.tmdb_credits_raw or {}
 	if is_followed:
+		try:
+			client = TMDbClient.from_settings()
+			live_credits = client.get_person_credits(tmdb_id)
+			if isinstance(live_credits, dict):
+				credits = live_credits
+		except Exception:
+			pass
+	if is_followed:
 		follow_role_statuses = [
 			{
 				"role": role,
@@ -634,7 +642,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		}
 
 		# Exclude movies where the current person has any self/archive-style credit
-		current_credits = person.tmdb_credits_raw or {}
+		current_credits = credits or {}
 		def _current_has_no_self_credit(mid: int) -> bool:
 			# If any cast entry for this movie has a self-like character, exclude.
 			for c in (current_credits.get("cast") or []):
@@ -812,6 +820,8 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	last_sync_key = last_sync.isoformat() if last_sync else "live"
 	derived_cache_key = f"person:derived:v2:{tmdb_id}:{int(hide_self_appearances)}:{last_sync_key}"
 	derived = cache.get(derived_cache_key)
+	if is_followed:
+		derived = None
 	born_display = ""
 	if bd:
 		parsed = _parse_iso_date(str(bd))

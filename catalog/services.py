@@ -23,6 +23,133 @@ COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE = "1800-01-01"
 COMPANY_TBA_SORT_BY = "popularity.desc"
 
 
+def _compact_person_credit_item(item: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(item, dict):
+        return {}
+    media_type = str(item.get("media_type") or "movie").strip().lower()
+    if media_type not in {"", "movie"}:
+        return {}
+    movie_id = item.get("id")
+    if not isinstance(movie_id, int):
+        return {}
+    compact: dict[str, Any] = {
+        "id": movie_id,
+        "title": str(item.get("title") or item.get("name") or movie_id),
+        "release_date": str(item.get("release_date") or "").strip(),
+        "popularity": item.get("popularity") if isinstance(item.get("popularity"), (int, float)) else item.get("popularity"),
+        "media_type": "movie",
+        "poster_path": str(item.get("poster_path") or ""),
+        "backdrop_path": str(item.get("backdrop_path") or ""),
+    }
+    character = str(item.get("character") or "").strip()
+    job = str(item.get("job") or "").strip()
+    if character:
+        compact["character"] = character
+    if job:
+        compact["job"] = job
+    return compact
+
+
+def compact_person_credits_payload(credits: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(credits, dict):
+        return {"cast": [], "crew": []}
+    cast = [
+        compact
+        for compact in (_compact_person_credit_item(item) for item in (credits.get("cast") or []))
+        if compact
+    ]
+    crew = [
+        compact
+        for compact in (_compact_person_credit_item(item) for item in (credits.get("crew") or []))
+        if compact
+    ]
+    return {"cast": cast, "crew": crew}
+
+
+def _company_movie_year(movie: dict[str, Any]) -> int | None:
+    release_date = str(movie.get("release_date") or "").strip()
+    if release_date:
+        try:
+            return date.fromisoformat(release_date).year
+        except ValueError:
+            pass
+    year = movie.get("year")
+    if isinstance(year, int) and year > 0:
+        return year
+    if isinstance(year, str):
+        year_s = year.strip()
+        if len(year_s) == 4 and year_s.isdigit():
+            return int(year_s)
+    return None
+
+
+def compact_company_movie(movie: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(movie, dict):
+        return {}
+    movie_id = movie.get("id")
+    if not isinstance(movie_id, int):
+        return {}
+    compact = {
+        "id": movie_id,
+        "title": str(movie.get("title") or movie.get("name") or movie_id),
+    }
+    year = _company_movie_year(movie)
+    if year is not None:
+        compact["year"] = year
+    return compact
+
+
+def compact_company_filmography_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        return {}
+    results = payload.get("results") or []
+    compact_results = [compact_company_movie(movie) for movie in results if isinstance(movie, dict)]
+    return {**payload, "results": [movie for movie in compact_results if movie]}
+
+
+def compact_company_filmography_pages(pages: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(pages, dict):
+        return {}
+    compact_pages: dict[str, Any] = {}
+    for key, payload in pages.items():
+        if isinstance(payload, dict):
+            compact_pages[str(key)] = compact_company_filmography_payload(payload)
+    return compact_pages
+
+
+def hydrate_company_movie_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not isinstance(results, list):
+        return []
+    client = TMDbClient.from_settings()
+    hydrated: list[dict[str, Any]] = []
+    for movie in results:
+        if not isinstance(movie, dict):
+            continue
+        movie_id = movie.get("id")
+        if not isinstance(movie_id, int):
+            hydrated.append(movie)
+            continue
+        needs_hydration = not movie.get("release_date") and not movie.get("poster_path")
+        if needs_hydration:
+            try:
+                full_movie = client.get_movie(movie_id)
+            except Exception:
+                full_movie = {}
+        else:
+            full_movie = movie
+        if isinstance(full_movie, dict) and full_movie:
+            merged = {**movie, **full_movie}
+            merged.setdefault("id", movie_id)
+            merged.setdefault("title", movie.get("title") or movie.get("name") or movie_id)
+            year = _company_movie_year(merged)
+            if year is not None:
+                merged["year"] = year
+            hydrated.append(merged)
+        else:
+            hydrated.append(movie)
+    return hydrated
+
+
 def get_or_sync_company_tba_movies(
     company: Company,
     *,
@@ -248,7 +375,7 @@ def get_or_sync_company_filmography_page(
         sort_by=COMPANY_FILMOGRAPHY_SORT_BY,
         extra_params={"release_date.gte": COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE},
     )
-    pages[key] = payload
+    pages[key] = compact_company_filmography_payload(payload)
 
     meta["total_pages"] = int(payload.get("total_pages") or meta.get("total_pages") or 1)
     meta["total_results"] = int(payload.get("total_results") or meta.get("total_results") or 0)
@@ -256,7 +383,7 @@ def get_or_sync_company_filmography_page(
     meta["release_date_gte"] = COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE
     meta["synced_at"] = timezone.now().isoformat()
 
-    company.tmdb_raw = {**tmdb_raw, "discover_movies_pages": pages, "discover_movies_meta": meta}
+    company.tmdb_raw = {**tmdb_raw, "discover_movies_pages": compact_company_filmography_pages(pages), "discover_movies_meta": meta}
     company.tmdb_last_sync_at = timezone.now()
     company.tmdb_last_sync_source = "sync" if force else "ttl"
     company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
@@ -337,6 +464,7 @@ def prefetch_company_filmography(
         sort_by=COMPANY_FILMOGRAPHY_SORT_BY,
         extra_params={"release_date.gte": COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE},
     )
+    first = compact_company_filmography_payload(first)
     total_pages = int(first.get("total_pages") or 1)
     pages_to_fetch = total_pages
     if max_pages is not None and max_pages > 0:
@@ -356,7 +484,7 @@ def prefetch_company_filmography(
         meta["sort_by"] = COMPANY_FILMOGRAPHY_SORT_BY
         meta["release_date_gte"] = COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE
         meta["synced_at"] = timezone.now().isoformat()
-        company.tmdb_raw = {**tmdb_raw, "discover_movies_pages": pages, "discover_movies_meta": meta}
+        company.tmdb_raw = {**tmdb_raw, "discover_movies_pages": compact_company_filmography_pages(pages), "discover_movies_meta": meta}
         company.tmdb_last_sync_at = timezone.now()
         company.tmdb_last_sync_source = "sync" if force else "ttl"
         company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
@@ -378,7 +506,7 @@ def prefetch_company_filmography(
             sort_by=COMPANY_FILMOGRAPHY_SORT_BY,
             extra_params={"release_date.gte": COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE},
         )
-        pages[key] = payload
+        pages[key] = compact_company_filmography_payload(payload)
         fetched += 1
         try:
             if progress_cb is not None:
@@ -394,7 +522,7 @@ def prefetch_company_filmography(
     meta["release_date_gte"] = COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE
     meta["synced_at"] = timezone.now().isoformat()
 
-    company.tmdb_raw = {**tmdb_raw, "discover_movies_pages": pages, "discover_movies_meta": meta}
+    company.tmdb_raw = {**tmdb_raw, "discover_movies_pages": compact_company_filmography_pages(pages), "discover_movies_meta": meta}
     company.tmdb_last_sync_at = timezone.now()
     company.tmdb_last_sync_source = "sync" if force else "ttl"
     company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
@@ -604,7 +732,7 @@ def get_or_sync_person(tmdb_id: int, *, force: bool = False) -> Person:
             client = TMDbClient.from_settings()
 
         raw = client.get_person(tmdb_id)
-        credits = client.get_person_credits(tmdb_id)
+        credits = compact_person_credits_payload(client.get_person_credits(tmdb_id))
         try:
             external_ids = client.get_person_external_ids(tmdb_id)
         except Exception:
@@ -747,10 +875,8 @@ def get_or_sync_company(tmdb_id: int, *, force: bool = False) -> Company:
 				"tba_movies_meta",
                 }
             }
-        discover_pages = (
-            existing.get("discover_movies_pages")
-            if isinstance(existing.get("discover_movies_pages"), dict)
-            else {}
+        discover_pages = compact_company_filmography_pages(
+            existing.get("discover_movies_pages") if isinstance(existing.get("discover_movies_pages"), dict) else {}
         )
         discover_meta = (
             existing.get("discover_movies_meta")

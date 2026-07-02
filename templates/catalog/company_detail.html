@@ -141,7 +141,7 @@
                 {% if filmography_mode == 'upcoming' %}
                   TBA
                 {% else %}
-                  {% if m.release_date %}{{ m.release_date|slice:":4" }}{% else %}TBA{% endif %}
+                  {% if m.release_date %}{{ m.release_date|slice:":4" }}{% elif m.year %}{{ m.year }}{% else %}TBA{% endif %}
                 {% endif %}
               </div>
               {% if filmography_mode != 'upcoming' and m.countdown_text %}
