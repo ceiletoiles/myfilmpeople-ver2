@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from datetime import timedelta
 from typing import Any
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.utils import timezone
 
-from catalog.models import Movie, NewsletterIssue
+from catalog.models import NewsletterIssue
 from catalog.newsletter import parse_issue, publish_issue
+from catalog.services import purge_stale_movies
 
 
 class Command(BaseCommand):
@@ -49,10 +48,7 @@ class Command(BaseCommand):
 		purged_movies = 0
 		if not bool(options.get("skip_movie_purge")):
 			retention_days = int(getattr(settings, "MOVIE_STALE_DELETE_DAYS", 5) or 5)
-			if retention_days < 1:
-				retention_days = 1
-			cutoff = timezone.now() - timedelta(days=retention_days)
-			purged_movies, _ = Movie.objects.filter(last_accessed_at__lt=cutoff).delete()
+			purged_movies, _ = purge_stale_movies(days=retention_days)
 
 		self.stdout.write(
 			self.style.SUCCESS(

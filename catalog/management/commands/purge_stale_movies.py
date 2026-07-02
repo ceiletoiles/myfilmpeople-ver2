@@ -8,6 +8,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from catalog.models import Movie
+from catalog.services import purge_stale_movies
 
 
 class Command(BaseCommand):
@@ -32,10 +33,9 @@ class Command(BaseCommand):
             days = 1
 
         cutoff = timezone.now() - timedelta(days=days)
-        stale_qs = Movie.objects.filter(last_accessed_at__lt=cutoff)
-        stale_count = stale_qs.count()
 
         if options.get("dry_run"):
+            stale_count = Movie.objects.filter(last_accessed_at__lt=cutoff).count()
             self.stdout.write(
                 self.style.WARNING(
                     f"[dry-run] Would delete {stale_count} movies not accessed since {cutoff.isoformat()}."
@@ -43,9 +43,9 @@ class Command(BaseCommand):
             )
             return
 
-        deleted_rows, _details = stale_qs.delete()
+        deleted_rows, _details = purge_stale_movies(days=days)
         self.stdout.write(
             self.style.SUCCESS(
-                f"Deleted {stale_count} stale movies (rows removed including cascades: {deleted_rows})."
+                f"Deleted stale movies not accessed in the last {days} days (rows removed including cascades: {deleted_rows})."
             )
         )

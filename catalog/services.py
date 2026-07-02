@@ -683,6 +683,14 @@ def _is_stale(last_sync_at) -> bool:
     return last_sync_at < timezone.now() - timedelta(hours=ttl_hours)
 
 
+def purge_stale_movies(*, days: int | None = None) -> tuple[int, dict[str, int]]:
+    days = int(days or getattr(settings, "MOVIE_STALE_DELETE_DAYS", 5) or 5)
+    if days < 1:
+        days = 1
+    cutoff = timezone.now() - timedelta(days=days)
+    return Movie.objects.filter(last_accessed_at__lt=cutoff).delete()
+
+
 def get_or_sync_person(tmdb_id: int, *, force: bool = False) -> Person:
     cache_key = f"db:person:v1:{int(tmdb_id)}"
     if not force:

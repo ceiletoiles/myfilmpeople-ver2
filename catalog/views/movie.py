@@ -9,7 +9,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 
-from ..services import get_or_sync_movie
+from ..services import get_or_sync_movie, purge_stale_movies
 from ..tmdb import TMDbClient, TMDbError
 from ..related_links import build_movie_related_links
 
@@ -377,6 +377,10 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	)
 	movie.last_accessed_at = timezone.now()
 	movie.save(update_fields=["last_accessed_at", "updated_at"])
+	try:
+		purge_stale_movies()
+	except Exception:
+		pass
 	client = TMDbClient.from_settings()
 
 	cast = []

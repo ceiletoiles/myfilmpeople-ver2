@@ -27,6 +27,7 @@ from .services import get_or_sync_company, get_or_sync_person, prefetch_company_
 from .views.movie import _build_country_name_lookup, _build_crew_groups, _build_release_groups
 from types import SimpleNamespace
 from unittest.mock import Mock
+from unittest.mock import ANY
 
 
 class NewMovieHelpersTests(TestCase):
@@ -857,6 +858,26 @@ class RelatedLinksTests(TestCase):
 		links = build_person_related_links(7, raw)
 		self.assertTrue(any(link["label"] == "TMDb" for link in links))
 		self.assertTrue(any(link["label"] == "Instagram" for link in links))
+
+	@patch("catalog.views.movie.purge_stale_movies")
+	@patch("catalog.views.movie.TMDbClient.from_settings")
+	@patch("catalog.views.movie.get_or_sync_movie")
+	def test_movie_detail_triggers_stale_movie_purge(self, mock_get_or_sync_movie, mock_from_settings, mock_purge_stale_movies) -> None:
+		user = get_user_model().objects.create_user(username="movie-purge-user", password="pw")
+		self.client.force_login(user)
+
+		movie = Movie.objects.create(tmdb_id=1, title="Example Movie")
+		mock_get_or_sync_movie.return_value = movie
+		mock_from_settings.return_value.get_configuration_countries.return_value = []
+		mock_from_settings.return_value.get_movie_alternative_titles.return_value = {}
+		mock_from_settings.return_value.get_movie_videos.return_value = {}
+		mock_from_settings.return_value.get_movie_credits.return_value = {"cast": [], "crew": []}
+		mock_from_settings.return_value.get_movie.return_value = {"id": 1, "title": "Example Movie", "release_date": "2026-01-01"}
+
+		response = self.client.get(reverse("movie_detail", args=[1]))
+
+		self.assertEqual(response.status_code, 200)
+		mock_purge_stale_movies.assert_called_once_with()
 
 	def test_compact_company_filmography_command_compacts_existing_rows(self) -> None:
 		company = Company.objects.create(

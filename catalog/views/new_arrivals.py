@@ -12,7 +12,7 @@ from django.utils import timezone
 from ..models import NewMovieArrival, NewsletterItem, NewsletterItemSeen
 
 
-HISTORY_DAYS = 365
+HISTORY_DAYS = 30
 
 
 @dataclass
@@ -246,7 +246,7 @@ def _group_items_by_month(items: list[dict]) -> list[dict]:
 
 @login_required
 def new_arrivals(request: HttpRequest) -> HttpResponse:
-	"""Display current New Arrivals and one-year History in the same page."""
+	"""Display current New Arrivals and 30-day History in the same page."""
 	now = timezone.now()
 	history_cutoff_dt = now - timedelta(days=HISTORY_DAYS)
 	history_cutoff_date = history_cutoff_dt.date()
@@ -261,7 +261,7 @@ def new_arrivals(request: HttpRequest) -> HttpResponse:
 	current_movies = _build_movie_sections(current_movie_arrivals)
 	current_dailies = _newsletter_entries(current_newsletter_items)
 
-	# History is limited to the last year by item date.
+	# History is limited to the last 30 days by item date.
 	# Include items where either created_at OR seen_at is within the last year
 	history_movie_arrivals = NewMovieArrival.objects.select_related("movie").filter(
 		user=request.user,
