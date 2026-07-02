@@ -355,7 +355,7 @@ class NewMovieArrivalMetadataTests(TestCase):
 	def test_record_new_movie_arrivals_persists_comeback_metadata(self) -> None:
 		User = get_user_model()
 		user = User.objects.create_user(username="gap-user", password="pw")
-		movie = Movie.objects.create(tmdb_id=12345, title="Comeback Film", release_date=date(2021, 1, 1))
+		movie = Movie.objects.create(tmdb_id=12345, title="Comeback Film", release_date=date(2026, 12, 1))
 
 		created = record_new_movie_arrivals(
 			user=user,
@@ -366,12 +366,12 @@ class NewMovieArrivalMetadataTests(TestCase):
 			new_movie_ids={movie.tmdb_id},
 			role="actor",
 			old_release_dates={1: "2014-01-01"},
-			new_release_dates={movie.tmdb_id: "2021-01-01"},
+			new_release_dates={movie.tmdb_id: "2026-12-01"},
 			new_event_meta_by_movie={
 				movie.tmdb_id: {
 					"kind": "comeback",
 					"last_release_date": "2014-01-01",
-					"new_release_date": "2021-01-01",
+					"new_release_date": "2026-12-01",
 					"gap_days": 2557,
 					"gap_label": "7 years",
 					"threshold_days": 1095,
@@ -550,7 +550,7 @@ class NewArrivalsSeenHistoryTests(TestCase):
 	def test_new_arrivals_visit_sets_seen_at_for_movie_and_newsletter(self) -> None:
 		User = get_user_model()
 		user = User.objects.create_user(username="history-user", password="pw")
-		movie = Movie.objects.create(tmdb_id=501, title="History Movie", release_date=date(2026, 5, 1))
+		movie = Movie.objects.create(tmdb_id=501, title="History Movie", release_date=date(2026, 12, 1))
 
 		arrival = NewMovieArrival.objects.create(
 			user=user,
@@ -595,7 +595,7 @@ class NewArrivalsSeenHistoryTests(TestCase):
 	def test_new_arrivals_context_ignores_past_movie_rows(self) -> None:
 		User = get_user_model()
 		user = User.objects.create_user(username="count-user", password="pw")
-		future_movie = Movie.objects.create(tmdb_id=601, title="Future Movie", release_date=date(2026, 5, 1))
+		future_movie = Movie.objects.create(tmdb_id=601, title="Future Movie", release_date=date(2026, 12, 1))
 		past_movie = Movie.objects.create(tmdb_id=602, title="Past Movie", release_date=date(2022, 10, 10))
 
 		NewMovieArrival.objects.create(
