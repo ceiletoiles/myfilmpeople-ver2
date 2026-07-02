@@ -4,6 +4,7 @@ from typing import Any
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
 from catalog.models import NewsletterIssue
 from catalog.newsletter import parse_issue, publish_issue

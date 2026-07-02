@@ -21,7 +21,6 @@ from django.utils.http import url_has_allowed_host_and_scheme
 
 from catalog.models import CompanyFollow, FollowActivity, PersonFollow
 from catalog.services import (
-	get_or_sync_company_tba_movies_page,
 	get_person_status_key,
 	get_person_status_label,
 )
@@ -409,17 +408,12 @@ def _annotate_company_status(follow) -> None:
 			follow.status_key = "announced"
 			follow.status = "Announced"
 		else:
-			tba_items: list[dict] = []
-			try:
-				tba_items, _, _ = get_or_sync_company_tba_movies_page(
-					company,
-					page=1,
-					page_size=1,
-				)
-			except Exception:
-				tba_items = []
+			cached_tba_movies = tmdb_raw.get("tba_movies")
+			has_cached_tba = isinstance(cached_tba_movies, list) and any(
+				isinstance(item, dict) for item in cached_tba_movies
+			)
 
-			if tba_items:
+			if has_cached_tba:
 				follow.status_key = "announced"
 				follow.status = "Announced"
 			elif latest_past_release is not None and latest_past_release < ten_years_ago:

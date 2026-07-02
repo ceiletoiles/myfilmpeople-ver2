@@ -27,7 +27,6 @@ from .services import get_or_sync_company, get_or_sync_person, prefetch_company_
 from .views.movie import _build_country_name_lookup, _build_crew_groups, _build_release_groups
 from types import SimpleNamespace
 from unittest.mock import Mock
-from unittest.mock import ANY
 
 
 class NewMovieHelpersTests(TestCase):
