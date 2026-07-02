@@ -248,10 +248,14 @@ def _group_items_by_month(items: list[dict]) -> list[dict]:
 def new_arrivals(request: HttpRequest) -> HttpResponse:
 	"""Display current New Arrivals and 30-day History in the same page."""
 	now = timezone.now()
+	today = now.date()
 	history_cutoff_dt = now - timedelta(days=HISTORY_DAYS)
 	history_cutoff_date = history_cutoff_dt.date()
 
 	current_movie_arrivals = NewMovieArrival.objects.select_related("movie").filter(user=request.user, is_seen=False)
+	current_movie_arrivals = current_movie_arrivals.filter(
+		Q(movie__release_date__isnull=True) | Q(movie__release_date__gte=today)
+	)
 	current_newsletter_items = (
 		NewsletterItem.objects.select_related("issue")
 		.filter(issue__published_at__isnull=False)
@@ -268,6 +272,8 @@ def new_arrivals(request: HttpRequest) -> HttpResponse:
 		is_seen=True,
 	).filter(
 		Q(created_at__gte=history_cutoff_dt) | Q(seen_at__gte=history_cutoff_dt)
+	).filter(
+		Q(movie__release_date__isnull=True) | Q(movie__release_date__gte=today)
 	)
 	history_newsletter_items = (
 		NewsletterItemSeen.objects.select_related("item", "item__issue")

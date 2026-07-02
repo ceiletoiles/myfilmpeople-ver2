@@ -384,6 +384,44 @@ class NewMovieArrivalMetadataTests(TestCase):
 		self.assertEqual(arrival.event_meta.get("kind"), "comeback")
 		self.assertEqual(arrival.event_meta.get("gap_label"), "7 years")
 
+	def test_record_new_movie_arrivals_skips_past_released_movies(self) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="past-user", password="pw")
+		movie = Movie.objects.create(tmdb_id=55555, title="Old Film", release_date=date(2022, 10, 10))
+
+		created = record_new_movie_arrivals(
+			user=user,
+			source_type="person",
+			source_id=9,
+			source_name="Example Person",
+			old_movie_ids=set(),
+			new_movie_ids={movie.tmdb_id},
+			role="actor",
+		)
+
+		self.assertEqual(created, 0)
+		self.assertFalse(NewMovieArrival.objects.filter(user=user, movie=movie).exists())
+
+	def test_record_new_movie_arrivals_skips_past_release_date_updates(self) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="past-update-user", password="pw")
+		movie = Movie.objects.create(tmdb_id=55556, title="Old Film 2", release_date=date(2022, 10, 10))
+
+		created = record_new_movie_arrivals(
+			user=user,
+			source_type="person",
+			source_id=9,
+			source_name="Example Person",
+			old_movie_ids={movie.tmdb_id},
+			new_movie_ids={movie.tmdb_id},
+			role="actor",
+			old_release_dates={movie.tmdb_id: "2022-10-08"},
+			new_release_dates={movie.tmdb_id: "2022-10-10"},
+		)
+
+		self.assertEqual(created, 0)
+		self.assertFalse(NewMovieArrival.objects.filter(user=user, movie=movie).exists())
+
 
 class MovieCrewGroupingTests(TestCase):
 	def test_build_crew_groups_places_music_jobs_after_cinematography(self) -> None:
@@ -553,6 +591,41 @@ class NewArrivalsSeenHistoryTests(TestCase):
 		self.assertIsNotNone(seen)
 		assert seen is not None
 		self.assertIsNotNone(seen.seen_at)
+
+	def test_new_arrivals_context_ignores_past_movie_rows(self) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="count-user", password="pw")
+		future_movie = Movie.objects.create(tmdb_id=601, title="Future Movie", release_date=date(2026, 5, 1))
+		past_movie = Movie.objects.create(tmdb_id=602, title="Past Movie", release_date=date(2022, 10, 10))
+
+		NewMovieArrival.objects.create(
+			user=user,
+			movie=future_movie,
+			event_type="new",
+			source_type="person",
+			source_id=99,
+			source_name="Example Person",
+			role="director",
+			is_seen=False,
+		)
+		NewMovieArrival.objects.create(
+			user=user,
+			movie=past_movie,
+			event_type="new",
+			source_type="person",
+			source_id=100,
+			source_name="Old Person",
+			role="actor",
+			is_seen=False,
+		)
+
+		rf = RequestFactory()
+		request = rf.get("/")
+		request.user = user
+		context = new_arrivals_context(request)
+
+		self.assertEqual(context["movie_new_arrivals_count"], 1)
+		self.assertEqual(context["new_arrivals_count"], 1)
 
 
 class SearchPrefixTests(TestCase):
@@ -870,6 +943,54 @@ class RelatedLinksTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.context["company_status_label"], "")
 
+	@patch("catalog.views.company.get_or_sync_company_filmography_page")
+	@patch("catalog.services.TMDbClient.from_settings")
+	@patch("catalog.views.company.get_or_sync_company")
+	def test_company_detail_hydrates_poster_on_later_pages(self, mock_get_company, mock_from_settings, mock_get_page) -> None:
+		client = mock_from_settings.return_value
+		client.get_movie.return_value = {
+			"id": 321,
+			"title": "Later Page Movie",
+			"poster_path": "/later-poster.jpg",
+			"release_date": "2026-01-15",
+		}
+
+		company = Company.objects.create(
+			tmdb_id=91,
+			name="Poster Studio",
+			logo_path="/logo.png",
+			tmdb_raw={
+				"name": "Poster Studio",
+				"discover_movies_pages": {
+					"1": {
+						"results": [
+							{"id": 1, "title": "First Page Movie", "release_date": "2026-01-01", "poster_path": "/first.jpg"}
+						]
+					}
+				},
+			},
+			tmdb_last_sync_at=timezone.now(),
+		)
+		mock_get_company.return_value = company
+		mock_get_page.return_value = {
+			"page": 2,
+			"results": [
+				{"id": 321, "title": "Later Page Movie", "release_date": "2026-01-15"}
+			],
+			"total_pages": 2,
+			"total_results": 2,
+		}
+
+		user = get_user_model().objects.create_user(username="poster-user", password="pw")
+		CompanyFollow.objects.create(user=user, company=company, name=company.name)
+		self.client.force_login(user)
+
+		response = self.client.get(reverse("company_detail", args=[company.tmdb_id]), {"page": 2})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "/later-poster.jpg")
+		client.get_movie.assert_called_once_with(321)
+
 	@patch("catalog.services.TMDbClient.from_settings")
 	def test_get_or_sync_person_caches_external_ids(self, mock_from_settings) -> None:
 		client = mock_from_settings.return_value
@@ -916,7 +1037,10 @@ class RelatedLinksTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		mock_purge_stale_movies.assert_called_once_with()
 
-	def test_compact_company_filmography_command_compacts_existing_rows(self) -> None:
+	@patch("catalog.management.commands.compact_company_filmography.TMDbClient.from_settings")
+	def test_compact_company_filmography_command_compacts_existing_rows(self, mock_from_settings) -> None:
+		client = mock_from_settings.return_value
+		client.get_movie.side_effect = lambda mid: {"id": mid, "poster_path": f"/poster-{mid}.jpg"}
 		company = Company.objects.create(
 			tmdb_id=41077,
 			name="A24",
@@ -931,7 +1055,6 @@ class RelatedLinksTests(TestCase):
 								"id": 123,
 								"title": "Example Film",
 								"release_date": "2026-01-02",
-								"poster_path": "/poster.jpg",
 								"overview": "large payload",
 							},
 						]
@@ -952,9 +1075,10 @@ class RelatedLinksTests(TestCase):
 				"title": "Example Film",
 				"year": 2026,
 				"release_date": "2026-01-02",
-				"poster_path": "/poster.jpg",
+				"poster_path": "/poster-123.jpg",
 			},
 		)
+		client.get_movie.assert_called_once_with(123)
 
 	def test_compact_person_credits_command_compacts_existing_rows(self) -> None:
 		person = Person.objects.create(

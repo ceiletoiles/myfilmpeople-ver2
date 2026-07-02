@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from django import template
 from django.contrib.auth.models import User
+from django.db.models import Q
+from django.utils import timezone
 
 register = template.Library()
 
@@ -14,5 +16,8 @@ def unseen_new_arrivals_count(user: User) -> int:
 		return 0
 	
 	from catalog.models import NewMovieArrival
-	
-	return NewMovieArrival.objects.filter(user=user, is_seen=False).count()
+
+	today = timezone.now().date()
+	return NewMovieArrival.objects.filter(user=user, is_seen=False).filter(
+		Q(movie__release_date__isnull=True) | Q(movie__release_date__gte=today)
+	).count()

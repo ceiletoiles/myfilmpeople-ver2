@@ -6,6 +6,7 @@ from django.core.management.base import BaseCommand
 
 from catalog.models import Company
 from catalog.services import compact_company_filmography_pages
+from catalog.tmdb import TMDbClient
 
 
 class Command(BaseCommand):
@@ -25,6 +26,7 @@ class Command(BaseCommand):
 		if company_tmdb_id is not None:
 			queryset = queryset.filter(tmdb_id=int(company_tmdb_id))
 
+		client = TMDbClient.from_settings()
 		updated = 0
 		for company in queryset.iterator():
 			if not isinstance(company.tmdb_raw, dict):
@@ -47,14 +49,37 @@ class Command(BaseCommand):
 					if not isinstance(item, dict):
 						continue
 					if str(item.get("release_date") or "").strip():
-						continue
-					year = item.get("year")
-					if isinstance(year, int) and year > 0:
-						item["release_date"] = f"{year:04d}-01-01"
-					elif isinstance(year, str):
-						year_s = year.strip()
-						if len(year_s) == 4 and year_s.isdigit():
-							item["release_date"] = f"{int(year_s):04d}-01-01"
+						pass
+					else:
+						year = item.get("year")
+						if isinstance(year, int) and year > 0:
+							item["release_date"] = f"{year:04d}-01-01"
+						elif isinstance(year, str):
+							year_s = year.strip()
+							if len(year_s) == 4 and year_s.isdigit():
+								item["release_date"] = f"{int(year_s):04d}-01-01"
+			# Backfill poster_path only for the first page. Later pages are hydrated
+			# on demand from TMDb at render time, so we keep them compact in DB.
+			page1 = compact_pages.get("1")
+			if isinstance(page1, dict):
+				page1_results = page1.get("results") or []
+				if isinstance(page1_results, list):
+					for item in page1_results:
+						if not isinstance(item, dict):
+							continue
+						if str(item.get("poster_path") or "").strip():
+							continue
+						mid = item.get("id")
+						if not isinstance(mid, int):
+							continue
+						try:
+							movie = client.get_movie(mid)
+						except Exception:
+							movie = {}
+						if isinstance(movie, dict):
+							poster_path = str(movie.get("poster_path") or "").strip()
+							if poster_path:
+								item["poster_path"] = poster_path
 			if compact_pages == pages:
 				continue
 

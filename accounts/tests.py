@@ -37,13 +37,12 @@ class CompanyStatusTests(TestCase):
 						],
 					}
 				},
+				"tba_movies": [
+					{"id": 99, "title": "Mystery Project", "release_date": ""}
+				],
 			}
 		)
-
-		with patch("accounts.views.get_or_sync_company_tba_movies_page", return_value=([
-			{"id": 99, "title": "Mystery Project", "release_date": ""}
-		], False, False)):
-			_annotate_company_status(follow)
+		_annotate_company_status(follow)
 
 		self.assertEqual(follow.status_key, "announced")
 		self.assertEqual(follow.status, "Announced")
@@ -60,9 +59,7 @@ class CompanyStatusTests(TestCase):
 				},
 			}
 		)
-
-		with patch("accounts.views.get_or_sync_company_tba_movies_page", return_value=([], False, False)):
-			_annotate_company_status(follow)
+		_annotate_company_status(follow)
 
 		self.assertEqual(follow.status_key, "inactive")
 		self.assertEqual(follow.status, "Inactive")

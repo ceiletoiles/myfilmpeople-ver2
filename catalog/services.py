@@ -124,6 +124,13 @@ def compact_company_filmography_pages(pages: dict[str, Any] | None) -> dict[str,
 
 
 def hydrate_company_movie_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Fill in missing movie display fields for a currently rendered page.
+
+    Company filmography pages may intentionally store compact rows without
+    poster_path. For the small set of movies on the current page, fetch the
+    TMDb movie details and backfill poster/release fields so the page can render
+    posters directly from TMDb without changing the database.
+    """
     if not isinstance(results, list):
         return []
     client = TMDbClient.from_settings()
@@ -135,16 +142,28 @@ def hydrate_company_movie_results(results: list[dict[str, Any]]) -> list[dict[st
         if not isinstance(movie_id, int):
             hydrated.append(movie)
             continue
-        needs_hydration = not movie.get("release_date") and not movie.get("poster_path")
-        if needs_hydration:
-            try:
-                full_movie = client.get_movie(movie_id)
-            except Exception:
-                full_movie = {}
-        else:
-            full_movie = movie
+
+        needs_poster = not str(movie.get("poster_path") or "").strip()
+        needs_release = not str(movie.get("release_date") or "").strip()
+        if not needs_poster and not needs_release:
+            merged = {**movie}
+            year = _company_movie_year(merged)
+            if year is not None:
+                merged["year"] = year
+            hydrated.append(merged)
+            continue
+
+        try:
+            full_movie = client.get_movie(movie_id)
+        except Exception:
+            full_movie = {}
+
         if isinstance(full_movie, dict) and full_movie:
-            merged = {**movie, **full_movie}
+            merged = {**movie}
+            if needs_poster and str(full_movie.get("poster_path") or "").strip():
+                merged["poster_path"] = str(full_movie.get("poster_path") or "").strip()
+            if needs_release and str(full_movie.get("release_date") or "").strip():
+                merged["release_date"] = str(full_movie.get("release_date") or "").strip()
             merged.setdefault("id", movie_id)
             merged.setdefault("title", movie.get("title") or movie.get("name") or movie_id)
             year = _company_movie_year(merged)

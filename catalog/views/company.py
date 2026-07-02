@@ -23,6 +23,7 @@ from ..services import (
 	get_or_sync_company,
 	get_or_sync_company_filmography_page,
 	get_or_sync_company_tba_movies_page,
+	hydrate_company_movie_results,
 )
 from ..tmdb import TMDbClient, TMDbError
 from ._shared import _add_years_safe, _countdown_text, _parse_iso_date
@@ -361,6 +362,11 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			has_next = len(tba_movies) > end or (
 				discover_total_pages is None or scan_page < discover_total_pages
 			)
+
+	if follow and filmography_mode == "filmography" and page > 1 and filmography_items:
+		# Page 1 is stored in DB. Later pages are hydrated on demand from TMDb so
+		# they can still show posters and other movie details.
+		filmography_items = hydrate_company_movie_results(filmography_items)
 	# Determine whether the company has any TBA (upcoming-without-date) titles.
 	# Show the Upcoming toggle only when we can confirm TBA titles exist.
 	def _live_tba_scan(max_pages: int) -> bool:

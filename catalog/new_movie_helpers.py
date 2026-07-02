@@ -20,6 +20,22 @@ def _norm_date_str(value: object) -> str:
 	return value.strip()
 
 
+def _is_current_or_future_movie(movie, *, today: date | None = None) -> bool:
+	"""Return True for movies we still want to surface as new arrivals.
+
+	We keep undated titles because they are usually upcoming/TBA projects.
+	Anything with a release date strictly before today is treated as past and
+	should not create a new-arrival notification.
+	"""
+	if movie is None:
+		return False
+	today = today or timezone.now().date()
+	release_date = getattr(movie, "release_date", None)
+	if release_date is None:
+		return True
+	return release_date >= today
+
+
 def _norm_role(value: object) -> str:
 	if not isinstance(value, str):
 		return ""
@@ -709,25 +725,34 @@ def record_new_movie_arrivals(
 		)
 	}
 
-	def _ensure_movie(mid: int) -> Movie | None:
+	def _ensure_movie(mid: int, *, release_date: str | None = None) -> Movie | None:
 		movie = movies_by_tmdb_id.get(mid)
 		if movie:
 			return movie
-		try:
-			from .services import get_or_sync_movie
-			movie = get_or_sync_movie(mid, force=True)
-		except Exception:
-			movie = None
-		if movie:
-			movies_by_tmdb_id[mid] = movie
+		release_dt = _parse_iso_date(release_date)
+		movie, _ = Movie.objects.get_or_create(
+			tmdb_id=mid,
+			defaults={
+				"title": str(mid),
+				"release_date": release_dt,
+			},
+		)
+		if release_dt is not None and movie.release_date != release_dt:
+			movie.release_date = release_dt
+			movie.save(update_fields=["release_date", "updated_at"])
+		movies_by_tmdb_id[mid] = movie
 		return movie
+
+	today = timezone.now().date()
 
 	# Record "new" events.
 	for movie_id in newly_arrived:
 		if movie_id in seen_new_tmdb_ids:
 			continue
-		movie = _ensure_movie(movie_id)
+		movie = _ensure_movie(movie_id, release_date=(new_release_dates or {}).get(movie_id))
 		if not movie:
+			continue
+		if not _is_current_or_future_movie(movie, today=today):
 			continue
 		event_meta = {}
 		if isinstance(new_event_meta_by_movie, dict):
@@ -751,8 +776,10 @@ def record_new_movie_arrivals(
 
 	# Record "update" events (release_date changes).
 	for movie_id, meta in updated.items():
-		movie = _ensure_movie(movie_id)
+		movie = _ensure_movie(movie_id, release_date=(new_release_dates or {}).get(movie_id))
 		if not movie:
+			continue
+		if not _is_current_or_future_movie(movie, today=today):
 			continue
 		existing = existing_updates.get(movie_id)
 		if existing is not None and (existing.event_meta or {}) == meta and existing.is_seen is False:
