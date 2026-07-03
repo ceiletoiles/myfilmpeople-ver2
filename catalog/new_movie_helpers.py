@@ -49,6 +49,17 @@ def _norm_role(value: object) -> str:
 	return value.strip().lower()
 
 
+def _split_role_tokens(value: object) -> list[str]:
+	if not isinstance(value, str):
+		return []
+	tokens: list[str] = []
+	for raw in value.replace("/", ",").replace(";", ",").replace("|", ",").split(","):
+		token = raw.strip().lower()
+		if token and token not in tokens:
+			tokens.append(token)
+	return tokens
+
+
 def _is_self_character(value: object) -> bool:
 	if not isinstance(value, str):
 		return False
@@ -64,8 +75,8 @@ def _is_self_character(value: object) -> bool:
 
 
 def _is_passive_crew_job(value: object) -> bool:
-	job = _norm_role(value)
-	if not job:
+	job_tokens = _split_role_tokens(value)
+	if not job_tokens:
 		return True
 	passive_markers = (
 		"thanks",
@@ -76,7 +87,7 @@ def _is_passive_crew_job(value: object) -> bool:
 		"based on",
 		"creator",
 	)
-	return any(marker in job for marker in passive_markers)
+	return all(any(marker in job for marker in passive_markers) for job in job_tokens)
 
 
 def _string_eq(left: object, right: str) -> bool:
@@ -109,9 +120,10 @@ def _value_matches_source(value: object, *, source_type: str, source_id: int, so
 			# Actor and crew credit changes typically expose a `job` or `character`.
 			item_job = value.get("job")
 			if role_n and isinstance(item_job, str) and item_job.strip():
-				if role_n == "actor" and _string_eq(item_job, "actor"):
+				job_tokens = _split_role_tokens(item_job)
+				if role_n == "actor" and "actor" in job_tokens:
 					return True
-				if role_n != "actor" and _string_eq(item_job, role):
+				if role_n != "actor" and role_n in job_tokens:
 					return True
 
 			item_character = value.get("character")
@@ -228,17 +240,17 @@ def _credit_matches_follow_role(credit: dict, *, followed_role: str) -> bool:
 	if role_n == "actor":
 		return not _is_self_character(credit.get("character"))
 
-	job_n = _norm_role(credit.get("job"))
-	if not job_n:
+	job_tokens = _split_role_tokens(credit.get("job"))
+	if not job_tokens:
 		return False
-	if _is_passive_crew_job(job_n):
+	if _is_passive_crew_job(credit.get("job")):
 		return False
 
 	if role_n == "director":
-		return job_n == "director"
+		return "director" in job_tokens
 	if role_n == "crew":
 		return True
-	return job_n == role_n
+	return role_n in job_tokens
 
 
 def extract_movie_ids_from_credits_for_role(credits: dict, followed_role: str) -> set[int]:

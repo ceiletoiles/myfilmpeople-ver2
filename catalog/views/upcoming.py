@@ -58,6 +58,15 @@ def _format_credit_detail(*, follow_role: str, credit_item: dict) -> str:
 	return follow_role.strip() if follow_role.strip() else "Credit"
 
 
+def _split_credit_jobs(job: str) -> list[str]:
+	tokens: list[str] = []
+	for raw in (job or "").replace("/", ",").replace(";", ",").replace("|", ",").split(","):
+		token = raw.strip().lower()
+		if token and token not in tokens:
+			tokens.append(token)
+	return tokens
+
+
 def _append_credit(entry: dict, *, person_name: str, credit_detail: str) -> None:
 	credit_set = entry.setdefault("_credit_set", set())
 	credit_details_by_person = entry.setdefault("_credit_details_by_person", {})
@@ -87,10 +96,13 @@ def _finalize_credits(entry: dict) -> None:
 
 def _crew_job_matches_follow_role(job: str, follow_role: str) -> bool:
 	job_n = _normalize_role(job)
+	job_tokens = _split_credit_jobs(job)
 	role_n = _normalize_role(follow_role)
 	if not job_n or not role_n:
 		return False
 	if job_n == role_n:
+		return True
+	if role_n in job_tokens:
 		return True
 	return role_n in job_n or job_n in role_n
 
@@ -138,7 +150,7 @@ def upcoming(request: HttpRequest) -> HttpResponse:
 			credit_items = [
 				c
 				for c in (credits.get("crew", []) or [])
-				if (c.get("job") or "").strip().lower() == "director"
+				if "director" in _split_credit_jobs(str(c.get("job") or ""))
 			]
 		elif follow_role_n == "crew":
 			# Backward compatible: generic "Crew" follows include all crew jobs.

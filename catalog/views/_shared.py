@@ -87,6 +87,15 @@ def _normalize_role(value: str) -> str:
 	return (value or "").strip().lower()
 
 
+def _split_role_tokens(value: str) -> list[str]:
+	tokens: list[str] = []
+	for raw in (value or "").replace("/", ",").replace(";", ",").replace("|", ",").split(","):
+		token = raw.strip()
+		if token and token not in tokens:
+			tokens.append(token)
+	return tokens
+
+
 def _role_category(role: str) -> str:
 	role_n = _normalize_role(role)
 	if role_n == "director":
@@ -107,7 +116,7 @@ def _person_role_options_from_credits(credits_raw: dict) -> list[str]:
 	for item in crew_items:
 		job = (item.get("job") or "").strip()
 		if job:
-			roles.add(job)
+			roles.update(_split_role_tokens(job))
 
 	preferred = {"director": 0, "actor": 1}
 	return sorted(

@@ -1152,7 +1152,28 @@ class RelatedLinksTests(TestCase):
 						"vote_average": 8.1,
 					},
 				],
-				"crew": [],
+				"crew": [
+					{
+						"id": 11,
+						"title": "Example Crew Movie",
+						"job": "Dialogue",
+						"release_date": "2025-01-01",
+						"popularity": 9.1,
+						"media_type": "movie",
+						"poster_path": "/poster-11.jpg",
+						"backdrop_path": "/backdrop-11.jpg",
+					},
+					{
+						"id": 11,
+						"title": "Example Crew Movie",
+						"job": "Story",
+						"release_date": "2025-01-01",
+						"popularity": 9.1,
+						"media_type": "movie",
+						"poster_path": "/poster-11.jpg",
+						"backdrop_path": "/backdrop-11.jpg",
+					},
+				],
 			},
 		)
 
@@ -1171,5 +1192,19 @@ class RelatedLinksTests(TestCase):
 				"poster_path": "/poster.jpg",
 				"backdrop_path": "/backdrop.jpg",
 				"character": "Hero",
+			},
+		)
+		self.assertEqual(len(credits["crew"]), 1)
+		self.assertEqual(
+			credits["crew"][0],
+			{
+				"id": 11,
+				"title": "Example Crew Movie",
+				"release_date": "2025-01-01",
+				"popularity": 9.1,
+				"media_type": "movie",
+				"poster_path": "/poster-11.jpg",
+				"backdrop_path": "/backdrop-11.jpg",
+				"job": "Dialogue, Story",
 			},
 		)

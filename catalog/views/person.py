@@ -754,7 +754,9 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 					return "Directing"
 			# If it's a crew job, infer department from credits.
 			for c in crew_items:
-				if str(c.get("job") or "").strip().lower() == role_n:
+				job = str(c.get("job") or "").strip().lower()
+				job_tokens = [token.strip() for token in job.replace("/", ",").replace(";", ",").replace("|", ",").split(",") if token.strip()]
+				if role_n == job or role_n in job_tokens:
 					dept = str(c.get("department") or "").strip()
 					if dept and filter_counts.get(dept):
 						return dept

@@ -50,19 +50,61 @@ def _compact_person_credit_item(item: dict[str, Any]) -> dict[str, Any]:
     return compact
 
 
+def _split_compact_jobs(job_value: object) -> list[str]:
+    if not isinstance(job_value, str):
+        return []
+    tokens: list[str] = []
+    for raw in job_value.replace("/", ",").replace(";", ",").replace("|", ",").split(","):
+        token = raw.strip()
+        if token and token not in tokens:
+            tokens.append(token)
+    return tokens
+
+
+def _merge_compact_person_credit_item(base: dict[str, Any], item: dict[str, Any]) -> dict[str, Any]:
+    merged = {**base}
+    for key in ("title", "release_date", "media_type", "poster_path", "backdrop_path"):
+        if not str(merged.get(key) or "").strip():
+            value = item.get(key)
+            if isinstance(value, str):
+                value = value.strip()
+            if value not in ("", None):
+                merged[key] = value
+    if isinstance(item.get("popularity"), (int, float)) and not isinstance(merged.get("popularity"), (int, float)):
+        merged["popularity"] = item.get("popularity")
+    character = str(merged.get("character") or "").strip()
+    item_character = str(item.get("character") or "").strip()
+    if item_character and not character:
+        merged["character"] = item_character
+    jobs = _split_compact_jobs(merged.get("job"))
+    jobs.extend(token for token in _split_compact_jobs(item.get("job")) if token not in jobs)
+    if jobs:
+        merged["job"] = ", ".join(jobs)
+    return merged
+
+
+def _compact_person_credit_list(items: list[Any]) -> list[dict[str, Any]]:
+    merged_by_id: dict[int, dict[str, Any]] = {}
+    for item in items:
+        compact = _compact_person_credit_item(item) if isinstance(item, dict) else {}
+        if not compact:
+            continue
+        movie_id = compact.get("id")
+        if not isinstance(movie_id, int):
+            continue
+        existing = merged_by_id.get(movie_id)
+        if existing is None:
+            merged_by_id[movie_id] = compact
+        else:
+            merged_by_id[movie_id] = _merge_compact_person_credit_item(existing, compact)
+    return list(merged_by_id.values())
+
+
 def compact_person_credits_payload(credits: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(credits, dict):
         return {"cast": [], "crew": []}
-    cast = [
-        compact
-        for compact in (_compact_person_credit_item(item) for item in (credits.get("cast") or []))
-        if compact
-    ]
-    crew = [
-        compact
-        for compact in (_compact_person_credit_item(item) for item in (credits.get("crew") or []))
-        if compact
-    ]
+    cast = _compact_person_credit_list(list(credits.get("cast") or []))
+    crew = _compact_person_credit_list(list(credits.get("crew") or []))
     return {"cast": cast, "crew": crew}
 
 
