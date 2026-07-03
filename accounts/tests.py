@@ -6,6 +6,7 @@ from datetime import timedelta
 from urllib.parse import parse_qs, urlparse
 from unittest.mock import Mock, patch
 
+import requests
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -181,8 +182,9 @@ class SignupVerificationTests(TestCase):
 		self.assertEqual(kwargs["headers"]["api-key"], "brevo-test-key")
 		self.assertEqual(kwargs["timeout"], 10)
 
-	@patch("accounts.email_services.requests.post", side_effect=TimeoutError("smtp timeout"))
-	def test_signup_creates_user_even_if_email_send_fails(self, _mock_post) -> None:
+	@patch("accounts.views.logger.error")
+	@patch("accounts.email_services.requests.post", side_effect=requests.exceptions.Timeout("api timeout"))
+	def test_signup_creates_user_even_if_brevo_send_fails(self, _mock_post, _mock_log_error) -> None:
 		with self.settings(BREVO_API_KEY="brevo-test-key"):
 			response = self.client.post(
 				reverse("signup"),

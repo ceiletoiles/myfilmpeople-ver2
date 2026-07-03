@@ -815,6 +815,124 @@ def prefetch_company_filmography(
     return fetched
 
 
+def prefetch_company_movies(
+    company: Company,
+    *,
+    force: bool = False,
+    max_pages: int | None = None,
+    progress_cb: Callable[[int, int], None] | None = None,
+    should_stop_cb: Callable[[], bool] | None = None,
+) -> int:
+    """Prefetch and cache full company-movies pagination into Company.tmdb_raw.
+
+    This uses TMDb's `/company/{id}/movies` endpoint, which tends to report the
+    complete page count more reliably for studio sync progress.
+    """
+    def should_stop() -> bool:
+        try:
+            return bool(should_stop_cb and should_stop_cb())
+        except Exception:
+            return False
+
+    tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+    pages = tmdb_raw.get("company_movies_pages")
+    if not isinstance(pages, dict):
+        pages = {}
+
+    meta = tmdb_raw.get("company_movies_meta")
+    if not isinstance(meta, dict):
+        meta = {}
+    cached_total_pages = meta.get("total_pages")
+    synced_at_raw = meta.get("synced_at")
+    company_movies_synced_at = None
+    if isinstance(synced_at_raw, str) and synced_at_raw.strip():
+        try:
+            company_movies_synced_at = datetime.fromisoformat(synced_at_raw.strip())
+            if company_movies_synced_at.tzinfo is None:
+                company_movies_synced_at = timezone.make_aware(company_movies_synced_at)
+        except Exception:
+            company_movies_synced_at = None
+    if (
+        not force
+        and company_movies_synced_at is not None
+        and not _is_stale(company_movies_synced_at)
+        and isinstance(cached_total_pages, int)
+        and cached_total_pages > 0
+        and len(pages) >= cached_total_pages
+    ):
+        return 0
+
+    if should_stop():
+        return 0
+
+    first = get_or_sync_company_movies_page(company, page=1, force=force)
+    first = compact_company_filmography_payload(first)
+    total_pages = int(first.get("total_pages") or 1)
+    pages_to_fetch = total_pages
+    if max_pages is not None and max_pages > 0:
+        pages_to_fetch = min(pages_to_fetch, int(max_pages))
+
+    # Re-store page 1 as the compact payload we want to keep in sync state.
+    tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+    pages = tmdb_raw.get("company_movies_pages")
+    if not isinstance(pages, dict):
+        pages = {}
+    pages["1"] = first
+
+    fetched = 1
+    try:
+        if progress_cb is not None:
+            progress_cb(fetched, pages_to_fetch)
+    except Exception:
+        pass
+
+    if should_stop():
+        meta["total_pages"] = total_pages
+        meta["total_results"] = int(first.get("total_results") or meta.get("total_results") or 0)
+        meta["sort_by"] = "company_movies"
+        meta["synced_at"] = timezone.now().isoformat()
+        company.tmdb_raw = {**tmdb_raw, "company_movies_pages": compact_company_filmography_pages(pages), "company_movies_meta": meta}
+        company.tmdb_last_sync_at = timezone.now()
+        company.tmdb_last_sync_source = "sync" if force else "ttl"
+        company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
+        try:
+            cache.set(f"db:company:v1:{int(company.tmdb_id)}", company, timeout=5 * 60)
+        except Exception:
+            pass
+        return fetched
+
+    for p in range(2, pages_to_fetch + 1):
+        if should_stop():
+            break
+        payload = get_or_sync_company_movies_page(company, page=p, force=force)
+        pages = company.tmdb_raw.get("company_movies_pages") if isinstance(company.tmdb_raw, dict) else {}
+        if isinstance(pages, dict):
+            pages[str(p)] = compact_company_filmography_payload(payload)
+        fetched += 1
+        try:
+            if progress_cb is not None:
+                progress_cb(fetched, pages_to_fetch)
+        except Exception:
+            pass
+        if should_stop():
+            break
+
+    meta["total_pages"] = total_pages
+    meta["total_results"] = int(first.get("total_results") or meta.get("total_results") or 0)
+    meta["sort_by"] = "company_movies"
+    meta["synced_at"] = timezone.now().isoformat()
+
+    company.tmdb_raw = {**tmdb_raw, "company_movies_pages": compact_company_filmography_pages(pages), "company_movies_meta": meta}
+    company.tmdb_last_sync_at = timezone.now()
+    company.tmdb_last_sync_source = "sync" if force else "ttl"
+    company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
+    try:
+        cache.set(f"db:company:v1:{int(company.tmdb_id)}", company, timeout=5 * 60)
+    except Exception:
+        pass
+    return fetched
+
+
 def get_or_sync_company_tba_movies_page(
     company: Company,
     *,

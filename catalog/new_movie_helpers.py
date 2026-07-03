@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import datetime
 from datetime import date
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from django.conf import settings
 from django.utils import timezone
@@ -20,7 +20,12 @@ def _norm_date_str(value: object) -> str:
 	return value.strip()
 
 
-def _is_current_or_future_movie(movie, *, today: date | None = None) -> bool:
+def _is_current_or_future_movie(
+	movie,
+	*,
+	release_date_hint: str | date | None = None,
+	today: date | None = None,
+) -> bool:
 	"""Return True for movies we still want to surface as new arrivals.
 
 	We keep undated titles because they are usually upcoming/TBA projects.
@@ -30,7 +35,9 @@ def _is_current_or_future_movie(movie, *, today: date | None = None) -> bool:
 	if movie is None:
 		return False
 	today = today or timezone.now().date()
-	release_date = getattr(movie, "release_date", None)
+	release_date = release_date_hint if release_date_hint is not None else getattr(movie, "release_date", None)
+	if isinstance(release_date, str):
+		release_date = _parse_iso_date(release_date)
 	if release_date is None:
 		return True
 	return release_date >= today
@@ -486,11 +493,11 @@ def extract_movie_ids_from_credits(credits: dict) -> set[int]:
 	return movie_ids
 
 
-def extract_movie_ids_from_filmography(filmography: dict) -> set[int]:
+def extract_movie_ids_from_filmography(filmography: dict, *, pages_key: str = "discover_movies_pages") -> set[int]:
 	"""Extract movie IDs from company filmography."""
 	movie_ids = set()
 	
-	pages = filmography.get("discover_movies_pages") or {}
+	pages = filmography.get(pages_key) or {}
 	for payload in pages.values():
 		if not isinstance(payload, dict):
 			continue
@@ -535,10 +542,10 @@ def extract_movie_release_dates_from_credits(credits: dict) -> dict[int, str]:
 	return by_id
 
 
-def extract_movie_release_dates_from_filmography(filmography: dict) -> dict[int, str]:
+def extract_movie_release_dates_from_filmography(filmography: dict, *, pages_key: str = "discover_movies_pages") -> dict[int, str]:
 	"""Extract movie_id -> release_date (raw string) from company filmography."""
 	by_id: dict[int, str] = {}
-	pages = filmography.get("discover_movies_pages") or {}
+	pages = filmography.get(pages_key) or {}
 	for payload in pages.values():
 		if not isinstance(payload, dict):
 			continue
@@ -565,14 +572,22 @@ def record_new_movie_arrivals(
 	*,
 	old_release_dates: dict[int, str] | None = None,
 	new_release_dates: dict[int, str] | None = None,
+	new_movie_display_by_movie: dict[int, dict] | None = None,
 	new_event_meta_by_movie: dict[int, dict] | None = None,
 	source_last_sync_at: "datetime.datetime" | None = None,
+	should_stop_cb: "Callable[[], bool] | None" = None,
 ) -> int:
 	"""
 	Record newly discovered movies.
 	Returns count of new arrivals recorded.
 	"""
 	count = 0
+	def should_stop() -> bool:
+		try:
+			return bool(should_stop_cb and should_stop_cb())
+		except Exception:
+			return False
+
 	newly_arrived = new_movie_ids - old_movie_ids
 
 	# Detect updates (currently: release_date changes).
@@ -614,6 +629,8 @@ def record_new_movie_arrivals(
 		# Map of tmdb movie id -> latest relevant change datetime (aware or naive)
 		recent_change_time_by_mid: dict[int, "datetime.datetime"] = {}
 		for mid in list(all_target_ids):
+			if should_stop():
+				return count
 			try:
 				payload = client.get_movie_changes(mid)
 			except Exception:
@@ -727,19 +744,49 @@ def record_new_movie_arrivals(
 
 	def _ensure_movie(mid: int, *, release_date: str | None = None) -> Movie | None:
 		movie = movies_by_tmdb_id.get(mid)
+		display_meta = {}
+		if isinstance(new_movie_display_by_movie, dict):
+			meta = new_movie_display_by_movie.get(mid)
+			if isinstance(meta, dict):
+				display_meta = meta
 		if movie:
+			update_fields: list[str] = []
+			title = str(display_meta.get("title") or "").strip()
+			if title and movie.title != title:
+				movie.title = title
+				update_fields.append("title")
+			poster_path = str(display_meta.get("poster_path") or "").strip()
+			if poster_path and movie.poster_path != poster_path:
+				movie.poster_path = poster_path
+				update_fields.append("poster_path")
+			if update_fields:
+				update_fields.append("updated_at")
+				movie.save(update_fields=update_fields)
 			return movie
 		release_dt = _parse_iso_date(release_date)
 		movie, _ = Movie.objects.get_or_create(
 			tmdb_id=mid,
 			defaults={
-				"title": str(mid),
+				"title": (str(display_meta.get("title") or "").strip() or str(mid)),
 				"release_date": release_dt,
+				"poster_path": str(display_meta.get("poster_path") or "").strip(),
 			},
 		)
 		if release_dt is not None and movie.release_date != release_dt:
 			movie.release_date = release_dt
 			movie.save(update_fields=["release_date", "updated_at"])
+		title = str(display_meta.get("title") or "").strip()
+		poster_path = str(display_meta.get("poster_path") or "").strip()
+		update_fields: list[str] = []
+		if title and movie.title != title:
+			movie.title = title
+			update_fields.append("title")
+		if poster_path and movie.poster_path != poster_path:
+			movie.poster_path = poster_path
+			update_fields.append("poster_path")
+		if update_fields:
+			update_fields.append("updated_at")
+			movie.save(update_fields=update_fields)
 		movies_by_tmdb_id[mid] = movie
 		return movie
 
@@ -747,12 +794,15 @@ def record_new_movie_arrivals(
 
 	# Record "new" events.
 	for movie_id in newly_arrived:
+		if should_stop():
+			return count
 		if movie_id in seen_new_tmdb_ids:
 			continue
-		movie = _ensure_movie(movie_id, release_date=(new_release_dates or {}).get(movie_id))
+		release_date_hint = (new_release_dates or {}).get(movie_id)
+		movie = _ensure_movie(movie_id, release_date=release_date_hint)
 		if not movie:
 			continue
-		if not _is_current_or_future_movie(movie, today=today):
+		if not _is_current_or_future_movie(movie, release_date_hint=release_date_hint, today=today):
 			continue
 		event_meta = {}
 		if isinstance(new_event_meta_by_movie, dict):
@@ -776,10 +826,13 @@ def record_new_movie_arrivals(
 
 	# Record "update" events (release_date changes).
 	for movie_id, meta in updated.items():
-		movie = _ensure_movie(movie_id, release_date=(new_release_dates or {}).get(movie_id))
+		if should_stop():
+			return count
+		release_date_hint = (new_release_dates or {}).get(movie_id)
+		movie = _ensure_movie(movie_id, release_date=release_date_hint)
 		if not movie:
 			continue
-		if not _is_current_or_future_movie(movie, today=today):
+		if not _is_current_or_future_movie(movie, release_date_hint=release_date_hint, today=today):
 			continue
 		existing = existing_updates.get(movie_id)
 		if existing is not None and (existing.event_meta or {}) == meta and existing.is_seen is False:

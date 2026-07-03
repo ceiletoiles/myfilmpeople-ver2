@@ -26,7 +26,7 @@ from ..new_movie_helpers import (
 from ..services import (
 	get_or_sync_company,
 	get_or_sync_person,
-	prefetch_company_filmography,
+	prefetch_company_movies,
 )
 
 SYNC_JOB_TTL_SECONDS = 60 * 60
@@ -141,6 +141,16 @@ def _run_sync_all_followed_job(
 		fail_companies = 0
 		notifications_created = 0
 		scope_title = _sync_scope_title(sync_scope)
+		person_name_by_id = dict(
+			PersonFollow.objects.filter(user=user)
+			.values_list("person__tmdb_id", "person__name")
+			.distinct()
+		)
+		company_name_by_id = dict(
+			CompanyFollow.objects.filter(user=user)
+			.values_list("company__tmdb_id", "company__name")
+			.distinct()
+		)
 
 		# Reset current sub-progress
 		_sync_job_patch(
@@ -163,10 +173,10 @@ def _run_sync_all_followed_job(
 		for i, pid in enumerate(person_ids, start=1):
 			if _sync_job_abort_if_cancel_requested(job_id):
 				return
-			person_label = f"Person {pid}"
+			person_label = person_name_by_id.get(pid) or f"Person {pid}"
 			_sync_job_patch(
 				job_id,
-				current_label=f"Loading person {i}/{total_people}…",
+				current_label=f"Loading person {i}/{total_people}: {person_label}…",
 				current_sub_done=0,
 				current_sub_total=0,
 			)
@@ -211,6 +221,7 @@ def _run_sync_all_followed_job(
 							new_movie_ids=new_role_movie_ids,
 						)
 						# Augment event meta with character names from the new credits (when available).
+						person_movie_display_by_movie: dict[int, dict] = {}
 						if isinstance(new_credits, dict):
 							for credit in (new_credits.get("cast") or []):
 								if not isinstance(credit, dict):
@@ -224,6 +235,20 @@ def _run_sync_all_followed_job(
 									# For cast entries, set the exact credit job to 'Actor' (preserve case/title).
 									if isinstance(meta, dict) and "credit_job" not in meta:
 										meta["credit_job"] = "Actor"
+									display = person_movie_display_by_movie.setdefault(mid, {})
+									title = str(credit.get("title") or credit.get("name") or "").strip()
+									if title and "title" not in display:
+										display["title"] = title
+									poster_path = str(credit.get("poster_path") or "").strip()
+									if poster_path and "poster_path" not in display:
+										display["poster_path"] = poster_path
+									display = person_movie_display_by_movie.setdefault(mid, {})
+									title = str(credit.get("title") or credit.get("name") or "").strip()
+									if title and "title" not in display:
+										display["title"] = title
+									poster_path = str(credit.get("poster_path") or "").strip()
+									if poster_path and "poster_path" not in display:
+										display["poster_path"] = poster_path
 
 							for credit in (new_credits.get("crew") or []):
 								if not isinstance(credit, dict):
@@ -234,6 +259,20 @@ def _run_sync_all_followed_job(
 									meta = (new_event_meta_by_movie.setdefault(mid, {}) if isinstance(new_event_meta_by_movie, dict) else {})
 									if isinstance(meta, dict) and "credit_job" not in meta:
 										meta["credit_job"] = job.strip()
+									display = person_movie_display_by_movie.setdefault(mid, {})
+									title = str(credit.get("title") or credit.get("name") or "").strip()
+									if title and "title" not in display:
+										display["title"] = title
+									poster_path = str(credit.get("poster_path") or "").strip()
+									if poster_path and "poster_path" not in display:
+										display["poster_path"] = poster_path
+									display = person_movie_display_by_movie.setdefault(mid, {})
+									title = str(credit.get("title") or credit.get("name") or "").strip()
+									if title and "title" not in display:
+										display["title"] = title
+									poster_path = str(credit.get("poster_path") or "").strip()
+									if poster_path and "poster_path" not in display:
+										display["poster_path"] = poster_path
 						notifications_created += record_new_movie_arrivals(
 							user=user,
 							source_type="person",
@@ -244,8 +283,10 @@ def _run_sync_all_followed_job(
 							role=follow.role or "",
 							old_release_dates=old_role_release_dates,
 							new_release_dates=new_role_release_dates,
+							new_movie_display_by_movie=person_movie_display_by_movie,
 							new_event_meta_by_movie=new_event_meta_by_movie,
 							source_last_sync_at=getattr(person, "tmdb_last_sync_at", None),
+							should_stop_cb=lambda: _sync_job_is_cancel_requested(job_id),
 						)
 
 				synced_people += 1
@@ -270,10 +311,10 @@ def _run_sync_all_followed_job(
 		for i, cid in enumerate(company_ids, start=1):
 			if _sync_job_abort_if_cancel_requested(job_id):
 				return
-			company_label = f"Studio {cid}"
+			company_label = company_name_by_id.get(cid) or f"Studio {cid}"
 			_sync_job_patch(
 				job_id,
-				current_label=f"Loading studio {i}/{total_companies}…",
+				current_label=f"Loading studio {i}/{total_companies}: {company_label}…",
 				current_sub_done=0,
 				current_sub_total=0,
 			)
@@ -286,10 +327,10 @@ def _run_sync_all_followed_job(
 				except Exception:
 					pass
 				old_tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-				old_movie_ids = extract_movie_ids_from_filmography(old_tmdb_raw)
-				old_pages = old_tmdb_raw.get("discover_movies_pages")
+				old_movie_ids = extract_movie_ids_from_filmography(old_tmdb_raw, pages_key="company_movies_pages")
+				old_pages = old_tmdb_raw.get("company_movies_pages")
 				old_baseline_present = isinstance(old_pages, dict) and len(old_pages) > 0
-				old_release_dates = extract_movie_release_dates_from_filmography(old_tmdb_raw)
+				old_release_dates = extract_movie_release_dates_from_filmography(old_tmdb_raw, pages_key="company_movies_pages")
 
 				company = get_or_sync_company(cid, force=True)
 				company_label = company.name or company_label
@@ -308,7 +349,7 @@ def _run_sync_all_followed_job(
 					)
 
 				try:
-					prefetch_company_filmography(
+					prefetch_company_movies(
 						company,
 						force=True,
 						max_pages=max_company_pages,
@@ -322,8 +363,27 @@ def _run_sync_all_followed_job(
 					return
 
 				new_tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-				new_movie_ids = extract_movie_ids_from_filmography(new_tmdb_raw)
-				new_release_dates = extract_movie_release_dates_from_filmography(new_tmdb_raw)
+				new_movie_ids = extract_movie_ids_from_filmography(new_tmdb_raw, pages_key="company_movies_pages")
+				new_release_dates = extract_movie_release_dates_from_filmography(new_tmdb_raw, pages_key="company_movies_pages")
+				company_movie_display_by_movie: dict[int, dict] = {}
+				if isinstance(new_tmdb_raw, dict):
+					pages = new_tmdb_raw.get("company_movies_pages") or {}
+					for payload in pages.values():
+						if not isinstance(payload, dict):
+							continue
+						for movie in payload.get("results", []) or []:
+							if not isinstance(movie, dict):
+								continue
+							mid = movie.get("id")
+							if not isinstance(mid, int):
+								continue
+							display = company_movie_display_by_movie.setdefault(mid, {})
+							title = str(movie.get("title") or movie.get("name") or "").strip()
+							if title and "title" not in display:
+								display["title"] = title
+							poster_path = str(movie.get("poster_path") or "").strip()
+							if poster_path and "poster_path" not in display:
+								display["poster_path"] = poster_path
 
 				if old_baseline_present:
 					notifications_created += record_new_movie_arrivals(
@@ -336,9 +396,11 @@ def _run_sync_all_followed_job(
 						role="studio",
 						old_release_dates=old_release_dates,
 						new_release_dates=new_release_dates,
+						new_movie_display_by_movie=company_movie_display_by_movie,
 						# Use the current company sync timestamp so older TMDb edits
 						# do not surface as fresh arrivals.
 						source_last_sync_at=getattr(company, "tmdb_last_sync_at", None),
+						should_stop_cb=lambda: _sync_job_is_cancel_requested(job_id),
 					)
 
 				CompanyFollow.objects.filter(user=user, company__tmdb_id=cid).update(name=company.name)
@@ -450,6 +512,34 @@ def _run_person_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int) -> None:
 		_sync_job_patch(job_id, current_label="Recording updates…", current_sub_done=75)
 		if old_baseline_present:
 			follows = PersonFollow.objects.filter(user=user, person__tmdb_id=tmdb_id)
+			person_movie_display_by_movie: dict[int, dict] = {}
+			if isinstance(new_credits, dict):
+				for credit in (new_credits.get("cast") or []):
+					if not isinstance(credit, dict):
+						continue
+					mid = credit.get("id")
+					if not isinstance(mid, int):
+						continue
+					display = person_movie_display_by_movie.setdefault(mid, {})
+					title = str(credit.get("title") or credit.get("name") or "").strip()
+					if title and "title" not in display:
+						display["title"] = title
+					poster_path = str(credit.get("poster_path") or "").strip()
+					if poster_path and "poster_path" not in display:
+						display["poster_path"] = poster_path
+				for credit in (new_credits.get("crew") or []):
+					if not isinstance(credit, dict):
+						continue
+					mid = credit.get("id")
+					if not isinstance(mid, int):
+						continue
+					display = person_movie_display_by_movie.setdefault(mid, {})
+					title = str(credit.get("title") or credit.get("name") or "").strip()
+					if title and "title" not in display:
+						display["title"] = title
+					poster_path = str(credit.get("poster_path") or "").strip()
+					if poster_path and "poster_path" not in display:
+						display["poster_path"] = poster_path
 			for follow in follows:
 				old_role_movie_ids = extract_movie_ids_from_credits_for_role(old_credits, follow.role or "")
 				new_role_movie_ids = extract_movie_ids_from_credits_for_role(new_credits, follow.role or "")
@@ -472,7 +562,9 @@ def _run_person_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int) -> None:
 					role=follow.role or "",
 					old_release_dates=old_role_release_dates,
 					new_release_dates=new_role_release_dates,
+					new_movie_display_by_movie=person_movie_display_by_movie,
 					new_event_meta_by_movie=new_event_meta_by_movie,
+					should_stop_cb=lambda: _sync_job_is_cancel_requested(job_id),
 				)
 
 		if _sync_job_abort_if_cancel_requested(job_id):
@@ -556,10 +648,10 @@ def _run_company_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int, max_compa
 		except Exception:
 			pass
 		old_tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-		old_movie_ids = extract_movie_ids_from_filmography(old_tmdb_raw)
-		old_pages = old_tmdb_raw.get("discover_movies_pages")
+		old_movie_ids = extract_movie_ids_from_filmography(old_tmdb_raw, pages_key="company_movies_pages")
+		old_pages = old_tmdb_raw.get("company_movies_pages")
 		old_baseline_present = isinstance(old_pages, dict) and len(old_pages) > 0
-		old_release_dates = extract_movie_release_dates_from_filmography(old_tmdb_raw)
+		old_release_dates = extract_movie_release_dates_from_filmography(old_tmdb_raw, pages_key="company_movies_pages")
 
 		company = get_or_sync_company(tmdb_id, force=True)
 		if _sync_job_abort_if_cancel_requested(job_id):
@@ -578,7 +670,7 @@ def _run_company_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int, max_compa
 			)
 
 		try:
-			prefetch_company_filmography(
+			prefetch_company_movies(
 				company,
 				force=True,
 				max_pages=max_company_pages,
@@ -592,8 +684,27 @@ def _run_company_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int, max_compa
 			return
 
 		new_tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-		new_movie_ids = extract_movie_ids_from_filmography(new_tmdb_raw)
-		new_release_dates = extract_movie_release_dates_from_filmography(new_tmdb_raw)
+		new_movie_ids = extract_movie_ids_from_filmography(new_tmdb_raw, pages_key="company_movies_pages")
+		new_release_dates = extract_movie_release_dates_from_filmography(new_tmdb_raw, pages_key="company_movies_pages")
+		company_movie_display_by_movie: dict[int, dict] = {}
+		if isinstance(new_tmdb_raw, dict):
+			pages = new_tmdb_raw.get("company_movies_pages") or {}
+			for payload in pages.values():
+				if not isinstance(payload, dict):
+					continue
+				for movie in payload.get("results", []) or []:
+					if not isinstance(movie, dict):
+						continue
+					mid = movie.get("id")
+					if not isinstance(mid, int):
+						continue
+					display = company_movie_display_by_movie.setdefault(mid, {})
+					title = str(movie.get("title") or movie.get("name") or "").strip()
+					if title and "title" not in display:
+						display["title"] = title
+					poster_path = str(movie.get("poster_path") or "").strip()
+					if poster_path and "poster_path" not in display:
+						display["poster_path"] = poster_path
 
 		notifications_created = 0
 		if old_baseline_present:
@@ -607,6 +718,8 @@ def _run_company_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int, max_compa
 				role="studio",
 				old_release_dates=old_release_dates,
 				new_release_dates=new_release_dates,
+				new_movie_display_by_movie=company_movie_display_by_movie,
+				should_stop_cb=lambda: _sync_job_is_cancel_requested(job_id),
 			)
 
 		CompanyFollow.objects.filter(user=user, company__tmdb_id=tmdb_id).update(name=company.name)
@@ -763,7 +876,7 @@ def company_sync_start(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		max_pages_int = int(max_pages)
 	except (TypeError, ValueError):
 		max_pages_int = 0
-	max_company_pages = 1 if max_pages_int <= 0 else max_pages_int
+	max_company_pages = None if max_pages_int <= 0 else max_pages_int
 
 	thread = threading.Thread(
 		target=_run_company_sync_job,
@@ -921,7 +1034,7 @@ def sync_all_followed_start(request: HttpRequest) -> HttpResponse:
 		max_pages_int = int(max_pages)
 	except (TypeError, ValueError):
 		max_pages_int = 0
-	max_company_pages = 1 if max_pages_int <= 0 else max_pages_int
+	max_company_pages = None if max_pages_int <= 0 else max_pages_int
 
 	thread = threading.Thread(
 		target=_run_sync_all_followed_job,

@@ -26,10 +26,14 @@ from ..new_movie_helpers import (
 from ..services import (
 	get_or_sync_company,
 	get_or_sync_person,
-	prefetch_company_filmography,
+	prefetch_company_movies,
 )
 from ._shared import SESSION_KEY_HIDE_SELF_APPEARANCES, _get_session_bool, _person_role_options_from_credits
 from ._shared import _parse_iso_date
+
+# Backward-compatible alias for tests and any older call sites that still patch
+# the previous helper name.
+prefetch_company_filmography = prefetch_company_movies
 
 
 def _wants_json(request: HttpRequest) -> bool:
@@ -309,18 +313,18 @@ def follow(request: HttpRequest) -> HttpResponse:
 	if entity_type == "company":
 		# Treat the follow moment as the baseline snapshot.
 		company = get_or_sync_company(tmdb_id, force=True)
-		# Pre-cache full company filmography so later syncs compare against the
-		# state visible at follow time, not an older stale cache.
+		# Pre-cache full company-movies pagination so later syncs compare against
+		# the state visible at follow time, not an older stale cache.
 		max_pages = getattr(settings, "TMDB_COMPANY_FILMOGRAPHY_PREFETCH_MAX_PAGES", 0)
 		try:
 			max_pages_int = int(max_pages)
 		except (TypeError, ValueError):
 			max_pages_int = 0
 		try:
-			prefetch_company_filmography(
+			prefetch_company_movies(
 				company,
 				force=True,
-				max_pages=1 if max_pages_int <= 0 else max_pages_int,
+				max_pages=None if max_pages_int <= 0 else max_pages_int,
 			)
 		except Exception:
 			# Non-fatal: following should still succeed even if TMDb is temporarily unavailable.
@@ -443,6 +447,34 @@ def person_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		follow_started_at = PersonFollow.objects.filter(user=request.user, person__tmdb_id=tmdb_id).values_list("created_at", flat=True).first()
 		follow_started_date = follow_started_at.date() if follow_started_at else None
 		follows = PersonFollow.objects.filter(user=request.user, person__tmdb_id=tmdb_id)
+		person_movie_display_by_movie: dict[int, dict] = {}
+		if isinstance(new_credits, dict):
+			for credit in (new_credits.get("cast") or []):
+				if not isinstance(credit, dict):
+					continue
+				mid = credit.get("id")
+				if not isinstance(mid, int):
+					continue
+				display = person_movie_display_by_movie.setdefault(mid, {})
+				title = str(credit.get("title") or credit.get("name") or "").strip()
+				if title and "title" not in display:
+					display["title"] = title
+				poster_path = str(credit.get("poster_path") or "").strip()
+				if poster_path and "poster_path" not in display:
+					display["poster_path"] = poster_path
+			for credit in (new_credits.get("crew") or []):
+				if not isinstance(credit, dict):
+					continue
+				mid = credit.get("id")
+				if not isinstance(mid, int):
+					continue
+				display = person_movie_display_by_movie.setdefault(mid, {})
+				title = str(credit.get("title") or credit.get("name") or "").strip()
+				if title and "title" not in display:
+					display["title"] = title
+				poster_path = str(credit.get("poster_path") or "").strip()
+				if poster_path and "poster_path" not in display:
+					display["poster_path"] = poster_path
 		for follow in follows:
 			old_role_movie_ids = extract_movie_ids_from_credits_for_role(old_credits, follow.role or "")
 			new_role_movie_ids = extract_movie_ids_from_credits_for_role(new_credits, follow.role or "")
@@ -498,6 +530,7 @@ def person_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				role=follow.role or "",
 				old_release_dates=old_role_release_dates,
 				new_release_dates=new_role_release_dates,
+				new_movie_display_by_movie=person_movie_display_by_movie,
 				new_event_meta_by_movie=new_event_meta_by_movie,
 				source_last_sync_at=getattr(person, "tmdb_last_sync_at", None),
 			)
@@ -529,10 +562,10 @@ def company_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	except Exception:
 		pass
 	old_tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-	old_movie_ids = extract_movie_ids_from_filmography(old_tmdb_raw)
-	old_pages = old_tmdb_raw.get("discover_movies_pages")
+	old_movie_ids = extract_movie_ids_from_filmography(old_tmdb_raw, pages_key="company_movies_pages")
+	old_pages = old_tmdb_raw.get("company_movies_pages")
 	old_baseline_present = isinstance(old_pages, dict) and len(old_pages) > 0
-	old_release_dates = extract_movie_release_dates_from_filmography(old_tmdb_raw)
+	old_release_dates = extract_movie_release_dates_from_filmography(old_tmdb_raw, pages_key="company_movies_pages")
 
 	# Sync new data
 	company = get_or_sync_company(tmdb_id, force=True)
@@ -544,25 +577,44 @@ def company_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		max_pages_int = 0
 	fetched_pages = 0
 	try:
-		fetched_pages = prefetch_company_filmography(
+		fetched_pages = prefetch_company_movies(
 			company,
 			force=True,
-			max_pages=1 if max_pages_int <= 0 else max_pages_int,
+			max_pages=None if max_pages_int <= 0 else max_pages_int,
 		)
 	except Exception:
 		pass
 
 	# Get new movie IDs after syncing
 	new_tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-	new_movie_ids = extract_movie_ids_from_filmography(new_tmdb_raw)
-	new_release_dates = extract_movie_release_dates_from_filmography(new_tmdb_raw)
+	new_movie_ids = extract_movie_ids_from_filmography(new_tmdb_raw, pages_key="company_movies_pages")
+	new_release_dates = extract_movie_release_dates_from_filmography(new_tmdb_raw, pages_key="company_movies_pages")
+	company_movie_display_by_movie: dict[int, dict] = {}
+	if isinstance(new_tmdb_raw, dict):
+		pages = new_tmdb_raw.get("company_movies_pages") or {}
+		for payload in pages.values():
+			if not isinstance(payload, dict):
+				continue
+			for movie in payload.get("results", []) or []:
+				if not isinstance(movie, dict):
+					continue
+				mid = movie.get("id")
+				if not isinstance(mid, int):
+					continue
+				display = company_movie_display_by_movie.setdefault(mid, {})
+				title = str(movie.get("title") or movie.get("name") or "").strip()
+				if title and "title" not in display:
+					display["title"] = title
+				poster_path = str(movie.get("poster_path") or "").strip()
+				if poster_path and "poster_path" not in display:
+					display["poster_path"] = poster_path
 
 	# Progress info (best-effort): pages cached vs total_pages.
 	pages_cached = 0
 	total_pages = None
 	try:
-		pages = new_tmdb_raw.get("discover_movies_pages")
-		meta = new_tmdb_raw.get("discover_movies_meta")
+		pages = new_tmdb_raw.get("company_movies_pages")
+		meta = new_tmdb_raw.get("company_movies_meta")
 		if isinstance(pages, dict):
 			pages_cached = len(pages)
 		if isinstance(meta, dict):
@@ -583,7 +635,7 @@ def company_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		# so the UI shows the specific company role instead of a placeholder.
 		company_event_meta: dict[int, dict] = {}
 		if isinstance(new_tmdb_raw, dict):
-			pages = new_tmdb_raw.get("discover_movies_pages") or {}
+			pages = new_tmdb_raw.get("company_movies_pages") or {}
 			for payload in pages.values():
 				if not isinstance(payload, dict):
 					continue
@@ -622,6 +674,7 @@ def company_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			role="studio",
 			old_release_dates=old_release_dates,
 			new_release_dates=new_release_dates,
+			new_movie_display_by_movie=company_movie_display_by_movie,
 			new_event_meta_by_movie=company_event_meta,
 			source_last_sync_at=getattr(company, "tmdb_last_sync_at", None),
 		)
@@ -702,6 +755,34 @@ def sync_all_followed(request: HttpRequest) -> HttpResponse:
 			new_credits = person.tmdb_credits_raw or {}
 			new_movie_ids = extract_movie_ids_from_credits(new_credits)
 			new_release_dates = extract_movie_release_dates_from_credits(new_credits)
+			person_movie_display_by_movie: dict[int, dict] = {}
+			if isinstance(new_credits, dict):
+				for credit in (new_credits.get("cast") or []):
+					if not isinstance(credit, dict):
+						continue
+					mid = credit.get("id")
+					if not isinstance(mid, int):
+						continue
+					display = person_movie_display_by_movie.setdefault(mid, {})
+					title = str(credit.get("title") or credit.get("name") or "").strip()
+					if title and "title" not in display:
+						display["title"] = title
+					poster_path = str(credit.get("poster_path") or "").strip()
+					if poster_path and "poster_path" not in display:
+						display["poster_path"] = poster_path
+				for credit in (new_credits.get("crew") or []):
+					if not isinstance(credit, dict):
+						continue
+					mid = credit.get("id")
+					if not isinstance(mid, int):
+						continue
+					display = person_movie_display_by_movie.setdefault(mid, {})
+					title = str(credit.get("title") or credit.get("name") or "").strip()
+					if title and "title" not in display:
+						display["title"] = title
+					poster_path = str(credit.get("poster_path") or "").strip()
+					if poster_path and "poster_path" not in display:
+						display["poster_path"] = poster_path
 
 			# Record new arrivals (only if a baseline existed pre-sync).
 			if old_baseline_present:
@@ -763,6 +844,7 @@ def sync_all_followed(request: HttpRequest) -> HttpResponse:
 						role=follow.role or "",
 						old_release_dates=old_role_release_dates,
 						new_release_dates=new_role_release_dates,
+						new_movie_display_by_movie=person_movie_display_by_movie,
 						new_event_meta_by_movie=new_event_meta_by_movie,
 						source_last_sync_at=getattr(person, "tmdb_last_sync_at", None),
 					)
@@ -781,10 +863,10 @@ def sync_all_followed(request: HttpRequest) -> HttpResponse:
 			except Exception:
 				pass
 			old_tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-			old_movie_ids = extract_movie_ids_from_filmography(old_tmdb_raw)
-			old_pages = old_tmdb_raw.get("discover_movies_pages")
+			old_movie_ids = extract_movie_ids_from_filmography(old_tmdb_raw, pages_key="company_movies_pages")
+			old_pages = old_tmdb_raw.get("company_movies_pages")
 			old_baseline_present = isinstance(old_pages, dict) and len(old_pages) > 0
-			old_release_dates = extract_movie_release_dates_from_filmography(old_tmdb_raw)
+			old_release_dates = extract_movie_release_dates_from_filmography(old_tmdb_raw, pages_key="company_movies_pages")
 
 			# Sync new data
 			company = get_or_sync_company(cid, force=True)
@@ -795,18 +877,37 @@ def sync_all_followed(request: HttpRequest) -> HttpResponse:
 			except (TypeError, ValueError):
 				max_pages_int = 0
 			try:
-				prefetch_company_filmography(
+				prefetch_company_movies(
 					company,
 					force=True,
-					max_pages=1 if max_pages_int <= 0 else max_pages_int,
+					max_pages=None if max_pages_int <= 0 else max_pages_int,
 				)
 			except Exception:
 				pass
 
 			# Get new movie IDs after syncing
 			new_tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-			new_movie_ids = extract_movie_ids_from_filmography(new_tmdb_raw)
-			new_release_dates = extract_movie_release_dates_from_filmography(new_tmdb_raw)
+			new_movie_ids = extract_movie_ids_from_filmography(new_tmdb_raw, pages_key="company_movies_pages")
+			new_release_dates = extract_movie_release_dates_from_filmography(new_tmdb_raw, pages_key="company_movies_pages")
+			company_movie_display_by_movie: dict[int, dict] = {}
+			if isinstance(new_tmdb_raw, dict):
+				pages = new_tmdb_raw.get("company_movies_pages") or {}
+				for payload in pages.values():
+					if not isinstance(payload, dict):
+						continue
+					for movie in payload.get("results", []) or []:
+						if not isinstance(movie, dict):
+							continue
+						mid = movie.get("id")
+						if not isinstance(mid, int):
+							continue
+						display = company_movie_display_by_movie.setdefault(mid, {})
+						title = str(movie.get("title") or movie.get("name") or "").strip()
+						if title and "title" not in display:
+							display["title"] = title
+						poster_path = str(movie.get("poster_path") or "").strip()
+						if poster_path and "poster_path" not in display:
+							display["poster_path"] = poster_path
 
 			# Record new arrivals (only if a baseline existed pre-sync).
 			if old_baseline_present:
@@ -832,6 +933,7 @@ def sync_all_followed(request: HttpRequest) -> HttpResponse:
 					role="studio",
 					old_release_dates=old_release_dates,
 					new_release_dates=new_release_dates,
+					new_movie_display_by_movie=company_movie_display_by_movie,
 				)
 
 			CompanyFollow.objects.filter(user=request.user, company__tmdb_id=cid).update(name=company.name)
