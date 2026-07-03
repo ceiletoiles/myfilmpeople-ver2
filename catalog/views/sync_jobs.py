@@ -163,6 +163,7 @@ def _run_sync_all_followed_job(
 		for i, pid in enumerate(person_ids, start=1):
 			if _sync_job_abort_if_cancel_requested(job_id):
 				return
+			person_label = f"Person {pid}"
 			_sync_job_patch(
 				job_id,
 				current_label=f"Loading person {i}/{total_people}…",
@@ -185,7 +186,7 @@ def _run_sync_all_followed_job(
 				)
 
 				person = get_or_sync_person(pid, force=True)
-				person_label = person.name or f"Person {pid}"
+				person_label = person.name or person_label
 				_sync_job_patch(job_id, current_label=f"Syncing person {person_label}…")
 				if _sync_job_abort_if_cancel_requested(job_id):
 					return
@@ -251,6 +252,12 @@ def _run_sync_all_followed_job(
 				if _sync_job_abort_if_cancel_requested(job_id):
 					return
 			except Exception:
+				_sync_job_patch(
+					job_id,
+					current_label=f"Failed person {person_label}…",
+					current_sub_done=0,
+					current_sub_total=0,
+				)
 				fail_people += 1
 			finally:
 				_sync_job_patch(
@@ -263,6 +270,7 @@ def _run_sync_all_followed_job(
 		for i, cid in enumerate(company_ids, start=1):
 			if _sync_job_abort_if_cancel_requested(job_id):
 				return
+			company_label = f"Studio {cid}"
 			_sync_job_patch(
 				job_id,
 				current_label=f"Loading studio {i}/{total_companies}…",
@@ -284,7 +292,7 @@ def _run_sync_all_followed_job(
 				old_release_dates = extract_movie_release_dates_from_filmography(old_tmdb_raw)
 
 				company = get_or_sync_company(cid, force=True)
-				company_label = company.name or f"Studio {cid}"
+				company_label = company.name or company_label
 				_sync_job_patch(job_id, current_label=f"Syncing studio {company_label}…")
 				if _sync_job_abort_if_cancel_requested(job_id):
 					return
@@ -338,6 +346,12 @@ def _run_sync_all_followed_job(
 				if _sync_job_abort_if_cancel_requested(job_id):
 					return
 			except Exception:
+				_sync_job_patch(
+					job_id,
+					current_label=f"Failed studio {company_label}…",
+					current_sub_done=0,
+					current_sub_total=0,
+				)
 				fail_companies += 1
 			finally:
 				_sync_job_patch(
@@ -351,11 +365,16 @@ def _run_sync_all_followed_job(
 
 		finished_at = timezone.now().isoformat()
 		fail_total = fail_people + fail_companies
+		if fail_total == 0:
+			completion_message = f"Sync complete. Notifications: {notifications_created}."
+		else:
+			completion_message = f"Sync completed with errors. Notifications: {notifications_created}. Failed: {fail_total}."
 		_sync_job_patch(
 			job_id,
 			status="done" if fail_total == 0 else "done_with_errors",
 			finished_at=finished_at,
 			current_label="Complete",
+			message=completion_message,
 		)
 	finally:
 		# Clear active job pointer.
@@ -394,6 +413,8 @@ def _run_person_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int) -> None:
 		if _sync_job_abort_if_cancel_requested(job_id):
 			return
 
+		person_label = f"Person {tmdb_id}"
+
 		if not PersonFollow.objects.filter(user=user, person__tmdb_id=tmdb_id).exists():
 			_sync_job_patch(
 				job_id,
@@ -415,7 +436,7 @@ def _run_person_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int) -> None:
 		old_credits = person.tmdb_credits_raw or {}
 		old_baseline_present = isinstance(old_credits.get("cast"), list) or isinstance(old_credits.get("crew"), list)
 
-		person_label = person.name or f"Person {tmdb_id}"
+		person_label = person.name or person_label
 		_sync_job_patch(job_id, current_label=f"Syncing person {person_label}…", current_sub_done=35)
 		if _sync_job_abort_if_cancel_requested(job_id):
 			return
@@ -465,6 +486,7 @@ def _run_person_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int) -> None:
 			notifications_created=notifications_created,
 			current_label="Complete",
 			current_sub_done=100,
+			message=f"Sync complete. Notifications: {notifications_created}.",
 		)
 	except Exception:
 		if _sync_job_abort_if_cancel_requested(job_id):
@@ -474,8 +496,9 @@ def _run_person_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int) -> None:
 			status="done_with_errors",
 			finished_at=timezone.now().isoformat(),
 			fail_people=1,
-			current_label="Failed",
+			current_label=f"Failed person {person_label}…",
 			current_sub_done=100,
+			message="Sync completed with errors.",
 		)
 	finally:
 		try:
@@ -513,6 +536,8 @@ def _run_company_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int, max_compa
 		if _sync_job_abort_if_cancel_requested(job_id):
 			return
 
+		company_label = f"Studio {tmdb_id}"
+
 		if not CompanyFollow.objects.filter(user=user, company__tmdb_id=tmdb_id).exists():
 			_sync_job_patch(
 				job_id,
@@ -539,7 +564,7 @@ def _run_company_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int, max_compa
 		company = get_or_sync_company(tmdb_id, force=True)
 		if _sync_job_abort_if_cancel_requested(job_id):
 			return
-		company_label = company.name or f"Studio {tmdb_id}"
+		company_label = company.name or company_label
 		_sync_job_patch(job_id, current_label=f"Syncing studio {company_label}…")
 
 		def _on_pages_progress(done: int, total: int) -> None:
@@ -596,6 +621,7 @@ def _run_company_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int, max_compa
 			current_label="Complete",
 			current_sub_done=0,
 			current_sub_total=0,
+			message=f"Sync complete. Notifications: {notifications_created}.",
 		)
 	except Exception:
 		_sync_job_patch(
@@ -603,7 +629,8 @@ def _run_company_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int, max_compa
 			status="done_with_errors",
 			finished_at=timezone.now().isoformat(),
 			fail_companies=1,
-			current_label="Failed",
+			current_label=f"Failed studio {company_label}…",
+			message="Sync completed with errors.",
 		)
 		if _sync_job_abort_if_cancel_requested(job_id):
 			return

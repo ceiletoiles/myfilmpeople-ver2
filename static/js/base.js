@@ -202,6 +202,17 @@
           clearPolling();
           if (activeButton) activeButton.disabled = false;
           setCancelVisible(false);
+
+          const completionMessage = (data.message || '').trim() || (
+            status === 'canceled'
+              ? 'Sync canceled.'
+              : ('Sync complete. Notifications: ' + Number(data.notifications_created || 0) + '.')
+          );
+          setText(completionMessage);
+          if (status === 'done' || status === 'done_with_errors') {
+            showPageMessage(completionMessage);
+          }
+
           resetActiveJob();
           // Auto-hide shortly after completion.
           window.setTimeout(function () {
