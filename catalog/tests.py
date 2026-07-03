@@ -23,7 +23,7 @@ from .new_movie_helpers import (
 	filter_movie_ids_by_release_date,
 	record_new_movie_arrivals,
 )
-from .services import get_or_sync_company, get_or_sync_person, prefetch_company_filmography
+from .services import get_or_sync_company, get_or_sync_person, prefetch_company_filmography, prefetch_company_movies
 from .views.movie import _build_country_name_lookup, _build_crew_groups, _build_release_groups
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -826,6 +826,61 @@ class RelatedLinksTests(TestCase):
 			},
 		)
 
+	@patch("catalog.services.TMDbClient.from_settings")
+	def test_company_tba_movies_are_fully_cached_after_prefetch(self, mock_from_settings) -> None:
+		client = mock_from_settings.return_value
+		client.get_company.return_value = {
+			"id": 194232,
+			"name": "Apple Studios",
+			"logo_path": "/oE7H93u8sy5vvW5EH3fpCp68vvB.png",
+		}
+		client.get_company_movies.return_value = {
+			"page": 1,
+			"results": [
+				{"id": 9001, "title": "Studio Movie", "release_date": "2026-01-01"},
+			],
+			"total_pages": 1,
+			"total_results": 1,
+		}
+		client.discover_movies_by_company.side_effect = [
+			{
+				"page": 1,
+				"results": [
+					{"id": 1, "title": "Future One", "release_date": "2099-01-01"},
+					{"id": 2, "title": "Announced One"},
+					{"id": 3, "title": "Past One", "release_date": "2020-01-01"},
+				],
+				"total_pages": 2,
+				"total_results": 5,
+			},
+			{
+				"page": 2,
+				"results": [
+					{"id": 4, "title": "Future Two", "release_date": "2100-01-01"},
+					{"id": 5, "title": "Announced Two"},
+				],
+				"total_pages": 2,
+				"total_results": 5,
+			},
+		]
+		client.get_company_alternative_names.return_value = {}
+
+		company = get_or_sync_company(194232, force=True)
+		prefetch_company_movies(company, force=True, max_pages=1)
+		company.refresh_from_db(fields=["tmdb_raw"])
+		raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+		tba_movies = raw.get("tba_movies") or []
+		tba_meta = raw.get("tba_scan_meta") or {}
+
+		self.assertEqual([m.get("id") for m in tba_movies], [1, 2, 4, 5])
+		self.assertEqual(tba_movies[0], {"id": 1, "release_date": "2099-01-01"})
+		self.assertEqual(tba_movies[1], {"id": 2})
+		self.assertEqual(tba_movies[2], {"id": 4, "release_date": "2100-01-01"})
+		self.assertEqual(tba_movies[3], {"id": 5})
+		self.assertEqual(tba_meta.get("scan_page"), 2)
+		self.assertEqual(tba_meta.get("discover_total_pages"), 2)
+		self.assertTrue(tba_meta.get("complete"))
+
 	def test_home_page_uses_cached_company_filmography_without_tmdb_hydration(self) -> None:
 		user = get_user_model().objects.create_user(username="home-company-user", password="pw")
 		self.client.force_login(user)
@@ -1037,10 +1092,7 @@ class RelatedLinksTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		mock_purge_stale_movies.assert_called_once_with()
 
-	@patch("catalog.management.commands.compact_company_filmography.TMDbClient.from_settings")
-	def test_compact_company_filmography_command_compacts_existing_rows(self, mock_from_settings) -> None:
-		client = mock_from_settings.return_value
-		client.get_movie.side_effect = lambda mid: {"id": mid, "poster_path": f"/poster-{mid}.jpg"}
+	def test_compact_company_filmography_command_compacts_existing_rows(self) -> None:
 		company = Company.objects.create(
 			tmdb_id=41077,
 			name="A24",
@@ -1078,7 +1130,6 @@ class RelatedLinksTests(TestCase):
 				"poster_path": "/poster-123.jpg",
 			},
 		)
-		client.get_movie.assert_called_once_with(123)
 
 	def test_compact_person_credits_command_compacts_existing_rows(self) -> None:
 		person = Person.objects.create(

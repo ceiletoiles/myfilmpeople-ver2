@@ -139,7 +139,7 @@
               <a class="filmography-title" href="{% url 'movie_detail' m.id %}"><strong>{% if m.title %}{{ m.title }}{% elif m.name %}{{ m.name }}{% else %}-{% endif %}</strong></a>
               <div class="filmography-year muted">
                 {% if filmography_mode == 'upcoming' %}
-                  TBA
+                  {% if m.release_date %}{{ m.release_date|slice:":4" }}{% elif m.year %}{{ m.year }}{% else %}TBA{% endif %}
                 {% else %}
                   {% if m.release_date %}{{ m.release_date|slice:":4" }}{% elif m.year %}{{ m.year }}{% else %}TBA{% endif %}
                 {% endif %}

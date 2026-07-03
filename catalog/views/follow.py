@@ -608,6 +608,31 @@ def company_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				poster_path = str(movie.get("poster_path") or "").strip()
 				if poster_path and "poster_path" not in display:
 					display["poster_path"] = poster_path
+		missing_display_ids = [
+			mid
+			for mid in new_movie_ids
+			if isinstance(mid, int)
+			and (
+				not str(company_movie_display_by_movie.get(mid, {}).get("title") or "").strip()
+				or not str(company_movie_display_by_movie.get(mid, {}).get("poster_path") or "").strip()
+			)
+		]
+		if missing_display_ids:
+			client = TMDbClient.from_settings()
+			for mid in missing_display_ids:
+				try:
+					full_movie = client.get_movie(mid)
+				except Exception:
+					continue
+				if not isinstance(full_movie, dict):
+					continue
+				display = company_movie_display_by_movie.setdefault(mid, {})
+				title = str(full_movie.get("title") or full_movie.get("name") or "").strip()
+				if title and "title" not in display:
+					display["title"] = title
+				poster_path = str(full_movie.get("poster_path") or "").strip()
+				if poster_path and "poster_path" not in display:
+					display["poster_path"] = poster_path
 
 	# Progress info (best-effort): pages cached vs total_pages.
 	pages_cached = 0
@@ -906,6 +931,31 @@ def sync_all_followed(request: HttpRequest) -> HttpResponse:
 						if title and "title" not in display:
 							display["title"] = title
 						poster_path = str(movie.get("poster_path") or "").strip()
+						if poster_path and "poster_path" not in display:
+							display["poster_path"] = poster_path
+				missing_display_ids = [
+					mid
+					for mid in new_movie_ids
+					if isinstance(mid, int)
+					and (
+						not str(company_movie_display_by_movie.get(mid, {}).get("title") or "").strip()
+						or not str(company_movie_display_by_movie.get(mid, {}).get("poster_path") or "").strip()
+					)
+				]
+				if missing_display_ids:
+					client = TMDbClient.from_settings()
+					for mid in missing_display_ids:
+						try:
+							full_movie = client.get_movie(mid)
+						except Exception:
+							continue
+						if not isinstance(full_movie, dict):
+							continue
+						display = company_movie_display_by_movie.setdefault(mid, {})
+						title = str(full_movie.get("title") or full_movie.get("name") or "").strip()
+						if title and "title" not in display:
+							display["title"] = title
+						poster_path = str(full_movie.get("poster_path") or "").strip()
 						if poster_path and "poster_path" not in display:
 							display["poster_path"] = poster_path
 

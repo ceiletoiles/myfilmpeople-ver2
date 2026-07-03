@@ -83,43 +83,58 @@ def _company_movie_year(movie: dict[str, Any]) -> int | None:
     return None
 
 
-def compact_company_movie(movie: dict[str, Any]) -> dict[str, Any]:
+def compact_company_movie(movie: dict[str, Any], *, include_title: bool = False) -> dict[str, Any]:
     if not isinstance(movie, dict):
         return {}
     movie_id = movie.get("id")
     if not isinstance(movie_id, int):
         return {}
-    compact = {
-        "id": movie_id,
-        "title": str(movie.get("title") or movie.get("name") or movie_id),
-    }
+    compact: dict[str, Any] = {"id": movie_id}
+    if include_title:
+        title = str(movie.get("title") or movie.get("name") or "").strip()
+        if title:
+            compact["title"] = title
     year = _company_movie_year(movie)
     if year is not None:
         compact["year"] = year
-    release_date = str(movie.get("release_date") or "").strip()
-    if release_date:
-        compact["release_date"] = release_date
-    poster_path = str(movie.get("poster_path") or "").strip()
-    if poster_path:
-        compact["poster_path"] = poster_path
+    if include_title:
+        release_date = str(movie.get("release_date") or "").strip()
+        if release_date:
+            compact["release_date"] = release_date
+        poster_path = str(movie.get("poster_path") or "").strip()
+        if poster_path:
+            compact["poster_path"] = poster_path
     return compact
 
 
-def compact_company_filmography_payload(payload: dict[str, Any]) -> dict[str, Any]:
+def compact_company_filmography_payload(payload: dict[str, Any], *, include_title: bool = False) -> dict[str, Any]:
     if not isinstance(payload, dict):
         return {}
     results = payload.get("results") or []
-    compact_results = [compact_company_movie(movie) for movie in results if isinstance(movie, dict)]
+    compact_results = [
+        compact_company_movie(movie, include_title=include_title) for movie in results if isinstance(movie, dict)
+    ]
     return {**payload, "results": [movie for movie in compact_results if movie]}
 
 
-def compact_company_filmography_pages(pages: dict[str, Any] | None) -> dict[str, Any]:
+def compact_company_filmography_pages(
+    pages: dict[str, Any] | None,
+    *,
+    include_title_for_first_page: bool = True,
+) -> dict[str, Any]:
     if not isinstance(pages, dict):
         return {}
     compact_pages: dict[str, Any] = {}
     for key, payload in pages.items():
         if isinstance(payload, dict):
-            compact_pages[str(key)] = compact_company_filmography_payload(payload)
+            try:
+                page_num = int(str(key))
+            except (TypeError, ValueError):
+                page_num = None
+            compact_pages[str(key)] = compact_company_filmography_payload(
+                payload,
+                include_title=include_title_for_first_page and page_num == 1,
+            )
     return compact_pages
 
 
@@ -143,9 +158,10 @@ def hydrate_company_movie_results(results: list[dict[str, Any]]) -> list[dict[st
             hydrated.append(movie)
             continue
 
+        needs_title = not str(movie.get("title") or movie.get("name") or "").strip()
         needs_poster = not str(movie.get("poster_path") or "").strip()
         needs_release = not str(movie.get("release_date") or "").strip()
-        if not needs_poster and not needs_release:
+        if not needs_title and not needs_poster and not needs_release:
             merged = {**movie}
             year = _company_movie_year(merged)
             if year is not None:
@@ -160,6 +176,10 @@ def hydrate_company_movie_results(results: list[dict[str, Any]]) -> list[dict[st
 
         if isinstance(full_movie, dict) and full_movie:
             merged = {**movie}
+            if needs_title:
+                title = str(full_movie.get("title") or full_movie.get("name") or "").strip()
+                if title:
+                    merged["title"] = title
             if needs_poster and str(full_movie.get("poster_path") or "").strip():
                 merged["poster_path"] = str(full_movie.get("poster_path") or "").strip()
             if needs_release and str(full_movie.get("release_date") or "").strip():
@@ -205,11 +225,23 @@ def get_or_sync_company_tba_movies(
     )
 
     cached = tmdb_raw.get("tba_movies")
+    cached_scan_complete = False
+    cached_movies = [m for m in cached if isinstance(m, dict)] if isinstance(cached, list) else []
+    if cached_movies:
+        cached_scan_page = int(meta.get("scan_page") or 0)
+        cached_total_pages = meta.get("discover_total_pages")
+        try:
+            cached_total_pages_int = int(cached_total_pages) if cached_total_pages is not None else None
+        except (TypeError, ValueError):
+            cached_total_pages_int = None
+        cached_scan_complete = cached_total_pages_int is not None and cached_scan_page >= cached_total_pages_int
+
     if (
         isinstance(cached, list)
         and meta_ok
         and not force
         and not _is_stale(company.tmdb_last_sync_at)
+        and cached_scan_complete
     ):
         # Ensure dict-only payloads.
         return [m for m in cached if isinstance(m, dict)]
@@ -518,13 +550,15 @@ def get_company_status_snapshot(company: Company, *, fallback_results: list[dict
         payloads = [payload for payload in pages.values() if isinstance(payload, dict)]
     elif fallback_results is not None:
         payloads = [{"results": fallback_results}]
+    tba_movies = raw.get("tba_movies")
+    if isinstance(tba_movies, list) and any(isinstance(movie, dict) for movie in tba_movies):
+        payloads.append({"results": [movie for movie in tba_movies if isinstance(movie, dict)]})
 
     upcoming_with_date = 0
     upcoming_no_date = 0
     latest_past_release: date | None = None
     has_cached_tba_movies = False
 
-    tba_movies = raw.get("tba_movies")
     if isinstance(tba_movies, list) and any(isinstance(movie, dict) for movie in tba_movies):
         has_cached_tba_movies = True
 
@@ -532,8 +566,13 @@ def get_company_status_snapshot(company: Company, *, fallback_results: list[dict
         for movie in (payload.get("results") or []):
             if not isinstance(movie, dict):
                 continue
-            release_date_str = str(movie.get("release_date") or "").strip()
+            release_date_str = str(movie.get("release_date") or movie.get("year") or "").strip()
             release_dt = None
+            if len(release_date_str) == 4 and release_date_str.isdigit():
+                try:
+                    release_dt = date(int(release_date_str), 1, 1)
+                except ValueError:
+                    release_dt = None
             if len(release_date_str) == 10 and release_date_str[4] == "-":
                 try:
                     release_dt = date.fromisoformat(release_date_str)
@@ -641,7 +680,8 @@ def get_or_sync_company_filmography_page(
             filmography_synced_at = None
 
     if (
-        isinstance(cached, dict)
+        page == 1
+        and isinstance(cached, dict)
         and not force
         and filmography_synced_at is not None
         and not _is_stale(filmography_synced_at)
@@ -655,24 +695,28 @@ def get_or_sync_company_filmography_page(
         sort_by=COMPANY_FILMOGRAPHY_SORT_BY,
         extra_params={"release_date.gte": COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE},
     )
-    pages[key] = compact_company_filmography_payload(payload)
+    if page == 1:
+        pages["1"] = compact_company_filmography_payload(payload, include_title=True)
+        meta["total_pages"] = int(payload.get("total_pages") or meta.get("total_pages") or 1)
+        meta["total_results"] = int(payload.get("total_results") or meta.get("total_results") or 0)
+        meta["sort_by"] = COMPANY_FILMOGRAPHY_SORT_BY
+        meta["release_date_gte"] = COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE
+        meta["synced_at"] = timezone.now().isoformat()
 
-    meta["total_pages"] = int(payload.get("total_pages") or meta.get("total_pages") or 1)
-    meta["total_results"] = int(payload.get("total_results") or meta.get("total_results") or 0)
-    meta["sort_by"] = COMPANY_FILMOGRAPHY_SORT_BY
-    meta["release_date_gte"] = COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE
-    meta["synced_at"] = timezone.now().isoformat()
-
-    company.tmdb_raw = {**tmdb_raw, "discover_movies_pages": compact_company_filmography_pages(pages), "discover_movies_meta": meta}
-    company.tmdb_last_sync_at = timezone.now()
-    company.tmdb_last_sync_source = "sync" if force else "ttl"
-    company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
-    _seed_company_summary_cache(company)
-    # Keep the short-lived cache consistent with DB writes.
-    try:
-        cache.set(f"db:company:v1:{int(company.tmdb_id)}", company, timeout=5 * 60)
-    except Exception:
-        pass
+        company.tmdb_raw = {
+            **tmdb_raw,
+            "discover_movies_pages": {"1": pages["1"]},
+            "discover_movies_meta": meta,
+        }
+        company.tmdb_last_sync_at = timezone.now()
+        company.tmdb_last_sync_source = "sync" if force else "ttl"
+        company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
+        _seed_company_summary_cache(company)
+        # Keep the short-lived cache consistent with DB writes.
+        try:
+            cache.set(f"db:company:v1:{int(company.tmdb_id)}", company, timeout=5 * 60)
+        except Exception:
+            pass
     return payload
 
 
@@ -731,7 +775,7 @@ def prefetch_company_filmography(
         and not _is_stale(filmography_synced_at)
         and isinstance(cached_total_pages, int)
         and cached_total_pages > 0
-        and len(pages) >= cached_total_pages
+        and "1" in pages
     ):
         return 0
 
@@ -745,57 +789,8 @@ def prefetch_company_filmography(
         sort_by=COMPANY_FILMOGRAPHY_SORT_BY,
         extra_params={"release_date.gte": COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE},
     )
-    first = compact_company_filmography_payload(first)
+    first = compact_company_filmography_payload(first, include_title=True)
     total_pages = int(first.get("total_pages") or 1)
-    pages_to_fetch = total_pages
-    if max_pages is not None and max_pages > 0:
-        pages_to_fetch = min(pages_to_fetch, int(max_pages))
-
-    pages["1"] = first
-    fetched = 1
-    try:
-        if progress_cb is not None:
-            progress_cb(fetched, pages_to_fetch)
-    except Exception:
-        pass
-
-    if should_stop():
-        meta["total_pages"] = total_pages
-        meta["total_results"] = int(first.get("total_results") or meta.get("total_results") or 0)
-        meta["sort_by"] = COMPANY_FILMOGRAPHY_SORT_BY
-        meta["release_date_gte"] = COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE
-        meta["synced_at"] = timezone.now().isoformat()
-        company.tmdb_raw = {**tmdb_raw, "discover_movies_pages": compact_company_filmography_pages(pages), "discover_movies_meta": meta}
-        company.tmdb_last_sync_at = timezone.now()
-        company.tmdb_last_sync_source = "sync" if force else "ttl"
-        company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
-        try:
-            cache.set(f"db:company:v1:{int(company.tmdb_id)}", company, timeout=5 * 60)
-        except Exception:
-            pass
-        return fetched
-
-    for p in range(2, pages_to_fetch + 1):
-        if should_stop():
-            break
-        key = str(p)
-        if not force and key in pages and not _is_stale(company.tmdb_last_sync_at):
-            continue
-        payload = client.discover_movies_by_company(
-            company.tmdb_id,
-            page=p,
-            sort_by=COMPANY_FILMOGRAPHY_SORT_BY,
-            extra_params={"release_date.gte": COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE},
-        )
-        pages[key] = compact_company_filmography_payload(payload)
-        fetched += 1
-        try:
-            if progress_cb is not None:
-                progress_cb(fetched, pages_to_fetch)
-        except Exception:
-            pass
-        if should_stop():
-            break
 
     meta["total_pages"] = total_pages
     meta["total_results"] = int(first.get("total_results") or meta.get("total_results") or 0)
@@ -803,7 +798,11 @@ def prefetch_company_filmography(
     meta["release_date_gte"] = COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE
     meta["synced_at"] = timezone.now().isoformat()
 
-    company.tmdb_raw = {**tmdb_raw, "discover_movies_pages": compact_company_filmography_pages(pages), "discover_movies_meta": meta}
+    company.tmdb_raw = {
+        **tmdb_raw,
+        "discover_movies_pages": {"1": first},
+        "discover_movies_meta": meta,
+    }
     company.tmdb_last_sync_at = timezone.now()
     company.tmdb_last_sync_source = "sync" if force else "ttl"
     company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
@@ -812,7 +811,7 @@ def prefetch_company_filmography(
         cache.set(f"db:company:v1:{int(company.tmdb_id)}", company, timeout=5 * 60)
     except Exception:
         pass
-    return fetched
+    return 1
 
 
 def prefetch_company_movies(
@@ -858,7 +857,7 @@ def prefetch_company_movies(
         and not _is_stale(company_movies_synced_at)
         and isinstance(cached_total_pages, int)
         and cached_total_pages > 0
-        and len(pages) >= cached_total_pages
+        and "1" in pages
     ):
         return 0
 
@@ -866,71 +865,34 @@ def prefetch_company_movies(
         return 0
 
     first = get_or_sync_company_movies_page(company, page=1, force=force)
-    first = compact_company_filmography_payload(first)
+    first = compact_company_filmography_payload(first, include_title=True)
     total_pages = int(first.get("total_pages") or 1)
-    pages_to_fetch = total_pages
-    if max_pages is not None and max_pages > 0:
-        pages_to_fetch = min(pages_to_fetch, int(max_pages))
 
-    # Re-store page 1 as the compact payload we want to keep in sync state.
     tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-    pages = tmdb_raw.get("company_movies_pages")
-    if not isinstance(pages, dict):
-        pages = {}
-    pages["1"] = first
-
-    fetched = 1
-    try:
-        if progress_cb is not None:
-            progress_cb(fetched, pages_to_fetch)
-    except Exception:
-        pass
-
-    if should_stop():
-        meta["total_pages"] = total_pages
-        meta["total_results"] = int(first.get("total_results") or meta.get("total_results") or 0)
-        meta["sort_by"] = "company_movies"
-        meta["synced_at"] = timezone.now().isoformat()
-        company.tmdb_raw = {**tmdb_raw, "company_movies_pages": compact_company_filmography_pages(pages), "company_movies_meta": meta}
-        company.tmdb_last_sync_at = timezone.now()
-        company.tmdb_last_sync_source = "sync" if force else "ttl"
-        company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
-        try:
-            cache.set(f"db:company:v1:{int(company.tmdb_id)}", company, timeout=5 * 60)
-        except Exception:
-            pass
-        return fetched
-
-    for p in range(2, pages_to_fetch + 1):
-        if should_stop():
-            break
-        payload = get_or_sync_company_movies_page(company, page=p, force=force)
-        pages = company.tmdb_raw.get("company_movies_pages") if isinstance(company.tmdb_raw, dict) else {}
-        if isinstance(pages, dict):
-            pages[str(p)] = compact_company_filmography_payload(payload)
-        fetched += 1
-        try:
-            if progress_cb is not None:
-                progress_cb(fetched, pages_to_fetch)
-        except Exception:
-            pass
-        if should_stop():
-            break
-
     meta["total_pages"] = total_pages
     meta["total_results"] = int(first.get("total_results") or meta.get("total_results") or 0)
     meta["sort_by"] = "company_movies"
     meta["synced_at"] = timezone.now().isoformat()
 
-    company.tmdb_raw = {**tmdb_raw, "company_movies_pages": compact_company_filmography_pages(pages), "company_movies_meta": meta}
+    company.tmdb_raw = {
+        **tmdb_raw,
+        "company_movies_pages": {"1": first},
+        "company_movies_meta": meta,
+    }
     company.tmdb_last_sync_at = timezone.now()
     company.tmdb_last_sync_source = "sync" if force else "ttl"
     company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
     try:
+        # Use a very large page size so the scan keeps all future/announced IDs
+        # in `tba_movies` rather than stopping at the first page chunk.
+        get_or_sync_company_tba_movies_page(company, page=1, page_size=1000000, force=force)
+    except Exception:
+        pass
+    try:
         cache.set(f"db:company:v1:{int(company.tmdb_id)}", company, timeout=5 * 60)
     except Exception:
         pass
-    return fetched
+    return 1
 
 
 def get_or_sync_company_tba_movies_page(
@@ -970,8 +932,21 @@ def get_or_sync_company_tba_movies_page(
     # we still reuse any cached tba_movies and rebuild scan meta incrementally.
     cached = tmdb_raw.get("tba_movies")
     cached_movies = [m for m in cached if isinstance(m, dict)] if isinstance(cached, list) else []
+    cached_scan_complete = False
+    if cached_movies:
+        cached_scan_page = int(meta.get("scan_page") or 0)
+        cached_total_pages = meta.get("discover_total_pages")
+        try:
+            cached_total_pages_int = int(cached_total_pages) if cached_total_pages is not None else None
+        except (TypeError, ValueError):
+            cached_total_pages_int = None
+        cached_scan_complete = (
+            cached_total_pages_int is not None
+            and cached_scan_page >= cached_total_pages_int
+            and bool(meta.get("complete"))
+        )
 
-    if cached_movies and not force:
+    if cached_movies and not force and cached_scan_complete:
         start = (page - 1) * page_size
         end = start + page_size
         items = cached_movies[start:end]
@@ -980,11 +955,21 @@ def get_or_sync_company_tba_movies_page(
         return items, has_prev, has_next
 
     if force or _is_stale(company.tmdb_last_sync_at):
-        meta = {"sort_by": COMPANY_TBA_SORT_BY, "scan_page": 0, "discover_total_pages": None}
+        meta = {
+            "sort_by": COMPANY_TBA_SORT_BY,
+            "scan_page": 0,
+            "discover_total_pages": None,
+            "complete": False,
+        }
         tba_movies: list[dict[str, Any]] = []
     elif meta.get("sort_by") and meta.get("sort_by") != COMPANY_TBA_SORT_BY:
         # Query shape changed; start over.
-        meta = {"sort_by": COMPANY_TBA_SORT_BY, "scan_page": 0, "discover_total_pages": None}
+        meta = {
+            "sort_by": COMPANY_TBA_SORT_BY,
+            "scan_page": 0,
+            "discover_total_pages": None,
+            "complete": False,
+        }
         tba_movies = []
     else:
         tba_movies = cached_movies
@@ -993,6 +978,7 @@ def get_or_sync_company_tba_movies_page(
                 "sort_by": COMPANY_TBA_SORT_BY,
                 "scan_page": int(meta.get("scan_page") or 0),
                 "discover_total_pages": meta.get("discover_total_pages"),
+                "complete": bool(meta.get("complete")),
             }
 
     # Dedup by id (preserve order-ish).
@@ -1013,7 +999,8 @@ def get_or_sync_company_tba_movies_page(
 
     client = TMDbClient.from_settings()
     fetched_pages = 0
-    while len(tba_movies) < desired_end and (max_scan_pages is None or fetched_pages < max_scan_pages):
+    today = timezone.now().date()
+    while max_scan_pages is None or fetched_pages < max_scan_pages:
         if discover_total_pages_int is not None and scan_page >= discover_total_pages_int:
             break
         # TMDb discover endpoints effectively cap at 500 pages.
@@ -1040,13 +1027,21 @@ def get_or_sync_company_tba_movies_page(
             for m in results:
                 if not isinstance(m, dict):
                     continue
-                if (m.get("release_date") or "").strip():
-                    continue
+                release_date = str(m.get("release_date") or "").strip()
                 mid = m.get("id")
                 if not isinstance(mid, int) or mid in dedup:
                     continue
-                dedup[mid] = m
-                tba_movies.append(m)
+                compact: dict[str, Any] = {"id": mid}
+                if release_date:
+                    try:
+                        release_dt = date.fromisoformat(release_date)
+                    except ValueError:
+                        release_dt = None
+                    if release_dt is not None and release_dt < today:
+                        continue
+                    compact["release_date"] = release_date
+                dedup[mid] = compact
+                tba_movies.append(compact)
                 if len(tba_movies) >= desired_end:
                     break
         fetched_pages += 1
@@ -1061,6 +1056,7 @@ def get_or_sync_company_tba_movies_page(
             "sort_by": COMPANY_TBA_SORT_BY,
             "scan_page": scan_page,
             "discover_total_pages": discover_total_pages_int,
+            "complete": scan_complete,
         },
     }
     company.tmdb_last_sync_at = timezone.now()
@@ -1285,20 +1281,26 @@ def get_or_sync_company(tmdb_id: int, *, force: bool = False) -> Company:
 				"tba_movies_meta",
                 }
             }
-        discover_pages = compact_company_filmography_pages(
-            existing.get("discover_movies_pages") if isinstance(existing.get("discover_movies_pages"), dict) else {}
-        )
+        discover_pages_raw = existing.get("discover_movies_pages") if isinstance(existing.get("discover_movies_pages"), dict) else {}
+        discover_pages = {}
+        if isinstance(discover_pages_raw, dict):
+            page1 = discover_pages_raw.get("1")
+            if isinstance(page1, dict):
+                discover_pages["1"] = compact_company_filmography_payload(page1, include_title=True)
         discover_meta = (
             existing.get("discover_movies_meta")
             if isinstance(existing.get("discover_movies_meta"), dict)
             else {}
         )
 
-        company_movies_pages = (
-            existing.get("company_movies_pages")
-            if isinstance(existing.get("company_movies_pages"), dict)
-            else {}
+        company_movies_pages_raw = (
+            existing.get("company_movies_pages") if isinstance(existing.get("company_movies_pages"), dict) else {}
         )
+        company_movies_pages = {}
+        if isinstance(company_movies_pages_raw, dict):
+            page1 = company_movies_pages_raw.get("1")
+            if isinstance(page1, dict):
+                company_movies_pages["1"] = compact_company_filmography_payload(page1, include_title=True)
         company_movies_meta = (
             existing.get("company_movies_meta")
             if isinstance(existing.get("company_movies_meta"), dict)
@@ -1355,23 +1357,24 @@ def get_or_sync_company_movies_page(
 
     key = str(page)
     cached = pages.get(key)
-    if isinstance(cached, dict) and not force:
+    if page == 1 and isinstance(cached, dict) and not force:
         return cached
 
     client = TMDbClient.from_settings()
     payload = client.get_company_movies(company.tmdb_id, page=page)
 
-    company.tmdb_raw = _ensure_paged_cache(
-        tmdb_raw,
-        pages_key="company_movies_pages",
-        meta_key="company_movies_meta",
-        page=page,
-        payload=payload,
-    )
-    company.tmdb_last_sync_at = timezone.now()
-    company.tmdb_last_sync_source = "sync" if force else "ttl"
-    company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
-    _seed_company_summary_cache(company)
+    if page == 1:
+        company.tmdb_raw = _ensure_paged_cache(
+            tmdb_raw,
+            pages_key="company_movies_pages",
+            meta_key="company_movies_meta",
+            page=page,
+            payload=compact_company_filmography_payload(payload, include_title=True),
+        )
+        company.tmdb_last_sync_at = timezone.now()
+        company.tmdb_last_sync_source = "sync" if force else "ttl"
+        company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
+        _seed_company_summary_cache(company)
     return payload
 
 

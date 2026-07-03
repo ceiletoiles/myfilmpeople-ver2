@@ -43,6 +43,9 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			payloads = [payload for payload in pages.values() if isinstance(payload, dict)]
 		elif fallback_results is not None:
 			payloads = [{"results": fallback_results}]
+		tba_movies = tmdb_raw.get("tba_movies")
+		if isinstance(tba_movies, list) and any(isinstance(movie, dict) for movie in tba_movies):
+			payloads.append({"results": [movie for movie in tba_movies if isinstance(movie, dict)]})
 
 		upcoming_with_date = 0
 		upcoming_no_date = 0
@@ -52,7 +55,7 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			for movie in (payload.get("results") or []):
 				if not isinstance(movie, dict):
 					continue
-				release_date_str = str(movie.get("release_date") or "").strip()
+				release_date_str = str(movie.get("release_date") or movie.get("year") or "").strip()
 				release_dt = _parse_iso_date(release_date_str)
 				if release_dt is not None and release_dt > today:
 					upcoming_with_date += 1
@@ -219,7 +222,7 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		today = timezone.now().date()
 		movies = [m for m in list(movies_all) if isinstance(m, dict)]
 		for m in movies:
-			release_dt = _parse_iso_date(str(m.get("release_date") or ""))
+			release_dt = _parse_iso_date(str(m.get("release_date") or m.get("year") or ""))
 			m["countdown_text"] = (
 				_countdown_text(today=today, release_dt=release_dt)
 				if release_dt is not None
@@ -240,7 +243,7 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				movies_all = discover_page.get("results") or []
 				movies = [m for m in list(movies_all) if isinstance(m, dict)]
 				for m in movies:
-					release_dt = _parse_iso_date(str(m.get("release_date") or ""))
+					release_dt = _parse_iso_date(str(m.get("release_date") or m.get("year") or ""))
 					m["countdown_text"] = (
 						_countdown_text(today=today, release_dt=release_dt)
 						if release_dt is not None
@@ -258,7 +261,7 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				movies_all = discover_page.get("results") or []
 				movies = [m for m in list(movies_all) if isinstance(m, dict)]
 				for m in movies:
-					release_dt = _parse_iso_date(str(m.get("release_date") or ""))
+					release_dt = _parse_iso_date(str(m.get("release_date") or m.get("year") or ""))
 					m["countdown_text"] = (
 						_countdown_text(today=today, release_dt=release_dt)
 						if release_dt is not None
@@ -344,12 +347,17 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				for m in results:
 					if not isinstance(m, dict):
 						continue
-					if (m.get("release_date") or "").strip():
-						continue
 					mid = m.get("id")
 					if not isinstance(mid, int) or mid in dedup:
 						continue
-					dedup[mid] = m
+					release_date_str = str(m.get("release_date") or "").strip()
+					if release_date_str:
+						release_dt = _parse_iso_date(release_date_str)
+						if release_dt is not None and release_dt < timezone.now().date():
+							continue
+						dedup[mid] = {"id": mid, "release_date": release_date_str}
+					else:
+						dedup[mid] = {"id": mid}
 					if len(dedup) >= desired_end:
 						break
 			tba_movies = list(dedup.values())
@@ -373,6 +381,8 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		# Page 1 is stored in DB. Later pages are hydrated on demand from TMDb so
 		# they can still show posters and other movie details.
 		filmography_items = hydrate_company_movie_results(filmography_items)
+	if filmography_mode == "upcoming" and filmography_items:
+		filmography_items = hydrate_company_movie_results(filmography_items)
 	# Determine whether the company has any TBA (upcoming-without-date) titles.
 	# Show the Upcoming toggle only when we can confirm TBA titles exist.
 	def _live_tba_scan(max_pages: int) -> bool:
@@ -381,8 +391,15 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			for scan_page in range(1, max_pages + 1):
 				payload = client.discover_movies_by_company(tmdb_id, page=scan_page, sort_by="popularity.desc")
 				results = payload.get("results") or []
-				if any(isinstance(m, dict) and not (m.get("release_date") or "").strip() for m in results):
-					return True
+				for m in results:
+					if not isinstance(m, dict):
+						continue
+					release_date_str = str(m.get("release_date") or "").strip()
+					if not release_date_str:
+						return True
+					release_dt = _parse_iso_date(release_date_str)
+					if release_dt is not None and release_dt >= timezone.now().date():
+						return True
 				try:
 					total_pages = int(payload.get("total_pages") or 0)
 				except (TypeError, ValueError):

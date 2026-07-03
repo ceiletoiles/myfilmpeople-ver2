@@ -507,6 +507,14 @@ def extract_movie_ids_from_filmography(filmography: dict, *, pages_key: str = "d
 			movie_id = movie.get("id")
 			if isinstance(movie_id, int):
 				movie_ids.add(movie_id)
+	tba_movies = filmography.get("tba_movies") or []
+	if isinstance(tba_movies, list):
+		for movie in tba_movies:
+			if not isinstance(movie, dict):
+				continue
+			movie_id = movie.get("id")
+			if isinstance(movie_id, int):
+				movie_ids.add(movie_id)
 	
 	return movie_ids
 
@@ -550,6 +558,25 @@ def extract_movie_release_dates_from_filmography(filmography: dict, *, pages_key
 		if not isinstance(payload, dict):
 			continue
 		for movie in payload.get("results", []) or []:
+			if not isinstance(movie, dict):
+				continue
+			mid = movie.get("id")
+			if not isinstance(mid, int):
+				continue
+			rd = _norm_date_str(movie.get("release_date"))
+			if not rd:
+				year = movie.get("year")
+				if isinstance(year, int) and year > 0:
+					rd = f"{year:04d}-01-01"
+				elif isinstance(year, str):
+					year_s = year.strip()
+					if len(year_s) == 4 and year_s.isdigit():
+						rd = f"{int(year_s):04d}-01-01"
+			if rd or mid not in by_id:
+				by_id[mid] = rd
+	tba_movies = filmography.get("tba_movies") or []
+	if isinstance(tba_movies, list):
+		for movie in tba_movies:
 			if not isinstance(movie, dict):
 				continue
 			mid = movie.get("id")
