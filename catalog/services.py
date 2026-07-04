@@ -933,7 +933,6 @@ def prefetch_company_movies(
         merged_meta["synced_at"] = timezone.now().isoformat()
         merged_meta["total_pages"] = total_pages
         merged_meta["total_results"] = int(first.get("total_results") or merged_meta.get("total_results") or 0)
-    emit_progress(1, total_pages)
 
     fetched_pages = 1
     emit_progress(1, 1)
