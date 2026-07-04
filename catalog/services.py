@@ -875,6 +875,14 @@ def prefetch_company_movies(
         except Exception:
             return False
 
+    def emit_progress(done: int, total: int) -> None:
+        if progress_cb is None:
+            return
+        try:
+            progress_cb(done, total)
+        except Exception:
+            pass
+
     tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
     pages = tmdb_raw.get("company_movies_pages")
     if not isinstance(pages, dict):
@@ -909,18 +917,53 @@ def prefetch_company_movies(
     first = get_or_sync_company_movies_page(company, page=1, force=force)
     first = compact_company_filmography_payload(first, include_title=True)
     total_pages = int(first.get("total_pages") or 1)
+    if total_pages < 1:
+        total_pages = 1
 
-    tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-    meta["total_pages"] = total_pages
-    meta["total_results"] = int(first.get("total_results") or meta.get("total_results") or 0)
-    meta["sort_by"] = "company_movies"
-    meta["synced_at"] = timezone.now().isoformat()
+    merged_raw = _ensure_paged_cache(
+        tmdb_raw,
+        pages_key="company_movies_pages",
+        meta_key="company_movies_meta",
+        page=1,
+        payload=first,
+    )
+    merged_meta = merged_raw.get("company_movies_meta")
+    if isinstance(merged_meta, dict):
+        merged_meta["sort_by"] = "company_movies"
+        merged_meta["synced_at"] = timezone.now().isoformat()
+        merged_meta["total_pages"] = total_pages
+        merged_meta["total_results"] = int(first.get("total_results") or merged_meta.get("total_results") or 0)
+    emit_progress(1, total_pages)
 
-    company.tmdb_raw = {
-        **tmdb_raw,
-        "company_movies_pages": {"1": first},
-        "company_movies_meta": meta,
-    }
+    fetched_pages = 1
+    max_fetch_pages = total_pages if max_pages is None else max(1, min(total_pages, int(max_pages)))
+    while fetched_pages < max_fetch_pages:
+        if should_stop():
+            break
+        page = fetched_pages + 1
+        payload = get_or_sync_company_movies_page(company, page=page, force=force)
+        if should_stop():
+            break
+        compact_payload = compact_company_filmography_payload(payload, include_title=True)
+        merged_raw = _ensure_paged_cache(
+            merged_raw,
+            pages_key="company_movies_pages",
+            meta_key="company_movies_meta",
+            page=page,
+            payload=compact_payload,
+        )
+        merged_meta = merged_raw.get("company_movies_meta")
+        if isinstance(merged_meta, dict):
+            merged_meta["sort_by"] = "company_movies"
+            merged_meta["synced_at"] = timezone.now().isoformat()
+            merged_meta["total_pages"] = total_pages
+            merged_meta["total_results"] = int(
+                compact_payload.get("total_results") or merged_meta.get("total_results") or 0
+            )
+        fetched_pages += 1
+        emit_progress(fetched_pages, total_pages)
+
+    company.tmdb_raw = merged_raw
     company.tmdb_last_sync_at = timezone.now()
     company.tmdb_last_sync_source = "sync" if force else "ttl"
     company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
@@ -934,7 +977,7 @@ def prefetch_company_movies(
         cache.set(f"db:company:v1:{int(company.tmdb_id)}", company, timeout=5 * 60)
     except Exception:
         pass
-    return 1
+    return fetched_pages
 
 
 def get_or_sync_company_tba_movies_page(

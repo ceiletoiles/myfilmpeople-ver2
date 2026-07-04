@@ -26,6 +26,7 @@ from ..new_movie_helpers import (
 from ..services import (
 	get_or_sync_company,
 	get_or_sync_person,
+	prefetch_company_filmography,
 	prefetch_company_movies,
 )
 
@@ -338,12 +339,17 @@ def _run_sync_all_followed_job(
 				if _sync_job_abort_if_cancel_requested(job_id):
 					return
 
+				try:
+					prefetch_company_filmography(company, force=True, max_pages=1)
+				except Exception:
+					pass
+
 				def _on_pages_progress(done: int, total: int) -> None:
 					if _sync_job_is_cancel_requested(job_id):
 						return
 					_sync_job_patch(
 						job_id,
-						current_label=f"{company_label}: pages {done}/{total}",
+						current_label=f"{company_label}: page {done}/{total}",
 						current_sub_done=int(done or 0),
 						current_sub_total=int(total or 0),
 					)
@@ -659,12 +665,17 @@ def _run_company_sync_job(*, job_id: UUID, user_id: int, tmdb_id: int, max_compa
 		company_label = company.name or company_label
 		_sync_job_patch(job_id, current_label=f"Syncing studio {company_label}…")
 
+		try:
+			prefetch_company_filmography(company, force=True, max_pages=1)
+		except Exception:
+			pass
+
 		def _on_pages_progress(done: int, total: int) -> None:
 			if _sync_job_is_cancel_requested(job_id):
 				return
 			_sync_job_patch(
 				job_id,
-				current_label=f"{company_label}: pages {done}/{total}",
+				current_label=f"{company_label}: page {done}/{total}",
 				current_sub_done=int(done or 0),
 				current_sub_total=int(total or 0),
 			)

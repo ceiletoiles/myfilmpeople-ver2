@@ -881,6 +881,71 @@ class RelatedLinksTests(TestCase):
 		self.assertEqual(tba_meta.get("discover_total_pages"), 2)
 		self.assertTrue(tba_meta.get("complete"))
 
+	@patch("catalog.services.TMDbClient.from_settings")
+	def test_company_movie_prefetch_reports_page_progress(self, mock_from_settings) -> None:
+		client = mock_from_settings.return_value
+		client.get_company.return_value = {
+			"id": 194232,
+			"name": "Apple Studios",
+			"logo_path": "/oE7H93u8sy5vvW5EH3fpCp68vvB.png",
+		}
+		client.get_company_movies.side_effect = [
+			{
+				"page": 1,
+				"results": [
+					{"id": 9001, "title": "Studio Movie 1", "release_date": "2026-01-01"},
+				],
+				"total_pages": 2,
+				"total_results": 2,
+			},
+			{
+				"page": 2,
+				"results": [
+					{"id": 9002, "title": "Studio Movie 2", "release_date": "2026-02-01"},
+				],
+				"total_pages": 2,
+				"total_results": 2,
+			},
+		]
+		client.discover_movies_by_company.side_effect = [
+			{
+				"page": 1,
+				"results": [
+					{"id": 1, "title": "Future One", "release_date": "2099-01-01"},
+				],
+				"total_pages": 2,
+				"total_results": 2,
+			},
+			{
+				"page": 2,
+				"results": [
+					{"id": 2, "title": "Future Two", "release_date": "2100-01-01"},
+				],
+				"total_pages": 2,
+				"total_results": 2,
+			},
+		]
+		client.get_company_alternative_names.return_value = {}
+
+		company = get_or_sync_company(194232, force=True)
+		progress_updates: list[tuple[int, int]] = []
+
+		prefetch_company_movies(
+			company,
+			force=True,
+			max_pages=2,
+			progress_cb=lambda done, total: progress_updates.append((done, total)),
+		)
+
+		company.refresh_from_db(fields=["tmdb_raw"])
+		raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+		pages = raw.get("company_movies_pages") or {}
+
+		self.assertEqual(progress_updates, [(1, 2), (2, 2)])
+		self.assertIn("1", pages)
+		self.assertIn("2", pages)
+		self.assertEqual(pages["2"]["results"][0]["id"], 9002)
+
 	def test_home_page_uses_cached_company_filmography_without_tmdb_hydration(self) -> None:
 		user = get_user_model().objects.create_user(username="home-company-user", password="pw")
 		self.client.force_login(user)
@@ -997,6 +1062,60 @@ class RelatedLinksTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.context["company_status_label"], "")
+
+	@patch("catalog.views.follow.prefetch_company_movies")
+	@patch("catalog.views.follow.prefetch_company_filmography")
+	@patch("catalog.views.follow.get_or_sync_company")
+	def test_company_sync_restores_discover_pages_for_studio_tabs(
+		self,
+		mock_get_company,
+		mock_prefetch_company_filmography,
+		mock_prefetch_company_movies,
+	) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="company-sync-user", password="pw")
+		company = Company.objects.create(
+			tmdb_id=92,
+			name="Sync Studio",
+			logo_path="/logo.png",
+			tmdb_raw={"name": "Sync Studio"},
+			tmdb_last_sync_at=timezone.now(),
+		)
+		CompanyFollow.objects.create(user=user, company=company, name=company.name)
+		mock_get_company.return_value = company
+		mock_prefetch_company_movies.return_value = 1
+
+		def _prefetch_company_filmography(comp, *, force=False, max_pages=1):
+			comp.tmdb_raw = {
+				"name": "Sync Studio",
+				"discover_movies_pages": {
+					"1": {
+						"results": [
+							{
+								"id": 777,
+								"title": "Future Studio Film",
+								"release_date": "2099-01-01",
+								"poster_path": "/poster-777.jpg",
+							}
+						],
+					}
+				},
+			}
+			comp.save(update_fields=["tmdb_raw", "updated_at"])
+			return 1
+
+		mock_prefetch_company_filmography.side_effect = _prefetch_company_filmography
+
+		self.client.force_login(user)
+		response = self.client.post(reverse("company_sync", args=[company.tmdb_id]))
+
+		self.assertEqual(response.status_code, 302)
+		company.refresh_from_db(fields=["tmdb_raw"])
+		raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+		pages = raw.get("discover_movies_pages") or {}
+		self.assertIn("1", pages)
+		self.assertEqual(pages["1"]["results"][0]["id"], 777)
+		mock_prefetch_company_filmography.assert_called()
 
 	@patch("catalog.views.company.get_or_sync_company_filmography_page")
 	@patch("catalog.services.TMDbClient.from_settings")
@@ -1127,7 +1246,6 @@ class RelatedLinksTests(TestCase):
 				"title": "Example Film",
 				"year": 2026,
 				"release_date": "2026-01-02",
-				"poster_path": "/poster-123.jpg",
 			},
 		)
 

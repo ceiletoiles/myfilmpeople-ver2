@@ -26,14 +26,12 @@ from ..new_movie_helpers import (
 from ..services import (
 	get_or_sync_company,
 	get_or_sync_person,
+	prefetch_company_filmography,
 	prefetch_company_movies,
 )
+from ..tmdb import TMDbClient
 from ._shared import SESSION_KEY_HIDE_SELF_APPEARANCES, _get_session_bool, _person_role_options_from_credits
 from ._shared import _parse_iso_date
-
-# Backward-compatible alias for tests and any older call sites that still patch
-# the previous helper name.
-prefetch_company_filmography = prefetch_company_movies
 
 
 def _wants_json(request: HttpRequest) -> bool:
@@ -313,6 +311,11 @@ def follow(request: HttpRequest) -> HttpResponse:
 	if entity_type == "company":
 		# Treat the follow moment as the baseline snapshot.
 		company = get_or_sync_company(tmdb_id, force=True)
+		try:
+			prefetch_company_filmography(company, force=True, max_pages=1)
+		except Exception:
+			# Non-fatal: following should still succeed even if TMDb is temporarily unavailable.
+			pass
 		# Pre-cache full company-movies pagination so later syncs compare against
 		# the state visible at follow time, not an older stale cache.
 		max_pages = getattr(settings, "TMDB_COMPANY_FILMOGRAPHY_PREFETCH_MAX_PAGES", 0)
@@ -569,6 +572,11 @@ def company_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 
 	# Sync new data
 	company = get_or_sync_company(tmdb_id, force=True)
+	try:
+		prefetch_company_filmography(company, force=True, max_pages=1)
+	except Exception:
+		# Non-fatal: keep syncing even if the discover refresh blips.
+		pass
 	# Refresh full filmography for followed companies.
 	max_pages = getattr(settings, "TMDB_COMPANY_FILMOGRAPHY_PREFETCH_MAX_PAGES", 0)
 	try:
