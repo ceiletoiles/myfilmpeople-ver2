@@ -32,18 +32,19 @@ class Command(BaseCommand):
 			raw = company.tmdb_raw
 			changed = False
 			merged = {**raw}
-			for pages_key in ("discover_movies_pages", "company_movies_pages"):
-				pages = raw.get(pages_key)
-				if not isinstance(pages, dict) or not pages:
-					continue
-				page1 = pages.get("1")
-				if not isinstance(page1, dict):
-					continue
-				compact_page1 = compact_company_filmography_payload(page1, include_title=True)
-				compact_pages = {"1": compact_page1} if compact_page1 else {}
-				if compact_pages != pages:
-					merged[pages_key] = compact_pages
+			for legacy_key in ("company_movies_pages", "company_movies_meta"):
+				if legacy_key in merged:
+					merged.pop(legacy_key, None)
 					changed = True
+			pages = raw.get("discover_movies_pages")
+			if isinstance(pages, dict) and pages:
+				page1 = pages.get("1")
+				if isinstance(page1, dict):
+					compact_page1 = compact_company_filmography_payload(page1, include_title=True)
+					compact_pages = {"1": compact_page1} if compact_page1 else {}
+					if compact_pages != pages:
+						merged["discover_movies_pages"] = compact_pages
+						changed = True
 			if not changed:
 				continue
 

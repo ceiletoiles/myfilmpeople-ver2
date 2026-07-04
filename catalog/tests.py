@@ -23,7 +23,12 @@ from .new_movie_helpers import (
 	filter_movie_ids_by_release_date,
 	record_new_movie_arrivals,
 )
-from .services import get_or_sync_company, get_or_sync_person, prefetch_company_filmography, prefetch_company_movies
+from .services import (
+	get_or_sync_company,
+	get_or_sync_person,
+	prefetch_company_filmography,
+	prefetch_company_movies,
+)
 from .views.movie import _build_country_name_lookup, _build_crew_groups, _build_release_groups
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -834,14 +839,6 @@ class RelatedLinksTests(TestCase):
 			"name": "Apple Studios",
 			"logo_path": "/oE7H93u8sy5vvW5EH3fpCp68vvB.png",
 		}
-		client.get_company_movies.return_value = {
-			"page": 1,
-			"results": [
-				{"id": 9001, "title": "Studio Movie", "release_date": "2026-01-01"},
-			],
-			"total_pages": 1,
-			"total_results": 1,
-		}
 		client.discover_movies_by_company.side_effect = [
 			{
 				"page": 1,
@@ -889,24 +886,6 @@ class RelatedLinksTests(TestCase):
 			"name": "Apple Studios",
 			"logo_path": "/oE7H93u8sy5vvW5EH3fpCp68vvB.png",
 		}
-		client.get_company_movies.side_effect = [
-			{
-				"page": 1,
-				"results": [
-					{"id": 9001, "title": "Studio Movie 1", "release_date": "2026-01-01"},
-				],
-				"total_pages": 2,
-				"total_results": 2,
-			},
-			{
-				"page": 2,
-				"results": [
-					{"id": 9002, "title": "Studio Movie 2", "release_date": "2026-02-01"},
-				],
-				"total_pages": 2,
-				"total_results": 2,
-			},
-		]
 		client.discover_movies_by_company.side_effect = [
 			{
 				"page": 1,
@@ -939,7 +918,7 @@ class RelatedLinksTests(TestCase):
 
 		company.refresh_from_db(fields=["tmdb_raw"])
 		raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-		pages = raw.get("company_movies_pages") or {}
+		pages = raw.get("discover_movies_pages") or {}
 
 		self.assertEqual(progress_updates, [(1, 2), (2, 2)])
 		self.assertIn("1", pages)

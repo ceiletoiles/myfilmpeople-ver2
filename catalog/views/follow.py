@@ -565,10 +565,10 @@ def company_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	except Exception:
 		pass
 	old_tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-	old_movie_ids = extract_movie_ids_from_filmography(old_tmdb_raw, pages_key="company_movies_pages")
-	old_pages = old_tmdb_raw.get("company_movies_pages")
+	old_movie_ids = extract_movie_ids_from_filmography(old_tmdb_raw)
+	old_pages = old_tmdb_raw.get("discover_movies_pages")
 	old_baseline_present = isinstance(old_pages, dict) and len(old_pages) > 0
-	old_release_dates = extract_movie_release_dates_from_filmography(old_tmdb_raw, pages_key="company_movies_pages")
+	old_release_dates = extract_movie_release_dates_from_filmography(old_tmdb_raw)
 
 	# Sync new data
 	company = get_or_sync_company(tmdb_id, force=True)
@@ -595,11 +595,11 @@ def company_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 
 	# Get new movie IDs after syncing
 	new_tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-	new_movie_ids = extract_movie_ids_from_filmography(new_tmdb_raw, pages_key="company_movies_pages")
-	new_release_dates = extract_movie_release_dates_from_filmography(new_tmdb_raw, pages_key="company_movies_pages")
+	new_movie_ids = extract_movie_ids_from_filmography(new_tmdb_raw)
+	new_release_dates = extract_movie_release_dates_from_filmography(new_tmdb_raw)
 	company_movie_display_by_movie: dict[int, dict] = {}
 	if isinstance(new_tmdb_raw, dict):
-		pages = new_tmdb_raw.get("company_movies_pages") or {}
+		pages = new_tmdb_raw.get("discover_movies_pages") or {}
 		for payload in pages.values():
 			if not isinstance(payload, dict):
 				continue
@@ -646,8 +646,8 @@ def company_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	pages_cached = 0
 	total_pages = None
 	try:
-		pages = new_tmdb_raw.get("company_movies_pages")
-		meta = new_tmdb_raw.get("company_movies_meta")
+		pages = new_tmdb_raw.get("discover_movies_pages")
+		meta = new_tmdb_raw.get("discover_movies_meta")
 		if isinstance(pages, dict):
 			pages_cached = len(pages)
 		if isinstance(meta, dict):
@@ -668,7 +668,7 @@ def company_sync(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		# so the UI shows the specific company role instead of a placeholder.
 		company_event_meta: dict[int, dict] = {}
 		if isinstance(new_tmdb_raw, dict):
-			pages = new_tmdb_raw.get("company_movies_pages") or {}
+			pages = new_tmdb_raw.get("discover_movies_pages") or {}
 			for payload in pages.values():
 				if not isinstance(payload, dict):
 					continue
@@ -896,10 +896,10 @@ def sync_all_followed(request: HttpRequest) -> HttpResponse:
 			except Exception:
 				pass
 			old_tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-			old_movie_ids = extract_movie_ids_from_filmography(old_tmdb_raw, pages_key="company_movies_pages")
-			old_pages = old_tmdb_raw.get("company_movies_pages")
+			old_movie_ids = extract_movie_ids_from_filmography(old_tmdb_raw)
+			old_pages = old_tmdb_raw.get("discover_movies_pages")
 			old_baseline_present = isinstance(old_pages, dict) and len(old_pages) > 0
-			old_release_dates = extract_movie_release_dates_from_filmography(old_tmdb_raw, pages_key="company_movies_pages")
+			old_release_dates = extract_movie_release_dates_from_filmography(old_tmdb_raw)
 
 			# Sync new data
 			company = get_or_sync_company(cid, force=True)
@@ -920,11 +920,11 @@ def sync_all_followed(request: HttpRequest) -> HttpResponse:
 
 			# Get new movie IDs after syncing
 			new_tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-			new_movie_ids = extract_movie_ids_from_filmography(new_tmdb_raw, pages_key="company_movies_pages")
-			new_release_dates = extract_movie_release_dates_from_filmography(new_tmdb_raw, pages_key="company_movies_pages")
+			new_movie_ids = extract_movie_ids_from_filmography(new_tmdb_raw)
+			new_release_dates = extract_movie_release_dates_from_filmography(new_tmdb_raw)
 			company_movie_display_by_movie: dict[int, dict] = {}
 			if isinstance(new_tmdb_raw, dict):
-				pages = new_tmdb_raw.get("company_movies_pages") or {}
+				pages = new_tmdb_raw.get("discover_movies_pages") or {}
 				for payload in pages.values():
 					if not isinstance(payload, dict):
 						continue

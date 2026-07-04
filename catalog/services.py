@@ -864,10 +864,9 @@ def prefetch_company_movies(
     progress_cb: Callable[[int, int], None] | None = None,
     should_stop_cb: Callable[[], bool] | None = None,
 ) -> int:
-    """Prefetch and cache full company-movies pagination into Company.tmdb_raw.
+    """Prefetch and cache full company filmography into Company.tmdb_raw.
 
-    This uses TMDb's `/company/{id}/movies` endpoint, which tends to report the
-    complete page count more reliably for studio sync progress.
+    This is kept as a compatibility wrapper for the studio sync flow.
     """
     def should_stop() -> bool:
         try:
@@ -884,11 +883,11 @@ def prefetch_company_movies(
             pass
 
     tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-    pages = tmdb_raw.get("company_movies_pages")
+    pages = tmdb_raw.get("discover_movies_pages")
     if not isinstance(pages, dict):
         pages = {}
 
-    meta = tmdb_raw.get("company_movies_meta")
+    meta = tmdb_raw.get("discover_movies_meta")
     if not isinstance(meta, dict):
         meta = {}
     cached_total_pages = meta.get("total_pages")
@@ -914,7 +913,7 @@ def prefetch_company_movies(
     if should_stop():
         return 0
 
-    first = get_or_sync_company_movies_page(company, page=1, force=force)
+    first = get_or_sync_company_filmography_page(company, page=1, force=force)
     first = compact_company_filmography_payload(first, include_title=True)
     total_pages = int(first.get("total_pages") or 1)
     if total_pages < 1:
@@ -922,14 +921,15 @@ def prefetch_company_movies(
 
     merged_raw = _ensure_paged_cache(
         tmdb_raw,
-        pages_key="company_movies_pages",
-        meta_key="company_movies_meta",
+        pages_key="discover_movies_pages",
+        meta_key="discover_movies_meta",
         page=1,
         payload=first,
     )
-    merged_meta = merged_raw.get("company_movies_meta")
+    merged_meta = merged_raw.get("discover_movies_meta")
     if isinstance(merged_meta, dict):
-        merged_meta["sort_by"] = "company_movies"
+        merged_meta["sort_by"] = COMPANY_FILMOGRAPHY_SORT_BY
+        merged_meta["release_date_gte"] = COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE
         merged_meta["synced_at"] = timezone.now().isoformat()
         merged_meta["total_pages"] = total_pages
         merged_meta["total_results"] = int(first.get("total_results") or merged_meta.get("total_results") or 0)
@@ -941,20 +941,21 @@ def prefetch_company_movies(
         if should_stop():
             break
         page = fetched_pages + 1
-        payload = get_or_sync_company_movies_page(company, page=page, force=force)
+        payload = get_or_sync_company_filmography_page(company, page=page, force=force)
         if should_stop():
             break
         compact_payload = compact_company_filmography_payload(payload, include_title=True)
         merged_raw = _ensure_paged_cache(
             merged_raw,
-            pages_key="company_movies_pages",
-            meta_key="company_movies_meta",
+            pages_key="discover_movies_pages",
+            meta_key="discover_movies_meta",
             page=page,
             payload=compact_payload,
         )
-        merged_meta = merged_raw.get("company_movies_meta")
+        merged_meta = merged_raw.get("discover_movies_meta")
         if isinstance(merged_meta, dict):
-            merged_meta["sort_by"] = "company_movies"
+            merged_meta["sort_by"] = COMPANY_FILMOGRAPHY_SORT_BY
+            merged_meta["release_date_gte"] = COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE
             merged_meta["synced_at"] = timezone.now().isoformat()
             merged_meta["total_pages"] = total_pages
             merged_meta["total_results"] = int(
@@ -1359,11 +1360,9 @@ def get_or_sync_company(tmdb_id: int, *, force: bool = False) -> Company:
                 not in {
                     "discover_movies_pages",
                     "discover_movies_meta",
-                    "company_movies_pages",
-                    "company_movies_meta",
-				"tba_movies",
-				"tba_scan_meta",
-				"tba_movies_meta",
+                    "tba_movies",
+                    "tba_scan_meta",
+                    "tba_movies_meta",
                 }
             }
         discover_pages_raw = existing.get("discover_movies_pages") if isinstance(existing.get("discover_movies_pages"), dict) else {}
@@ -1378,20 +1377,6 @@ def get_or_sync_company(tmdb_id: int, *, force: bool = False) -> Company:
             else {}
         )
 
-        company_movies_pages_raw = (
-            existing.get("company_movies_pages") if isinstance(existing.get("company_movies_pages"), dict) else {}
-        )
-        company_movies_pages = {}
-        if isinstance(company_movies_pages_raw, dict):
-            page1 = company_movies_pages_raw.get("1")
-            if isinstance(page1, dict):
-                company_movies_pages["1"] = compact_company_filmography_payload(page1, include_title=True)
-        company_movies_meta = (
-            existing.get("company_movies_meta")
-            if isinstance(existing.get("company_movies_meta"), dict)
-            else {}
-        )
-
         if isinstance(raw, dict):
             merged = {**existing, **raw, "alternative_names": alternative_names}
         else:
@@ -1399,9 +1384,9 @@ def get_or_sync_company(tmdb_id: int, *, force: bool = False) -> Company:
         merged.update({
             "discover_movies_pages": discover_pages,
             "discover_movies_meta": discover_meta,
-            "company_movies_pages": company_movies_pages,
-            "company_movies_meta": company_movies_meta,
         })
+        merged.pop("company_movies_pages", None)
+        merged.pop("company_movies_meta", None)
 
         company.name = merged.get("name") or company.name
         company.logo_path = merged.get("logo_path") or ""
@@ -1422,47 +1407,6 @@ def get_or_sync_company(tmdb_id: int, *, force: bool = False) -> Company:
     except Exception:
         pass
     return company
-
-
-def get_or_sync_company_movies_page(
-    company: Company,
-    *,
-    page: int,
-    force: bool = False,
-) -> dict:
-    """Fetch and cache /company/{id}/movies pages on the company JSON blob."""
-    page = int(page or 1)
-    if page < 1:
-        page = 1
-
-    tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-    pages = tmdb_raw.get("company_movies_pages")
-    if not isinstance(pages, dict):
-        pages = {}
-
-    key = str(page)
-    cached = pages.get(key)
-    if page == 1 and isinstance(cached, dict) and not force:
-        return cached
-
-    client = TMDbClient.from_settings()
-    payload = client.get_company_movies(company.tmdb_id, page=page)
-
-    if page == 1:
-        company.tmdb_raw = _ensure_paged_cache(
-            tmdb_raw,
-            pages_key="company_movies_pages",
-            meta_key="company_movies_meta",
-            page=page,
-            payload=compact_company_filmography_payload(payload, include_title=True),
-        )
-        company.tmdb_last_sync_at = timezone.now()
-        company.tmdb_last_sync_source = "sync" if force else "ttl"
-        company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
-        _seed_company_summary_cache(company)
-    return payload
-
-
 def get_or_sync_movie(
     tmdb_id: int,
     *,
