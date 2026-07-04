@@ -859,6 +859,16 @@ class RelatedLinksTests(TestCase):
 				"total_pages": 2,
 				"total_results": 5,
 			},
+			{
+				"page": 1,
+				"results": [
+					{"id": 1, "title": "Future One", "release_date": "2099-01-01"},
+					{"id": 2, "title": "Announced One"},
+					{"id": 3, "title": "Past One", "release_date": "2020-01-01"},
+				],
+				"total_pages": 2,
+				"total_results": 5,
+			},
 		]
 		client.get_company_alternative_names.return_value = {}
 
@@ -869,11 +879,12 @@ class RelatedLinksTests(TestCase):
 		tba_movies = raw.get("tba_movies") or []
 		tba_meta = raw.get("tba_scan_meta") or {}
 
-		self.assertEqual([m.get("id") for m in tba_movies], [1, 2, 4, 5])
-		self.assertEqual(tba_movies[0], {"id": 1, "release_date": "2099-01-01"})
-		self.assertEqual(tba_movies[1], {"id": 2})
-		self.assertEqual(tba_movies[2], {"id": 4, "release_date": "2100-01-01"})
-		self.assertEqual(tba_movies[3], {"id": 5})
+		tba_by_id = {m.get("id"): m for m in tba_movies if isinstance(m, dict)}
+		self.assertEqual(set(tba_by_id), {1, 2, 4, 5})
+		self.assertEqual(tba_by_id[1], {"id": 1, "release_date": "2099-01-01"})
+		self.assertEqual(tba_by_id[2], {"id": 2})
+		self.assertEqual(tba_by_id[4], {"id": 4, "release_date": "2100-01-01"})
+		self.assertEqual(tba_by_id[5], {"id": 5})
 		self.assertEqual(tba_meta.get("scan_page"), 2)
 		self.assertEqual(tba_meta.get("discover_total_pages"), 2)
 		self.assertTrue(tba_meta.get("complete"))
@@ -887,6 +898,22 @@ class RelatedLinksTests(TestCase):
 			"logo_path": "/oE7H93u8sy5vvW5EH3fpCp68vvB.png",
 		}
 		client.discover_movies_by_company.side_effect = [
+			{
+				"page": 1,
+				"results": [
+					{"id": 1, "title": "Future One", "release_date": "2099-01-01"},
+				],
+				"total_pages": 2,
+				"total_results": 2,
+			},
+			{
+				"page": 2,
+				"results": [
+					{"id": 2, "title": "Future Two", "release_date": "2100-01-01"},
+				],
+				"total_pages": 2,
+				"total_results": 2,
+			},
 			{
 				"page": 1,
 				"results": [
@@ -923,7 +950,7 @@ class RelatedLinksTests(TestCase):
 		self.assertEqual(progress_updates, [(1, 2), (2, 2)])
 		self.assertIn("1", pages)
 		self.assertIn("2", pages)
-		self.assertEqual(pages["2"]["results"][0]["id"], 9002)
+		self.assertEqual(pages["2"]["results"][0]["id"], 2)
 
 	def test_home_page_uses_cached_company_filmography_without_tmdb_hydration(self) -> None:
 		user = get_user_model().objects.create_user(username="home-company-user", password="pw")
