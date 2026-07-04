@@ -851,20 +851,20 @@ class RelatedLinksTests(TestCase):
 				"total_results": 5,
 			},
 			{
-				"page": 2,
-				"results": [
-					{"id": 4, "title": "Future Two", "release_date": "2100-01-01"},
-					{"id": 5, "title": "Announced Two"},
-				],
-				"total_pages": 2,
-				"total_results": 5,
-			},
-			{
 				"page": 1,
 				"results": [
 					{"id": 1, "title": "Future One", "release_date": "2099-01-01"},
 					{"id": 2, "title": "Announced One"},
 					{"id": 3, "title": "Past One", "release_date": "2020-01-01"},
+				],
+				"total_pages": 2,
+				"total_results": 5,
+			},
+			{
+				"page": 2,
+				"results": [
+					{"id": 4, "title": "Future Two", "release_date": "2100-01-01"},
+					{"id": 5, "title": "Announced Two"},
 				],
 				"total_pages": 2,
 				"total_results": 5,
@@ -907,14 +907,6 @@ class RelatedLinksTests(TestCase):
 				"total_results": 2,
 			},
 			{
-				"page": 2,
-				"results": [
-					{"id": 2, "title": "Future Two", "release_date": "2100-01-01"},
-				],
-				"total_pages": 2,
-				"total_results": 2,
-			},
-			{
 				"page": 1,
 				"results": [
 					{"id": 1, "title": "Future One", "release_date": "2099-01-01"},
@@ -947,10 +939,10 @@ class RelatedLinksTests(TestCase):
 		raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
 		pages = raw.get("discover_movies_pages") or {}
 
-		self.assertEqual(progress_updates, [(1, 2), (2, 2)])
+		self.assertEqual(progress_updates, [(1, 1)])
 		self.assertIn("1", pages)
-		self.assertIn("2", pages)
-		self.assertEqual(pages["2"]["results"][0]["id"], 2)
+		self.assertNotIn("2", pages)
+		self.assertEqual(pages["1"]["results"][0]["id"], 1)
 
 	def test_home_page_uses_cached_company_filmography_without_tmdb_hydration(self) -> None:
 		user = get_user_model().objects.create_user(username="home-company-user", password="pw")
