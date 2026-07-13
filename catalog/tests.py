@@ -11,7 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .context_processors import new_arrivals_context
-from .models import Company, CompanyFollow, Movie, NewMovieArrival, NewsletterIssue, NewsletterItem, NewsletterItemSeen, Person, PersonFollow
+from .models import Company, CompanyFollow, DiaryAccount, Movie, NewMovieArrival, NewsletterIssue, NewsletterItem, NewsletterItemSeen, Person, PersonFollow
 from .related_links import build_person_related_links
 from .newsletter import parse_issue, publish_issue, split_newsletter_items, upsert_issue_from_raw_text
 from .new_movie_helpers import (
@@ -234,6 +234,29 @@ class ConnectPageTests(TestCase):
 		response = self.client.get(reverse("home"))
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, reverse("connect"))
+
+
+class DiaryPageTests(TestCase):
+	def setUp(self) -> None:
+		self.User = get_user_model()
+		self.user = self.User.objects.create_user(username="diary-user", password="testpass123")
+		self.client.force_login(self.user)
+
+	def test_diary_page_renders_empty_connection_state(self) -> None:
+		response = self.client.get(reverse("diary"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Diary")
+		self.assertContains(response, "Not set")
+		self.assertContains(response, "Not connected")
+
+	def test_diary_settings_saves_username(self) -> None:
+		response = self.client.post(reverse("diary_settings"), {"letterboxd_username": "@example_user"})
+
+		self.assertEqual(response.status_code, 302)
+		account = DiaryAccount.objects.get(user=self.user)
+		self.assertEqual(account.letterboxd_username, "example_user")
+		self.assertRedirects(response, reverse("diary"))
 
 
 class PersonComebackHelperTests(TestCase):

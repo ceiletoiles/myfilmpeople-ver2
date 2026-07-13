@@ -20,6 +20,7 @@ urlpatterns = [
     path("collaboration/suggest/", views.collaboration_suggest, name="collaboration_suggest"),
     path("upcoming/", views.upcoming, name="upcoming"),
     path("diary/", views.diary, name="diary"),
+    path("diary/settings/", views.diary_settings, name="diary_settings"),
     path("recent/", views.recent, name="recent"),
     path("new/", views.new_arrivals, name="new_arrivals"),
     path("person/<int:tmdb_id>/", views.person_detail, name="person_detail"),

@@ -29,6 +29,12 @@
       <p class="diary-intro">
         Diary exists only to bring your Letterboxd history into MyFilmPeople so the rest of the site can stay focused on people and studios.
       </p>
+      {% if rss_feed_url %}
+        <div class="diary-feed-callout">
+          <span class="diary-card-kicker">RSS feed</span>
+          <a href="{{ rss_feed_url }}" target="_blank" rel="noreferrer">{{ rss_feed_url }}</a>
+        </div>
+      {% endif %}
     </div>
 
     <div class="diary-status-panel">
@@ -47,9 +53,33 @@
     </div>
   </section>
 
-  <section class="diary-actions" aria-label="Diary actions">
-    <button type="button" class="diary-action diary-action-primary" disabled>Sync Now</button>
-    <button type="button" class="diary-action diary-action-secondary" disabled>Import Letterboxd History</button>
+  <section class="diary-settings" aria-label="Letterboxd settings">
+    <form method="post" action="{% url 'diary_settings' %}" class="diary-settings-form">
+      {% csrf_token %}
+      <div class="diary-settings-field">
+        <label class="diary-card-kicker" for="{{ form.letterboxd_username.id_for_label }}">Letterboxd Username</label>
+        <div class="diary-input-row">
+          <span class="diary-input-prefix">@</span>
+          {{ form.letterboxd_username }}
+        </div>
+        {% if form.letterboxd_username.help_text %}
+          <p class="diary-field-help">{{ form.letterboxd_username.help_text }}</p>
+        {% endif %}
+        {% if form.letterboxd_username.errors %}
+          <div class="diary-field-errors">
+            {% for error in form.letterboxd_username.errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="diary-actions" aria-label="Diary actions">
+        <button type="submit" class="diary-action diary-action-primary">Save Username</button>
+        <button type="button" class="diary-action diary-action-secondary" disabled>Sync Now</button>
+        <button type="button" class="diary-action diary-action-secondary" disabled>Import Letterboxd History</button>
+      </div>
+    </form>
   </section>
 
   <section class="diary-grid" aria-label="Diary setup summary">
