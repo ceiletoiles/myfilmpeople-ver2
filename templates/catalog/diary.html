@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Diary{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260713a" />
+{% endblock %}
+
+{% block page_header %}
+  <div class="page-header diary-page-header">
+    <button type="button" class="nav-icon-btn" data-menu-toggle aria-controls="site-drawer" aria-expanded="false">
+      <img class="nav-icon" src="{% static 'img/menu.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
+      <span class="sr-only">Open menu</span>
+    </button>
+    <div class="page-header-content">
+      <h1>Diary</h1>
+      <p class="page-tagline">Minimal Letterboxd sync for MyFilmPeople</p>
+    </div>
+    <span class="page-header-spacer" aria-hidden="true"></span>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <section class="diary-hero">
+    <div class="diary-hero-copy">
+      <p class="diary-eyebrow">Letterboxd sync</p>
+      <h2>Keep your watch history aligned without turning this into another movie app.</h2>
+      <p class="diary-intro">
+        Diary exists only to bring your Letterboxd history into MyFilmPeople so the rest of the site can stay focused on people and studios.
+      </p>
+    </div>
+
+    <div class="diary-status-panel">
+      <div class="diary-status-row">
+        <span class="diary-status-label">Letterboxd username</span>
+        <strong class="diary-status-value">{% if letterboxd_username %}@{{ letterboxd_username }}{% else %}Not set{% endif %}</strong>
+      </div>
+      <div class="diary-status-row">
+        <span class="diary-status-label">Connection status</span>
+        <strong class="diary-status-value">{{ connection_status }}</strong>
+      </div>
+      <div class="diary-status-row">
+        <span class="diary-status-label">Last successful sync</span>
+        <strong class="diary-status-value">{{ last_sync_label }}</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="diary-actions" aria-label="Diary actions">
+    <button type="button" class="diary-action diary-action-primary" disabled>Sync Now</button>
+    <button type="button" class="diary-action diary-action-secondary" disabled>Import Letterboxd History</button>
+  </section>
+
+  <section class="diary-grid" aria-label="Diary setup summary">
+    <article class="diary-card diary-card-accent">
+      <span class="diary-card-kicker">First time setup</span>
+      <h3>Letterboxd Username</h3>
+      <p>Later milestones will store the username permanently and use it to reach your RSS feed.</p>
+      <div class="diary-input-sample" aria-hidden="true">@username</div>
+    </article>
+
+    <article class="diary-card">
+      <span class="diary-card-kicker">Import history</span>
+      <h3>Complete history import</h3>
+      <p>This page shell reserves space for imports that can be re-run safely whenever you need to refresh your diary.</p>
+      <div class="diary-note">
+        Imports your complete Letterboxd history. Existing entries are updated and new entries are added. Safe to run multiple times.
+      </div>
+    </article>
+  </section>
+{% endblock %}

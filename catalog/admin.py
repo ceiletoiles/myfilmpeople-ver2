@@ -5,6 +5,8 @@ from django.utils.html import format_html
 from .models import (
 	Company,
 	CompanyFollow,
+	DiaryAccount,
+	DiaryEntry,
 	FollowActivity,
 	Movie,
 	NewMovieArrival,
@@ -33,6 +35,28 @@ class CompanyAdmin(admin.ModelAdmin):
 class MovieAdmin(admin.ModelAdmin):
 	search_fields = ("title", "tmdb_id")
 	list_display = ("tmdb_id", "title", "release_date", "tmdb_last_sync_at")
+
+
+@admin.register(DiaryAccount)
+class DiaryAccountAdmin(admin.ModelAdmin):
+	list_display = ("user", "letterboxd_username", "last_successful_sync_at", "newest_processed_guid")
+	search_fields = ("user__username", "letterboxd_username", "newest_processed_guid")
+
+
+@admin.register(DiaryEntry)
+class DiaryEntryAdmin(admin.ModelAdmin):
+	list_display = (
+		"user",
+		"watched_date",
+		"original_title",
+		"original_release_year",
+		"match_source",
+		"manual_lock",
+		"tmdb_id",
+	)
+	list_filter = ("match_source", "manual_lock", "liked", "rewatch", "watched_date")
+	search_fields = ("user__username", "original_title", "official_title", "rss_guid")
+	raw_id_fields = ("user",)
 
 
 @admin.register(PersonFollow)

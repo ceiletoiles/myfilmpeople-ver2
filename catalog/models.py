@@ -63,8 +63,86 @@ class Movie(models.Model):
 			models.Index(fields=["title", "tmdb_id"]),
 			models.Index(fields=["release_date", "tmdb_id"]),
 			models.Index(fields=["tmdb_last_sync_at", "tmdb_id"]),
-			models.Index(fields=["last_accessed_at", "tmdb_id"]),
+		models.Index(fields=["last_accessed_at", "tmdb_id"]),
 		]
+
+
+class DiaryAccount(models.Model):
+	user = models.OneToOneField(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.CASCADE,
+		related_name="diary_account",
+	)
+	letterboxd_username = models.CharField(max_length=80, blank=True, default="")
+	last_successful_sync_at = models.DateTimeField(null=True, blank=True)
+	newest_processed_guid = models.CharField(max_length=512, blank=True, default="")
+
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		ordering = ["user_id"]
+
+	def __str__(self) -> str:
+		username = self.letterboxd_username.strip()
+		if username:
+			return f"{self.user_id} @{username}"
+		return f"{self.user_id} Diary"
+
+	@property
+	def is_connected(self) -> bool:
+		return bool(self.letterboxd_username.strip())
+
+
+class DiaryEntry(models.Model):
+	class MatchSource(models.TextChoices):
+		AUTO = "AUTO", "Auto"
+		MANUAL = "MANUAL", "Manual"
+
+	user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="diary_entries")
+	original_title = models.CharField(max_length=255, db_index=True)
+	original_release_year = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
+	watched_date = models.DateField(db_index=True)
+	rating = models.DecimalField(max_digits=3, decimal_places=1, null=True, blank=True)
+	liked = models.BooleanField(default=False)
+	rewatch = models.BooleanField(default=False)
+	review = models.TextField(blank=True, default="")
+	rss_guid = models.CharField(max_length=512, blank=True, default="", db_index=True)
+
+	tmdb_id = models.PositiveIntegerField(null=True, blank=True, db_index=True)
+	official_title = models.CharField(max_length=255, blank=True, default="")
+	release_date = models.DateField(null=True, blank=True)
+	match_source = models.CharField(max_length=20, choices=MatchSource.choices, default=MatchSource.AUTO)
+	manual_lock = models.BooleanField(default=False)
+
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		ordering = ["-watched_date", "-created_at", "-id"]
+		constraints = [
+			models.UniqueConstraint(
+				fields=["user", "original_title", "original_release_year", "watched_date"],
+				name="uniq_diary_entry_original_watch",
+			),
+		]
+		indexes = [
+			models.Index(fields=["user", "watched_date"], name="catalog_dia_user_watched_idx"),
+			models.Index(fields=["user", "rss_guid"], name="catalog_dia_user_rss_guid_idx"),
+			models.Index(fields=["user", "tmdb_id"], name="catalog_dia_user_tmdb_idx"),
+		]
+
+	def __str__(self) -> str:
+		year = f" ({self.original_release_year})" if self.original_release_year else ""
+		return f"{self.original_title}{year} - {self.watched_date.isoformat()}"
+
+	@property
+	def has_tmdb_match(self) -> bool:
+		return self.tmdb_id is not None
+
+	@property
+	def is_manual_match(self) -> bool:
+		return self.match_source == self.MatchSource.MANUAL
 
 
 class PersonFollow(models.Model):
