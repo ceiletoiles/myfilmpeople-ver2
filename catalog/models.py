@@ -114,6 +114,7 @@ class DiaryEntry(models.Model):
 	release_date = models.DateField(null=True, blank=True)
 	match_source = models.CharField(max_length=20, choices=MatchSource.choices, default=MatchSource.AUTO)
 	manual_lock = models.BooleanField(default=False)
+	match_candidates = models.JSONField(default=list, blank=True)
 
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)

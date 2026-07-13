@@ -22,6 +22,8 @@ from django.utils import timezone
 
 from ..forms import DiaryAccountForm, DiaryImportForm
 from ..models import DiaryAccount, DiaryEntry
+from ..services import get_or_sync_movie
+from ..tmdb import TMDbClient, TMDbError
 
 
 DIARY_IMPORT_JOB_TTL_SECONDS = 60 * 60
@@ -115,6 +117,94 @@ def _parse_diary_row(row: dict[str, str]) -> dict[str, object] | None:
 	}
 
 
+def _normalize_title(value: str) -> str:
+	text = (value or "").casefold()
+	for token in ("the ", "a ", "an "):
+		if text.startswith(token):
+			text = text[len(token):]
+			break
+	return "".join(ch for ch in text if ch.isalnum() or ch.isspace()).strip()
+
+
+def _parse_release_year_from_date(value: str | None) -> int | None:
+	if not value:
+		return None
+	text = str(value).strip()
+	if len(text) >= 4 and text[:4].isdigit():
+		return int(text[:4])
+	return None
+
+
+def _build_candidate_payload(movie: dict[str, object], *, score: float) -> dict[str, object]:
+	return {
+		"tmdb_id": movie.get("id"),
+		"title": str(movie.get("title") or movie.get("name") or "").strip(),
+		"release_date": str(movie.get("release_date") or "").strip(),
+		"poster_path": str(movie.get("poster_path") or "").strip(),
+		"score": round(float(score), 3),
+	}
+
+
+def _score_tmdb_candidate(*, query_title: str, query_year: int | None, movie: dict[str, object]) -> float:
+	title = str(movie.get("title") or movie.get("name") or "").strip()
+	if not title:
+		return 0.0
+	movie_year = _parse_release_year_from_date(str(movie.get("release_date") or ""))
+	qt = _normalize_title(query_title)
+	mt = _normalize_title(title)
+	if not qt or not mt:
+		return 0.0
+
+	title_exact = qt == mt
+	title_similar = qt in mt or mt in qt
+	year_match = query_year is None or movie_year is None or query_year == movie_year
+	score = 0.0
+	if title_exact and query_year is not None and movie_year is not None and query_year == movie_year:
+		score = 1.0
+	elif title_exact:
+		score = 0.96 if year_match else 0.9
+	elif title_similar and year_match:
+		score = 0.82
+	else:
+		try:
+			from difflib import SequenceMatcher
+
+			score = SequenceMatcher(None, qt, mt).ratio()
+			if year_match:
+				score += 0.05
+		except Exception:
+			score = 0.0
+	return min(score, 1.0)
+
+
+def _match_tmdb_movie(*, title: str, release_year: int | None) -> tuple[dict[str, object] | None, list[dict[str, object]]]:
+	try:
+		client = TMDbClient.from_settings()
+		query = title.strip()
+		if release_year:
+			query = f"{query} {release_year}"
+		payload = client.search_movies(query, page=1) or {}
+	except Exception:
+		return None, []
+
+	results = [item for item in (payload.get("results") or []) if isinstance(item, dict)]
+	scored: list[tuple[float, dict[str, object]]] = []
+	for item in results:
+		score = _score_tmdb_candidate(query_title=title, query_year=release_year, movie=item)
+		if score > 0:
+			scored.append((score, item))
+	scored.sort(key=lambda pair: (-pair[0], _parse_release_year_from_date(str(pair[1].get("release_date") or "")) or 0, str(pair[1].get("title") or "").casefold()))
+
+	if not scored:
+		return None, []
+
+	candidates = [_build_candidate_payload(movie, score=score) for score, movie in scored[:3]]
+	best_score, best_movie = scored[0]
+	if best_score >= 0.95:
+		return _build_candidate_payload(best_movie, score=best_score), candidates
+	return None, candidates
+
+
 def _load_diary_import_rows(temp_path: str) -> tuple[list[dict[str, object]], str]:
 	if not os.path.exists(temp_path):
 		raise FileNotFoundError("Upload file no longer exists.")
@@ -176,13 +266,22 @@ def _diary_import_progress_url(job_id: UUID) -> str:
 	return reverse("diary_import_progress", kwargs={"job_id": str(job_id)})
 
 
-def _upsert_diary_entry(user, row: dict[str, object]) -> tuple[str, DiaryEntry]:
-	lookup = {
+def _diary_entry_lookup(user, row: dict[str, object]) -> dict[str, object]:
+	return {
 		"user": user,
 		"original_title": str(row["original_title"]),
 		"original_release_year": row["original_release_year"],
 		"watched_date": row["watched_date"],
 	}
+
+
+def _upsert_diary_entry(
+	user,
+	row: dict[str, object],
+	match_data: dict[str, object] | None = None,
+	match_candidates: list[dict[str, object]] | None = None,
+) -> tuple[str, DiaryEntry]:
+	lookup = _diary_entry_lookup(user, row)
 	entry = DiaryEntry.objects.filter(**lookup).first()
 	if entry is None:
 		entry = DiaryEntry.objects.create(
@@ -192,6 +291,12 @@ def _upsert_diary_entry(user, row: dict[str, object]) -> tuple[str, DiaryEntry]:
 			rewatch=bool(row["rewatch"]),
 			review=str(row["review"] or ""),
 			rss_guid=str(row["rss_guid"] or ""),
+			tmdb_id=(match_data or {}).get("tmdb_id"),
+			official_title=str((match_data or {}).get("title") or ""),
+			release_date=(match_data or {}).get("release_date") or None,
+			match_source=DiaryEntry.MatchSource.AUTO if match_data else DiaryEntry.MatchSource.AUTO,
+			manual_lock=False,
+			match_candidates=match_candidates or [],
 		)
 		return "created", entry
 
@@ -274,12 +379,23 @@ def _run_diary_import_job(*, job_id: UUID, user_id: int, temp_path: str, source_
 			title = str(parsed["original_title"])
 			year = parsed["original_release_year"]
 			last_guid = str(parsed["rss_guid"] or last_guid)
+			lookup = _diary_entry_lookup(user, parsed)
+			existing_entry = DiaryEntry.objects.filter(**lookup).first()
+			match_data: dict[str, object] | None = None
+			match_candidates: list[dict[str, object]] = []
+			if existing_entry is None:
+				match_data, match_candidates = _match_tmdb_movie(title=title, release_year=year)
 			_diary_import_patch(
 				job_id,
 				current_label=f"Importing {idx}/{total_rows}...",
 				current_title=title + (f" ({year})" if year else ""),
 			)
-			status, _entry = _upsert_diary_entry(user, parsed)
+			status, _entry = _upsert_diary_entry(
+				user,
+				parsed,
+				match_data=match_data,
+				match_candidates=match_candidates,
+			)
 			if status == "created":
 				created_entries += 1
 			elif status == "updated":
@@ -343,6 +459,24 @@ def _diary_import_context(account: DiaryAccount, form: DiaryAccountForm | DiaryI
 	}
 
 
+def _review_entries_for_user(user) -> list[dict[str, object]]:
+	entries = (
+		DiaryEntry.objects.filter(user=user, tmdb_id__isnull=True)
+		.order_by("-watched_date", "-created_at")
+		[:12]
+	)
+	review_entries: list[dict[str, object]] = []
+	for entry in entries:
+		candidates = entry.match_candidates if isinstance(entry.match_candidates, list) else []
+		review_entries.append(
+			{
+				"entry": entry,
+				"candidates": [cand for cand in candidates if isinstance(cand, dict)],
+			}
+		)
+	return review_entries
+
+
 @login_required
 def diary(request: HttpRequest) -> HttpResponse:
 	account = _get_diary_account(request.user)
@@ -350,6 +484,7 @@ def diary(request: HttpRequest) -> HttpResponse:
 	import_form = DiaryImportForm()
 	context = _diary_import_context(account, form)
 	context["import_form"] = import_form
+	context["review_entries"] = _review_entries_for_user(request.user)
 	return render(request, "catalog/diary.html", context)
 
 
@@ -474,3 +609,52 @@ def diary_import_progress(request: HttpRequest, job_id: str) -> HttpResponse:
 		return JsonResponse({"ok": False, "error": "Not allowed."}, status=403)
 
 	return JsonResponse({"ok": True, **data})
+
+
+@login_required
+def diary_match_entry(request: HttpRequest) -> HttpResponse:
+	if request.method != "POST":
+		return redirect("diary")
+
+	entry_id_raw = (request.POST.get("entry_id") or "").strip()
+	tmdb_id_raw = (request.POST.get("tmdb_id") or "").strip()
+	try:
+		entry_id = int(entry_id_raw)
+		tmdb_id = int(tmdb_id_raw)
+	except ValueError:
+		messages.error(request, "Invalid match selection.")
+		return redirect("diary")
+
+	entry = DiaryEntry.objects.filter(user=request.user, pk=entry_id).first()
+	if entry is None:
+		messages.error(request, "Diary entry not found.")
+		return redirect("diary")
+	if entry.manual_lock and entry.tmdb_id:
+		messages.info(request, "This entry is already locked.")
+		return redirect("diary")
+
+	try:
+		movie = get_or_sync_movie(tmdb_id, force=False)
+	except Exception:
+		messages.error(request, "Could not load the selected movie.")
+		return redirect("diary")
+
+	entry.tmdb_id = movie.tmdb_id
+	entry.official_title = movie.title
+	entry.release_date = movie.release_date
+	entry.match_source = DiaryEntry.MatchSource.MANUAL
+	entry.manual_lock = True
+	entry.match_candidates = []
+	entry.save(
+		update_fields=[
+			"tmdb_id",
+			"official_title",
+			"release_date",
+			"match_source",
+			"manual_lock",
+			"match_candidates",
+			"updated_at",
+		]
+	)
+	messages.success(request, f"Matched {entry.original_title} to {movie.title}.")
+	return redirect("diary")

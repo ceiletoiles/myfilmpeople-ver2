@@ -146,4 +146,48 @@
       </div>
     </article>
   </section>
+
+  <section class="diary-review" aria-label="Needs review">
+    <article class="diary-card diary-review-card">
+      <span class="diary-card-kicker">Needs review</span>
+      <h3>Manual TMDb matching</h3>
+      <p>Entries below need a confirmation before they can be locked in permanently.</p>
+
+      {% if review_entries %}
+        <div class="diary-review-list">
+          {% for item in review_entries %}
+            <article class="diary-review-item">
+              <div class="diary-review-copy">
+                <strong>{{ item.entry.original_title }}</strong>
+                <div class="muted">
+                  {{ item.entry.watched_date|date:"j M Y" }}
+                  {% if item.entry.original_release_year %} . {{ item.entry.original_release_year }}{% endif %}
+                </div>
+              </div>
+
+              {% if item.candidates %}
+                <div class="diary-review-candidates">
+                  {% for candidate in item.candidates %}
+                    <form method="post" action="{% url 'diary_match_entry' %}" class="diary-review-match-form">
+                      {% csrf_token %}
+                      <input type="hidden" name="entry_id" value="{{ item.entry.id }}" />
+                      <input type="hidden" name="tmdb_id" value="{{ candidate.tmdb_id }}" />
+                      <button type="submit" class="diary-review-match-btn">
+                        {{ candidate.title }}
+                        {% if candidate.release_date %}<span class="muted">({{ candidate.release_date|slice:":4" }})</span>{% endif %}
+                      </button>
+                    </form>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <div class="diary-review-empty muted">No TMDb suggestions saved for this entry yet.</div>
+              {% endif %}
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No diary entries need review right now.</p>
+      {% endif %}
+    </article>
+  </section>
 {% endblock %}

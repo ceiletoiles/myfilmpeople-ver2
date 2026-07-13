@@ -281,6 +281,10 @@
 	margin-top: 18px;
 }
 
+.diary-review {
+	margin-top: 18px;
+}
+
 .diary-import-card {
 	display: grid;
 	gap: 14px;
@@ -355,6 +359,52 @@
 	color: #0f172a;
 	line-height: 1.4;
 	word-break: break-word;
+}
+
+.diary-review-card {
+	display: grid;
+	gap: 14px;
+}
+
+.diary-review-list {
+	display: grid;
+	gap: 14px;
+}
+
+.diary-review-item {
+	display: grid;
+	gap: 12px;
+	padding: 14px 16px;
+	border-radius: 16px;
+	border: 1px solid rgba(148, 163, 184, 0.35);
+	background: rgba(248, 250, 252, 0.96);
+}
+
+.diary-review-candidates {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.diary-review-match-form {
+	margin: 0;
+}
+
+.diary-review-match-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 10px 14px;
+	border-radius: 999px;
+	border: 1px solid #cbd5e1;
+	background: #ffffff;
+	color: #0f172a;
+	font-weight: 700;
+	text-align: left;
+}
+
+.diary-review-match-btn:hover {
+	background: #f8fafc;
 }
 
 .diary-import-progress-bar {

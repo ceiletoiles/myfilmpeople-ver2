@@ -23,6 +23,7 @@ urlpatterns = [
     path("diary/settings/", views.diary_settings, name="diary_settings"),
     path("diary/import/start/", views.diary_import_start, name="diary_import_start"),
     path("diary/import/progress/<uuid:job_id>/", views.diary_import_progress, name="diary_import_progress"),
+    path("diary/review/match/", views.diary_match_entry, name="diary_match_entry"),
     path("recent/", views.recent, name="recent"),
     path("new/", views.new_arrivals, name="new_arrivals"),
     path("person/<int:tmdb_id>/", views.person_detail, name="person_detail"),

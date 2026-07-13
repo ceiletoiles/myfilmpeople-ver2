@@ -266,19 +266,27 @@ class DiaryPageTests(TestCase):
 			"Come and See,1985,2026-07-11,5,yes,no,Great film,https://letterboxd.com/film/come-and-see/\n"
 		)
 		upload = SimpleUploadedFile("letterboxd.csv", csv_content.encode("utf-8"), content_type="text/csv")
-		response = self.client.post(reverse("diary_import_start"), {"import_file": upload})
+		with patch("catalog.views.diary.TMDbClient.from_settings") as mock_tmdb:
+			mock_client = Mock()
+			mock_client.search_movies.return_value = {
+				"results": [
+					{"id": 1, "title": "Come and See", "release_date": "1985-07-01", "poster_path": "/poster.jpg"},
+				]
+			}
+			mock_tmdb.return_value = mock_client
+			response = self.client.post(reverse("diary_import_start"), {"import_file": upload})
 
-		self.assertEqual(response.status_code, 200)
-		payload = response.json()
-		self.assertTrue(payload["ok"])
-		progress_url = payload["progress_url"]
+			self.assertEqual(response.status_code, 200)
+			payload = response.json()
+			self.assertTrue(payload["ok"])
+			progress_url = payload["progress_url"]
 
-		progress = None
-		for _ in range(30):
-			progress = self.client.get(progress_url).json()
-			if progress.get("status") != "running":
-				break
-			time.sleep(0.1)
+			progress = None
+			for _ in range(30):
+				progress = self.client.get(progress_url).json()
+				if progress.get("status") != "running":
+					break
+				time.sleep(0.1)
 
 		self.assertIsNotNone(progress)
 		self.assertEqual(progress.get("status"), "done")
@@ -289,6 +297,24 @@ class DiaryPageTests(TestCase):
 		self.assertEqual(str(entry.rating), "5.0")
 		self.assertTrue(entry.liked)
 		self.assertFalse(entry.rewatch)
+		self.assertEqual(entry.tmdb_id, 1)
+		self.assertEqual(entry.match_source, DiaryEntry.MatchSource.AUTO)
+		self.assertEqual(entry.official_title, "Come and See")
+
+	def test_diary_review_page_shows_pending_entries(self) -> None:
+		DiaryEntry.objects.create(
+			user=self.user,
+			original_title="Unknown Film",
+			original_release_year=2024,
+			watched_date=date(2026, 7, 11),
+			match_candidates=[{"tmdb_id": 10, "title": "Unknown Film", "release_date": "2024-01-01"}],
+		)
+
+		response = self.client.get(reverse("diary"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Needs review")
+		self.assertContains(response, "Unknown Film")
 
 
 class PersonComebackHelperTests(TestCase):
