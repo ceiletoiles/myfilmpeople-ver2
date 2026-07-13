@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 from datetime import date
+import time
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import RequestFactory
 from django.test import TestCase, override_settings
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from django.utils import timezone
 
 from .context_processors import new_arrivals_context
-from .models import Company, CompanyFollow, DiaryAccount, Movie, NewMovieArrival, NewsletterIssue, NewsletterItem, NewsletterItemSeen, Person, PersonFollow
+from .models import Company, CompanyFollow, DiaryAccount, DiaryEntry, Movie, NewMovieArrival, NewsletterIssue, NewsletterItem, NewsletterItemSeen, Person, PersonFollow
 from .related_links import build_person_related_links
 from .newsletter import parse_issue, publish_issue, split_newsletter_items, upsert_issue_from_raw_text
 from .new_movie_helpers import (
@@ -257,6 +259,36 @@ class DiaryPageTests(TestCase):
 		account = DiaryAccount.objects.get(user=self.user)
 		self.assertEqual(account.letterboxd_username, "example_user")
 		self.assertRedirects(response, reverse("diary"))
+
+	def test_diary_import_upload_creates_entries(self) -> None:
+		csv_content = (
+			"Name,Year,Date,Rating,Liked,Rewatch,Review,URI\n"
+			"Come and See,1985,2026-07-11,5,yes,no,Great film,https://letterboxd.com/film/come-and-see/\n"
+		)
+		upload = SimpleUploadedFile("letterboxd.csv", csv_content.encode("utf-8"), content_type="text/csv")
+		response = self.client.post(reverse("diary_import_start"), {"import_file": upload})
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(payload["ok"])
+		progress_url = payload["progress_url"]
+
+		progress = None
+		for _ in range(30):
+			progress = self.client.get(progress_url).json()
+			if progress.get("status") != "running":
+				break
+			time.sleep(0.1)
+
+		self.assertIsNotNone(progress)
+		self.assertEqual(progress.get("status"), "done")
+		self.assertEqual(DiaryEntry.objects.filter(user=self.user).count(), 1)
+		entry = DiaryEntry.objects.get(user=self.user)
+		self.assertEqual(entry.original_title, "Come and See")
+		self.assertEqual(entry.original_release_year, 1985)
+		self.assertEqual(str(entry.rating), "5.0")
+		self.assertTrue(entry.liked)
+		self.assertFalse(entry.rewatch)
 
 
 class PersonComebackHelperTests(TestCase):

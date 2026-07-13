@@ -7,6 +7,10 @@
   <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260713a" />
 {% endblock %}
 
+{% block extra_js %}
+  <script src="{{ STATIC_PREFIX }}js/pages/diary.js?v=20260713a"></script>
+{% endblock %}
+
 {% block page_header %}
   <div class="page-header diary-page-header">
     <button type="button" class="nav-icon-btn" data-menu-toggle aria-controls="site-drawer" aria-expanded="false">
@@ -96,6 +100,49 @@
       <p>This page shell reserves space for imports that can be re-run safely whenever you need to refresh your diary.</p>
       <div class="diary-note">
         Imports your complete Letterboxd history. Existing entries are updated and new entries are added. Safe to run multiple times.
+      </div>
+    </article>
+  </section>
+
+  <section class="diary-import" aria-label="Import Letterboxd history">
+    <article class="diary-card diary-import-card">
+      <span class="diary-card-kicker">Import history</span>
+      <h3>Import Letterboxd History</h3>
+      <p>Upload your exported Letterboxd CSV or ZIP file. The import runs in the background and shows progress while it works.</p>
+
+      <form method="post" action="{% url 'diary_import_start' %}" enctype="multipart/form-data" class="diary-import-form" data-diary-import-form data-diary-import-start-url="{% url 'diary_import_start' %}">
+        {% csrf_token %}
+        <div class="diary-import-field">
+          <label class="diary-card-kicker" for="{{ import_form.import_file.id_for_label }}">Letterboxd export file</label>
+          {{ import_form.import_file }}
+          {% if import_form.import_file.help_text %}
+            <p class="diary-field-help">{{ import_form.import_file.help_text }}</p>
+          {% endif %}
+          {% if import_form.import_file.errors %}
+            <div class="diary-field-errors">
+              {% for error in import_form.import_file.errors %}
+                <div>{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+        <button type="submit" class="diary-action diary-action-primary">Import Letterboxd History</button>
+      </form>
+
+      <div class="diary-note diary-import-note">
+        Imports your complete Letterboxd history. Existing entries are updated and new entries are added. Safe to run multiple times.
+      </div>
+
+      <div class="diary-import-progress" data-diary-import-progress hidden>
+        <div class="diary-import-progress-row">
+          <div class="diary-import-progress-text" data-diary-import-progress-text>Queued...</div>
+        </div>
+        <div class="diary-import-progress-current" data-diary-import-progress-current></div>
+        <div class="diary-import-progress-bar" data-diary-import-progress-bar role="progressbar" aria-label="Diary import progress" aria-valuemin="0" aria-valuemax="100">
+          <div class="diary-import-progress-bar-fill" data-diary-import-progress-fill></div>
+        </div>
+        <div class="diary-import-progress-meta" data-diary-import-progress-meta></div>
       </div>
     </article>
   </section>

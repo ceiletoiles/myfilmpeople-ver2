@@ -277,6 +277,101 @@
 	line-height: 1.65;
 }
 
+.diary-import {
+	margin-top: 18px;
+}
+
+.diary-import-card {
+	display: grid;
+	gap: 14px;
+}
+
+.diary-import-form {
+	display: grid;
+	gap: 14px;
+}
+
+.diary-import-field {
+	display: grid;
+	gap: 8px;
+}
+
+.diary-import-field input[type="file"] {
+	display: block;
+	width: 100%;
+	padding: 11px 12px;
+	border: 1px solid #cbd5e1;
+	border-radius: 14px;
+	background: #ffffff;
+	color: #0f172a;
+}
+
+.diary-import-field input[type="file"]::file-selector-button {
+	margin-right: 12px;
+	padding: 8px 12px;
+	border: 0;
+	border-radius: 999px;
+	background: #0f172a;
+	color: #ffffff;
+	font: inherit;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.diary-import-note {
+	margin-top: 0;
+}
+
+.diary-import-progress {
+	display: grid;
+	gap: 10px;
+	padding: 14px 16px;
+	border-radius: 16px;
+	border: 1px solid rgba(148, 163, 184, 0.35);
+	background: rgba(248, 250, 252, 0.96);
+}
+
+.diary-import-progress-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.diary-import-progress-text {
+	font-size: 0.96rem;
+	color: #334155;
+	line-height: 1.45;
+}
+
+.diary-import-progress-meta {
+	font-size: 0.92rem;
+	color: #64748b;
+}
+
+.diary-import-progress-current {
+	font-size: 1rem;
+	font-weight: 700;
+	color: #0f172a;
+	line-height: 1.4;
+	word-break: break-word;
+}
+
+.diary-import-progress-bar {
+	height: 10px;
+	border-radius: 999px;
+	background: #e2e8f0;
+	overflow: hidden;
+}
+
+.diary-import-progress-bar-fill {
+	height: 100%;
+	width: 0%;
+	border-radius: 999px;
+	background: linear-gradient(90deg, #0f172a 0%, #2563eb 100%);
+	transition: width 220ms ease;
+}
+
 @media (max-width: 900px) {
 	.diary-hero,
 	.diary-grid {
@@ -321,5 +416,9 @@
 
 	.diary-settings-field input[type="text"] {
 		height: 46px;
+	}
+
+	.diary-import-field input[type="file"] {
+		padding: 10px 11px;
 	}
 }

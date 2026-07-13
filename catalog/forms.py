@@ -32,3 +32,15 @@ class DiaryAccountForm(forms.Form):
 		if not _LETTERBOXD_USERNAME_RE.fullmatch(username):
 			raise ValidationError("Use only letters, numbers, underscores, or hyphens.")
 		return username
+
+
+class DiaryImportForm(forms.Form):
+	import_file = forms.FileField(
+		label="Letterboxd export file",
+		help_text="Upload your Letterboxd diary CSV or ZIP export.",
+		widget=forms.ClearableFileInput(
+			attrs={
+				"accept": ".csv,.zip",
+			}
+		),
+	)
