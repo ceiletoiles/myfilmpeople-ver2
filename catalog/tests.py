@@ -265,8 +265,8 @@ class DiaryPageTests(TransactionTestCase):
 
 	def test_diary_import_upload_creates_entries(self) -> None:
 		csv_content = (
-			"Name,Year,Date,Rating,Liked,Rewatch,Review,URI\n"
-			"Come and See,1985,2026-07-11,5,yes,no,Great film,https://letterboxd.com/film/come-and-see/\n"
+			"Name,Year,Watched Date,Date,Rating,Liked,Rewatch,Review,URI\n"
+			"Come and See,1985,2026-07-10,2026-07-11,5,yes,no,Great film,https://letterboxd.com/film/come-and-see/\n"
 		)
 		upload = SimpleUploadedFile("letterboxd.csv", csv_content.encode("utf-8"), content_type="text/csv")
 		with patch("catalog.views.diary.TMDbClient.from_settings") as mock_tmdb:
@@ -297,6 +297,7 @@ class DiaryPageTests(TransactionTestCase):
 		entry = DiaryEntry.objects.get(user=self.user)
 		self.assertEqual(entry.original_title, "Come and See")
 		self.assertEqual(entry.original_release_year, 1985)
+		self.assertEqual(entry.watched_date, date(2026, 7, 10))
 		self.assertEqual(str(entry.rating), "5.0")
 		self.assertTrue(entry.liked)
 		self.assertFalse(entry.rewatch)
@@ -359,6 +360,66 @@ class DiaryPageTests(TransactionTestCase):
 		self.assertEqual(entry.tmdb_id, 1)
 		account = DiaryAccount.objects.get(user=self.user)
 		self.assertIsNotNone(account.last_successful_sync_at)
+
+	def test_diary_sync_prefers_letterboxd_watched_date_and_film_title(self) -> None:
+		rss_xml = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<rss version=\"2.0\" xmlns:letterboxd=\"https://letterboxd.com/rss/1.0/\" xmlns:tmdb=\"https://themoviedb.org/rss/1.0/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">
+  <channel>
+    <title>Letterboxd Diary</title>
+    <item>
+      <title>Obsession, 2025 - ★★★★★</title>
+      <link>https://letterboxd.com/ceiletoiles/film/obsession-2025/</link>
+      <guid isPermaLink=\"false\">letterboxd-watch-1375601173</guid>
+      <pubDate>Wed, 1 Jul 2026 04:30:42 +1200</pubDate>
+      <letterboxd:watchedDate>2026-06-30</letterboxd:watchedDate>
+      <letterboxd:rewatch>No</letterboxd:rewatch>
+      <letterboxd:filmTitle>Obsession</letterboxd:filmTitle>
+      <letterboxd:filmYear>2025</letterboxd:filmYear>
+      <letterboxd:memberRating>5.0</letterboxd:memberRating>
+      <letterboxd:memberLike>Yes</letterboxd:memberLike>
+      <tmdb:movieId>1339713</tmdb:movieId>
+      <description><![CDATA[
+        <p><img src=\"https://a.ltrbxd.com/resized/film-poster/1/2/3/4/4/7/2/1234472-obsession-2025-2-0-600-0-900-crop.jpg?v=cff6fc00b6\"/></p>
+        <p>Watched on Tuesday June 30, 2026.</p>
+      ]]></description>
+      <dc:creator>shiv</dc:creator>
+    </item>
+  </channel>
+</rss>
+"""
+		self.client.post(reverse("diary_settings"), {"letterboxd_username": "@example_user"})
+
+		with patch("catalog.views.diary.requests.get") as mock_get, patch("catalog.views.diary.TMDbClient.from_settings") as mock_tmdb:
+			mock_response = Mock()
+			mock_response.text = rss_xml
+			mock_response.raise_for_status.return_value = None
+			mock_get.return_value = mock_response
+
+			mock_client = Mock()
+			mock_client.search_movies.return_value = {
+				"results": [
+					{"id": 1339713, "title": "Obsession", "release_date": "2025-01-01", "poster_path": "/poster.jpg"},
+				]
+			}
+			mock_tmdb.return_value = mock_client
+
+			response = self.client.post(reverse("diary_sync_start"))
+			self.assertEqual(response.status_code, 200)
+			progress_url = response.json()["progress_url"]
+
+			progress = None
+			for _ in range(30):
+				progress = self.client.get(progress_url).json()
+				if progress.get("status") != "running":
+					break
+				time.sleep(0.1)
+
+		self.assertIsNotNone(progress)
+		self.assertEqual(progress.get("status"), "done")
+		entry = DiaryEntry.objects.get(user=self.user)
+		self.assertEqual(entry.original_title, "Obsession")
+		self.assertEqual(entry.watched_date, date(2026, 6, 30))
+		self.assertEqual(entry.rss_guid, "letterboxd-watch-1375601173")
 
 	def test_diary_import_and_rss_sync_merge_same_film(self) -> None:
 		csv_content = (
@@ -578,6 +639,7 @@ class DiaryPageTests(TransactionTestCase):
 		self.assertContains(response, "Diary List")
 		self.assertContains(response, "Come and See")
 		self.assertContains(response, "Hold or double-click to edit.")
+		self.assertContains(response, "diary-rating-stars")
 
 	def test_diary_entry_update_saves_changes(self) -> None:
 		entry = DiaryEntry.objects.create(

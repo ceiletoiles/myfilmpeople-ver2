@@ -919,6 +919,66 @@ body.modal-open {
 	font-weight: 600;
 }
 
+.diary-rating-badge {
+	gap: 0.12rem;
+	padding: 0.2rem 0.55rem;
+}
+
+.diary-rating-stars {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.02rem;
+	line-height: 1;
+	letter-spacing: 0;
+}
+
+.diary-star {
+	display: inline-block;
+	font-size: 0.88rem;
+	line-height: 1;
+}
+
+.diary-star.is-filled,
+.diary-star.is-half {
+	color: #facc15;
+}
+
+.diary-star.is-empty {
+	color: rgba(250, 204, 21, 0.32);
+}
+
+.diary-star.is-half {
+	position: relative;
+	color: rgba(250, 204, 21, 0.32);
+}
+
+.diary-star.is-half::before {
+	content: "★";
+	position: absolute;
+	inset: 0 auto 0 0;
+	width: 50%;
+	overflow: hidden;
+	color: #facc15;
+}
+
+.diary-icon-badge {
+	min-width: 1.75rem;
+	padding: 0.2rem 0.45rem;
+	font-size: 0.92rem;
+	font-weight: 800;
+	line-height: 1;
+}
+
+.diary-icon-like {
+	background: rgba(239, 68, 68, 0.12);
+	color: #fb7185;
+}
+
+.diary-icon-rewatch {
+	background: rgba(59, 130, 246, 0.12);
+	color: #93c5fd;
+}
+
 @media (max-width: 900px) {
 	.diary-hero,
 	.diary-grid {

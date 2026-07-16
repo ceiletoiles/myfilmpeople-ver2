@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load diary_tags %}
 
 {% block title %}Diary List{% endblock %}
 
@@ -69,9 +70,9 @@
                   </div>
                 </div>
                 <div class="diary-badges diary-list-badges">
-                  {% if entry.rating %}<span class="diary-badge">{{ entry.rating }} stars</span>{% endif %}
-                  {% if entry.liked %}<span class="diary-badge">Liked</span>{% endif %}
-                  {% if entry.rewatch %}<span class="diary-badge">Rewatch</span>{% endif %}
+                  {% if entry.rating %}<span class="diary-badge diary-rating-badge">{% diary_rating_stars entry.rating %}</span>{% endif %}
+                  {% if entry.liked %}<span class="diary-badge diary-icon-badge diary-icon-like" title="Liked" aria-label="Liked">&hearts;</span>{% endif %}
+                  {% if entry.rewatch %}<span class="diary-badge diary-icon-badge diary-icon-rewatch" title="Rewatch" aria-label="Rewatch">&#10227;</span>{% endif %}
                 </div>
               </div>
 

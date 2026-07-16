@@ -71,6 +71,16 @@ def _first_nonempty(row: dict[str, str], names: set[str]) -> str:
 	return ""
 
 
+def _first_nonempty_in_order(row: dict[str, str], names: tuple[str, ...]) -> str:
+	for name in names:
+		for key, value in row.items():
+			if _normalize_header_key(key) == name:
+				text = (value or "").strip()
+				if text:
+					return text
+	return ""
+
+
 def _parse_bool(value: str) -> bool:
 	norm = (value or "").strip().lower()
 	return norm in {"1", "true", "t", "yes", "y", "on", "liked", "like", "watched"}
@@ -119,7 +129,9 @@ def _parse_watch_date(value: str) -> date | None:
 
 def _parse_diary_row(row: dict[str, str]) -> dict[str, object] | None:
 	title = _first_nonempty(row, {"name", "title", "film", "movie"})
-	watched_date = _parse_watch_date(_first_nonempty(row, {"date", "watched date", "watched at", "watched"}))
+	watched_date = _parse_watch_date(
+		_first_nonempty_in_order(row, ("watched date", "watched at", "watched", "date"))
+	)
 	if not title or watched_date is None:
 		return None
 
@@ -561,6 +573,16 @@ def _sync_element_text(element: ET.Element, names: set[str]) -> str:
 	return ""
 
 
+def _sync_element_text_first(element: ET.Element, names: tuple[str, ...]) -> str:
+	for name in names:
+		for child in list(element):
+			if _sync_xml_local_name(child.tag) == name:
+				text = "".join(child.itertext()).strip()
+				if text:
+					return text
+	return ""
+
+
 def _strip_html(text: str) -> str:
 	cleaned = re.sub(r"<[^>]+>", " ", html.unescape(text or ""))
 	return " ".join(cleaned.split()).strip()
@@ -583,16 +605,16 @@ def _parse_letterboxd_rss_datetime(value: str) -> datetime | None:
 
 
 def _parse_letterboxd_rss_item(item: ET.Element) -> dict[str, object] | None:
-	title = _sync_element_text(item, {"title", "filmtitle", "movietitle"})
+	title = _sync_element_text_first(item, ("filmtitle", "movietitle", "title"))
 	if not title:
 		return None
 
-	guid = _sync_element_text(item, {"guid", "id", "uri"})
+	guid = _sync_element_text_first(item, ("guid", "id", "uri"))
 	link = _sync_element_text(item, {"link"})
 	if not guid:
 		guid = link
 
-	watched_text = _sync_element_text(item, {"watcheddate", "watched", "date", "pubdate"})
+	watched_text = _sync_element_text_first(item, ("watcheddate", "watched", "date", "pubdate"))
 	watched_date = _parse_watch_date(watched_text)
 	if watched_date is None:
 		dt = _parse_letterboxd_rss_datetime(watched_text)
@@ -601,7 +623,7 @@ def _parse_letterboxd_rss_item(item: ET.Element) -> dict[str, object] | None:
 	if watched_date is None:
 		return None
 
-	release_year_text = _sync_element_text(item, {"filmyear", "year", "releaseyear"})
+	release_year_text = _sync_element_text_first(item, ("filmyear", "year", "releaseyear"))
 	release_year = _parse_release_year(release_year_text)
 	if release_year is None:
 		match = re.search(r"\((\d{4})\)\s*$", title)
@@ -613,8 +635,8 @@ def _parse_letterboxd_rss_item(item: ET.Element) -> dict[str, object] | None:
 		"original_title": title,
 		"original_release_year": release_year,
 		"watched_date": watched_date,
-		"rating": _parse_rating(_sync_element_text(item, {"memberrating", "rating", "score"})),
-		"liked": _parse_bool(_sync_element_text(item, {"like", "liked"})),
+		"rating": _parse_rating(_sync_element_text_first(item, ("memberrating", "rating", "score"))),
+		"liked": _parse_bool(_sync_element_text_first(item, ("memberlike", "like", "liked"))),
 		"rewatch": _parse_bool(_sync_element_text(item, {"rewatch", "rewatched"})),
 		"review": _strip_html(review_text),
 		"rss_guid": guid,
