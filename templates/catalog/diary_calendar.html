@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Diary Calendar{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260716a" />
+{% endblock %}
+
+{% block page_header %}
+  <div class="page-header diary-page-header">
+    <button type="button" class="nav-icon-btn" data-menu-toggle aria-controls="site-drawer" aria-expanded="false">
+      <img class="nav-icon" src="{% static 'img/menu.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
+      <span class="sr-only">Open menu</span>
+    </button>
+    <div class="page-header-content">
+      <h1>Diary Calendar</h1>
+      <p class="page-tagline">Month-by-month view of your Letterboxd diary</p>
+    </div>
+    <span class="page-header-spacer" aria-hidden="true"></span>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <section class="diary-view-nav" aria-label="Diary views">
+    <a class="diary-view-link" href="{% url 'diary' %}">Overview</a>
+    <a class="diary-view-link" href="{% url 'diary_calendar' %}">Calendar View</a>
+    <a class="diary-view-link" href="{% url 'diary_list' %}">List View</a>
+  </section>
+
+  <section class="diary-card">
+    <span class="diary-card-kicker">Diary calendar</span>
+    <h2>{{ entry_count }} entries</h2>
+    <p class="muted">Entries are grouped by month, with the newest watches first.</p>
+  </section>
+
+  {% if month_groups %}
+    <section class="diary-calendar-months" aria-label="Diary calendar months">
+      {% for month in month_groups %}
+        <article class="diary-card diary-calendar-month">
+          <h3>{{ month.month_label }}</h3>
+          <div class="diary-list-rows">
+            {% for entry in month.entries %}
+              <div class="diary-calendar-entry">
+                <strong>{{ entry.watched_date|date:"j" }} {{ entry.original_title }}</strong>
+                <div class="muted">
+                  {% if entry.original_release_year %}{{ entry.original_release_year }}{% else %}Unknown year{% endif %}
+                  {% if entry.official_title %} . {{ entry.official_title }}{% endif %}
+                </div>
+                <div class="diary-badges">
+                  {% if entry.rating %}<span class="diary-badge">{{ entry.rating }} stars</span>{% endif %}
+                  {% if entry.liked %}<span class="diary-badge">Liked</span>{% endif %}
+                  {% if entry.rewatch %}<span class="diary-badge">Rewatch</span>{% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </article>
+      {% endfor %}
+    </section>
+  {% else %}
+    <section class="diary-card">
+      <p class="muted">No diary entries yet.</p>
+    </section>
+  {% endif %}
+{% endblock %}

@@ -838,6 +838,51 @@ def _review_entries_for_user(user) -> list[dict[str, object]]:
 	return review_entries
 
 
+def _diary_entries_for_user(user) -> list[DiaryEntry]:
+	return list(
+		DiaryEntry.objects.filter(user=user)
+		.order_by("-watched_date", "-created_at", "-id")
+	)
+
+
+def _diary_month_groups(entries: list[DiaryEntry]) -> list[dict[str, object]]:
+	groups: list[dict[str, object]] = []
+	current_key: tuple[int, int] | None = None
+	current_group: dict[str, object] | None = None
+	for entry in entries:
+		key = (entry.watched_date.year, entry.watched_date.month)
+		if current_key != key:
+			current_key = key
+			current_group = {
+				"year": key[0],
+				"month": key[1],
+				"month_label": entry.watched_date.strftime("%B %Y"),
+				"entries": [],
+			}
+			groups.append(current_group)
+		assert current_group is not None
+		current_group["entries"].append(entry)
+	return groups
+
+
+def _diary_calendar_cells(entries: list[DiaryEntry]) -> list[dict[str, object]]:
+	return [
+		{
+			"day": entry.watched_date.day,
+			"label": entry.watched_date.strftime("%d %b %Y"),
+			"title": entry.original_title,
+			"release_year": entry.original_release_year,
+			"rating": entry.rating,
+			"review": entry.review,
+			"liked": entry.liked,
+			"rewatch": entry.rewatch,
+			"tmdb_id": entry.tmdb_id,
+			"official_title": entry.official_title,
+		}
+		for entry in entries
+	]
+
+
 @login_required
 def diary(request: HttpRequest) -> HttpResponse:
 	account = _get_diary_account(request.user)
@@ -846,8 +891,43 @@ def diary(request: HttpRequest) -> HttpResponse:
 	context = _diary_import_context(account, form)
 	context["import_form"] = import_form
 	context["sync_job"] = _diary_sync_start_background(request.user)
+	all_entries = _diary_entries_for_user(request.user)
+	context["recent_entries"] = all_entries[:12]
+	context["entry_count"] = len(all_entries)
 	context["review_entries"] = _review_entries_for_user(request.user)
 	return render(request, "catalog/diary.html", context)
+
+
+@login_required
+def diary_calendar(request: HttpRequest) -> HttpResponse:
+	account = _get_diary_account(request.user)
+	form = DiaryAccountForm(initial={"letterboxd_username": account.letterboxd_username})
+	entries = _diary_entries_for_user(request.user)
+	context = _diary_import_context(account, form)
+	context.update(
+		{
+			"entries": entries[:120],
+			"month_groups": _diary_month_groups(entries[:120]),
+			"calendar_cells": _diary_calendar_cells(entries[:120]),
+			"entry_count": len(entries),
+		}
+	)
+	return render(request, "catalog/diary_calendar.html", context)
+
+
+@login_required
+def diary_list(request: HttpRequest) -> HttpResponse:
+	account = _get_diary_account(request.user)
+	form = DiaryAccountForm(initial={"letterboxd_username": account.letterboxd_username})
+	entries = _diary_entries_for_user(request.user)
+	context = _diary_import_context(account, form)
+	context.update(
+		{
+			"entries": entries,
+			"entry_count": len(entries),
+		}
+	)
+	return render(request, "catalog/diary_list.html", context)
 
 
 @login_required

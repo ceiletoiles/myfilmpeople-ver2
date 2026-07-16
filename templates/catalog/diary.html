@@ -85,6 +85,12 @@
     </form>
   </section>
 
+  <section class="diary-view-nav" aria-label="Diary views">
+    <a class="diary-view-link" href="{% url 'diary' %}">Overview</a>
+    <a class="diary-view-link" href="{% url 'diary_calendar' %}">Calendar View</a>
+    <a class="diary-view-link" href="{% url 'diary_list' %}">List View</a>
+  </section>
+
   <section class="diary-sync" aria-label="Diary sync progress">
     <article class="diary-card diary-sync-card">
       <span class="diary-card-kicker">Sync status</span>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 import time
 from unittest.mock import patch
 
@@ -371,6 +372,42 @@ class DiaryPageTests(TransactionTestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Needs review")
 		self.assertContains(response, "Unknown Film")
+
+	def test_diary_calendar_page_renders(self) -> None:
+		DiaryEntry.objects.create(
+			user=self.user,
+			original_title="Come and See",
+			original_release_year=1985,
+			watched_date=date(2026, 7, 11),
+			rating=Decimal("5.0"),
+			liked=True,
+			official_title="Come and See",
+		)
+
+		response = self.client.get(reverse("diary_calendar"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Diary Calendar")
+		self.assertContains(response, "Come and See")
+		self.assertContains(response, "July 2026")
+
+	def test_diary_list_page_renders(self) -> None:
+		DiaryEntry.objects.create(
+			user=self.user,
+			original_title="Come and See",
+			original_release_year=1985,
+			watched_date=date(2026, 7, 11),
+			rating=Decimal("5.0"),
+			liked=True,
+			official_title="Come and See",
+		)
+
+		response = self.client.get(reverse("diary_list"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Diary List")
+		self.assertContains(response, "Come and See")
+		self.assertContains(response, "Matched")
 
 	def test_diary_manual_match_blocks_duplicate_tmdb_matches(self) -> None:
 		first = DiaryEntry.objects.create(

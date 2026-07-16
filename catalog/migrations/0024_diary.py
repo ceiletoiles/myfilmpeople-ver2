@@ -59,7 +59,6 @@ class Migration(migrations.Migration):
 					),
 				),
 				("manual_lock", models.BooleanField(default=False)),
-				("match_candidates", models.JSONField(blank=True, default=list)),
 				("created_at", models.DateTimeField(auto_now_add=True)),
 				("updated_at", models.DateTimeField(auto_now=True)),
 				(
