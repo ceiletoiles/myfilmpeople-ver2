@@ -68,6 +68,17 @@
     </details>
   </section>
 
+  <section class="diary-import-progress diary-sync-progress" data-diary-sync-progress data-diary-sync-progress-url="{% if sync_job %}{{ sync_job.progress_url }}{% endif %}" hidden aria-label="Diary sync progress">
+    <div class="diary-import-progress-row">
+      <div class="diary-import-progress-text" data-diary-sync-progress-text>Queued...</div>
+    </div>
+    <div class="diary-import-progress-current" data-diary-sync-progress-current></div>
+    <div class="diary-import-progress-bar" data-diary-sync-progress-bar role="progressbar" aria-label="Diary sync progress" aria-valuemin="0" aria-valuemax="100">
+      <div class="diary-import-progress-bar-fill" data-diary-sync-progress-fill></div>
+    </div>
+    <div class="diary-import-progress-meta" data-diary-sync-progress-meta></div>
+  </section>
+
   <section id="diary-import-panel" class="diary-panel" hidden aria-label="Import Letterboxd history">
     <article class="diary-card diary-import-card">
       <span class="diary-card-kicker">Import history</span>

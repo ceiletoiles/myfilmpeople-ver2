@@ -253,6 +253,7 @@ class DiaryPageTests(TransactionTestCase):
 		self.assertContains(response, "Letterboxd Username")
 		self.assertContains(response, "Calendar View")
 		self.assertContains(response, "List View")
+		self.assertContains(response, "data-diary-sync-progress")
 
 	def test_diary_settings_saves_username(self) -> None:
 		response = self.client.post(reverse("diary_settings"), {"letterboxd_username": "@example_user"})
