@@ -8,7 +8,6 @@ from django.shortcuts import render
 from django.utils import timezone
 
 from ..models import CompanyFollow, PersonFollow
-from .diary import _diary_sync_start_background
 from ._shared import _add_months_safe, _add_years_safe, _normalize_role, _parse_iso_date, _role_category
 
 
@@ -148,7 +147,6 @@ def _released_days_ago_text(*, today: date, release_dt: date) -> str:
 
 @login_required
 def recent(request: HttpRequest) -> HttpResponse:
-	_diary_sync_start_background(request.user)
 	today = timezone.now().date()
 	one_year_ago = today - timedelta(days=365)
 

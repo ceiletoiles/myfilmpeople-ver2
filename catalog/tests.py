@@ -568,7 +568,7 @@ class DiaryPageTests(TransactionTestCase):
 		self.assertContains(response, "Needs review")
 		self.assertContains(response, "Unknown Film")
 
-	def test_diary_review_page_fetches_live_candidates_when_missing(self) -> None:
+	def test_diary_review_page_does_not_call_tmdb_for_missing_candidates(self) -> None:
 		DiaryEntry.objects.create(
 			user=self.user,
 			original_title="Unknown Film",
@@ -577,18 +577,11 @@ class DiaryPageTests(TransactionTestCase):
 		)
 
 		with patch("catalog.views.diary.TMDbClient.from_settings") as mock_tmdb:
-			mock_client = Mock()
-			mock_client.search_movies.return_value = {
-				"results": [
-					{"id": 10, "title": "Unknown Film Redux", "release_date": "2024-01-01", "poster_path": "/poster.jpg"},
-				]
-			}
-			mock_tmdb.return_value = mock_client
-
 			response = self.client.get(reverse("diary"))
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, "Unknown Film Redux")
+		mock_tmdb.assert_not_called()
+		self.assertContains(response, "No TMDb suggestions saved for this entry yet.")
 
 	def test_diary_calendar_page_renders(self) -> None:
 		DiaryEntry.objects.create(

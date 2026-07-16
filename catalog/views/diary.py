@@ -885,12 +885,6 @@ def _review_entries_for_user(user) -> list[dict[str, object]]:
 	for entry in entries:
 		candidates = entry.match_candidates if isinstance(entry.match_candidates, list) else []
 		candidate_list = [cand for cand in candidates if isinstance(cand, dict)]
-		if not candidate_list:
-			_, live_candidates = _match_tmdb_movie(
-				title=entry.original_title,
-				release_year=entry.original_release_year if isinstance(entry.original_release_year, int) else None,
-			)
-			candidate_list = live_candidates
 		review_entries.append(
 			{
 				"entry": entry,
