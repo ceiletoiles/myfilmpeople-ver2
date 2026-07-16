@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from .collaboration import collaboration_finder, collaboration_suggest
 from .connect import connect
-from .diary import diary, diary_calendar, diary_import_progress, diary_import_start, diary_list, diary_match_entry, diary_settings, diary_sync_progress, diary_sync_start
+from .diary import diary, diary_calendar, diary_entry_update, diary_import_progress, diary_import_start, diary_list, diary_match_entry, diary_settings, diary_sync_progress, diary_sync_start
 from .company import company_detail
 from .follow import (
 	company_note,
@@ -43,6 +43,7 @@ __all__ = [
 	"connect",
 	"diary",
 	"diary_calendar",
+	"diary_entry_update",
 	"diary_import_progress",
 	"diary_import_start",
 	"diary_list",

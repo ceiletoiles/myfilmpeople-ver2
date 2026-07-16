@@ -29,7 +29,7 @@ from django.utils import timezone
 from ..forms import DiaryAccountForm, DiaryImportForm
 from ..models import DiaryAccount, DiaryEntry
 from ..services import get_or_sync_movie
-from ..tmdb import TMDbClient, TMDbError
+from ..tmdb import TMDbClient
 
 
 DIARY_IMPORT_JOB_TTL_SECONDS = 60 * 60
@@ -224,6 +224,13 @@ def _match_tmdb_movie(*, title: str, release_year: int | None) -> tuple[dict[str
 	return None, candidates
 
 
+def _poster_url(poster_path: str) -> str:
+	path = (poster_path or "").strip()
+	if not path:
+		return ""
+	return f"https://image.tmdb.org/t/p/w342{path}"
+
+
 def _load_diary_import_rows(temp_path: str) -> tuple[list[dict[str, object]], str]:
 	if not os.path.exists(temp_path):
 		raise FileNotFoundError("Upload file no longer exists.")
@@ -317,6 +324,7 @@ def _upsert_diary_entry(
 			rss_guid=rss_guid,
 			tmdb_id=(match_data or {}).get("tmdb_id"),
 			official_title=str((match_data or {}).get("title") or ""),
+			poster_path=str((match_data or {}).get("poster_path") or ""),
 			release_date=(match_data or {}).get("release_date") or None,
 			match_source=DiaryEntry.MatchSource.AUTO,
 			manual_lock=False,
@@ -341,6 +349,7 @@ def _upsert_diary_entry(
 			for field_name, value in (
 				("tmdb_id", match_data.get("tmdb_id")),
 				("official_title", str(match_data.get("title") or "")),
+				("poster_path", str(match_data.get("poster_path") or "")),
 				("release_date", match_data.get("release_date") or None),
 			):
 				if getattr(entry, field_name) != value:
@@ -623,6 +632,7 @@ def _apply_tmdb_match_to_entry(
 		for field_name, value in (
 			("tmdb_id", match_data.get("tmdb_id")),
 			("official_title", str(match_data.get("title") or "")),
+			("poster_path", str(match_data.get("poster_path") or "")),
 			("release_date", match_data.get("release_date") or None),
 		):
 			if getattr(entry, field_name) != value:
@@ -1144,6 +1154,7 @@ def diary_match_entry(request: HttpRequest) -> HttpResponse:
 
 	entry.tmdb_id = movie.tmdb_id
 	entry.official_title = movie.title
+	entry.poster_path = movie.poster_path
 	entry.release_date = movie.release_date
 	entry.match_source = DiaryEntry.MatchSource.MANUAL
 	entry.manual_lock = True
@@ -1152,6 +1163,7 @@ def diary_match_entry(request: HttpRequest) -> HttpResponse:
 		update_fields=[
 			"tmdb_id",
 			"official_title",
+			"poster_path",
 			"release_date",
 			"match_source",
 			"manual_lock",
@@ -1160,4 +1172,43 @@ def diary_match_entry(request: HttpRequest) -> HttpResponse:
 		]
 	)
 	messages.success(request, f"Matched {entry.original_title} to {movie.title}.")
+	return redirect("diary")
+
+
+@login_required
+def diary_entry_update(request: HttpRequest, entry_id: int) -> HttpResponse:
+	if request.method != "POST":
+		return redirect("diary")
+
+	entry = DiaryEntry.objects.filter(user=request.user, pk=entry_id).first()
+	if entry is None:
+		messages.error(request, "Diary entry not found.")
+		return redirect("diary")
+
+	def _post_bool(name: str) -> bool:
+		return (request.POST.get(name) or "").strip().lower() in {"1", "true", "on", "yes", "y"}
+
+	rating_raw = (request.POST.get("rating") or "").strip()
+	review = (request.POST.get("review") or "").strip()
+	liked = _post_bool("liked")
+	rewatch = _post_bool("rewatch")
+
+	if rating_raw:
+		try:
+			rating = Decimal(rating_raw)
+		except (InvalidOperation, ValueError):
+			messages.error(request, "Rating must be a number.")
+			return redirect("diary")
+		if rating < 0 or rating > 5:
+			messages.error(request, "Rating must be between 0 and 5.")
+			return redirect("diary")
+	else:
+		rating = None
+
+	entry.rating = rating
+	entry.review = review
+	entry.liked = liked
+	entry.rewatch = rewatch
+	entry.save(update_fields=["rating", "review", "liked", "rewatch", "updated_at"])
+	messages.success(request, f"Updated {entry.original_title}.")
 	return redirect("diary")

@@ -1,0 +1,43 @@
+{% load static %}
+
+<div class="diary-editor" data-diary-editor data-diary-placeholder-poster="{% static 'img/placeholder-movie.svg' %}" hidden>
+  <div class="diary-editor-backdrop" data-diary-editor-close></div>
+  <div class="diary-editor-dialog card">
+    <button type="button" class="secondary diary-editor-close" data-diary-editor-close aria-label="Close" title="Close">&times;</button>
+    <div class="diary-editor-head">
+      <img class="diary-editor-poster" data-diary-editor-poster src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+      <div class="diary-editor-copy">
+        <span class="diary-card-kicker">Edit entry</span>
+        <h3 data-diary-editor-title>Diary entry</h3>
+        <p class="muted" data-diary-editor-meta></p>
+      </div>
+    </div>
+
+    <form method="post" class="diary-editor-form" data-diary-editor-form>
+      {% csrf_token %}
+      <div class="diary-editor-field">
+        <label for="diary-editor-rating">Rating</label>
+        <input id="diary-editor-rating" name="rating" type="number" min="0" max="5" step="0.5" inputmode="decimal" />
+      </div>
+      <div class="diary-editor-toggles">
+        <label class="diary-editor-toggle">
+          <input type="checkbox" name="liked" />
+          <span>Liked</span>
+        </label>
+        <label class="diary-editor-toggle">
+          <input type="checkbox" name="rewatch" />
+          <span>Rewatch</span>
+        </label>
+      </div>
+      <div class="diary-editor-field">
+        <label for="diary-editor-review">Review</label>
+        <textarea id="diary-editor-review" name="review" rows="5" placeholder="Add notes or a short review..."></textarea>
+      </div>
+      <div class="diary-editor-actions">
+        <a class="diary-editor-view-link" data-diary-editor-view href="#" target="_blank" rel="noreferrer">Open movie</a>
+        <button type="button" class="diary-action diary-action-secondary" data-diary-editor-close>Cancel</button>
+        <button type="submit" class="diary-action diary-action-primary">Save changes</button>
+      </div>
+    </form>
+  </div>
+</div>

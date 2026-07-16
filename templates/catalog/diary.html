@@ -4,11 +4,11 @@
 {% block title %}Diary{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260713a" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260716b" />
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{{ STATIC_PREFIX }}js/pages/diary.js?v=20260713a"></script>
+  <script src="{{ STATIC_PREFIX }}js/pages/diary.js?v=20260716b"></script>
 {% endblock %}
 
 {% block page_header %}
@@ -31,29 +31,8 @@
       <p class="diary-eyebrow">Letterboxd sync</p>
       <h2>Keep your watch history aligned without turning this into another movie app.</h2>
       <p class="diary-intro">
-        Diary exists only to bring your Letterboxd history into MyFilmPeople so the rest of the site can stay focused on people and studios.
+        Diary keeps the Letterboxd username, Calendar View, and List View close at hand. Everything else sits behind the menu.
       </p>
-      {% if rss_feed_url %}
-        <div class="diary-feed-callout">
-          <span class="diary-card-kicker">RSS feed</span>
-          <a href="{{ rss_feed_url }}" target="_blank" rel="noreferrer">{{ rss_feed_url }}</a>
-        </div>
-      {% endif %}
-    </div>
-
-    <div class="diary-status-panel">
-      <div class="diary-status-row">
-        <span class="diary-status-label">Letterboxd username</span>
-        <strong class="diary-status-value">{% if letterboxd_username %}@{{ letterboxd_username }}{% else %}Not set{% endif %}</strong>
-      </div>
-      <div class="diary-status-row">
-        <span class="diary-status-label">Connection status</span>
-        <strong class="diary-status-value">{{ connection_status }}</strong>
-      </div>
-      <div class="diary-status-row">
-        <span class="diary-status-label">Last successful sync</span>
-        <strong class="diary-status-value">{{ last_sync_label }}</strong>
-      </div>
     </div>
   </section>
 
@@ -77,58 +56,27 @@
           </div>
         {% endif %}
       </div>
-
       <div class="diary-actions" aria-label="Diary actions">
         <button type="submit" class="diary-action diary-action-primary">Save Username</button>
-        <button type="button" class="diary-action diary-action-secondary" data-diary-sync-button data-diary-sync-start-url="{% url 'diary_sync_start' %}">Sync Now</button>
       </div>
     </form>
   </section>
 
   <section class="diary-view-nav" aria-label="Diary views">
-    <a class="diary-view-link" href="{% url 'diary' %}">Overview</a>
     <a class="diary-view-link" href="{% url 'diary_calendar' %}">Calendar View</a>
     <a class="diary-view-link" href="{% url 'diary_list' %}">List View</a>
   </section>
 
-  <section class="diary-sync" aria-label="Diary sync progress">
-    <article class="diary-card diary-sync-card">
-      <span class="diary-card-kicker">Sync status</span>
-      <h3>Letterboxd RSS sync</h3>
-      <p>Use RSS for lightweight refreshes between full imports. The sync runs in the background and updates the diary without disturbing the page.</p>
+  <details class="diary-quick-menu">
+    <summary class="diary-quick-menu-button" aria-label="Diary menu">...</summary>
+    <div class="diary-quick-menu-panel" role="menu">
+      <button type="button" class="diary-quick-menu-item" data-diary-sync-button data-diary-sync-start-url="{% url 'diary_sync_start' %}">Sync now</button>
+      <button type="button" class="diary-quick-menu-item" data-diary-panel-toggle="diary-import-panel">Import history</button>
+      <button type="button" class="diary-quick-menu-item" data-diary-panel-toggle="diary-review-panel">Review queue</button>
+    </div>
+  </details>
 
-      <div class="diary-import-progress" data-diary-sync-progress data-diary-sync-progress-url="{{ sync_job.progress_url|default:'' }}" {% if not sync_job %}hidden{% endif %}>
-        <div class="diary-import-progress-row">
-          <div class="diary-import-progress-text" data-diary-sync-progress-text>{{ sync_job.current_label|default:"Queued..." }}</div>
-        </div>
-        <div class="diary-import-progress-current" data-diary-sync-progress-current>{{ sync_job.current_title|default:"" }}</div>
-        <div class="diary-import-progress-bar" data-diary-sync-progress-bar role="progressbar" aria-label="Diary sync progress" aria-valuemin="0" aria-valuemax="100">
-          <div class="diary-import-progress-bar-fill" data-diary-sync-progress-fill></div>
-        </div>
-        <div class="diary-import-progress-meta" data-diary-sync-progress-meta></div>
-      </div>
-    </article>
-  </section>
-
-  <section class="diary-grid" aria-label="Diary setup summary">
-    <article class="diary-card diary-card-accent">
-      <span class="diary-card-kicker">First time setup</span>
-      <h3>Letterboxd Username</h3>
-      <p>Later milestones will store the username permanently and use it to reach your RSS feed.</p>
-      <div class="diary-input-sample" aria-hidden="true">@username</div>
-    </article>
-
-    <article class="diary-card">
-      <span class="diary-card-kicker">Import history</span>
-      <h3>Complete history import</h3>
-      <p>This page shell reserves space for imports that can be re-run safely whenever you need to refresh your diary.</p>
-      <div class="diary-note">
-        Imports your complete Letterboxd history. Existing entries are updated and new entries are added. Safe to run multiple times.
-      </div>
-    </article>
-  </section>
-
-  <section class="diary-import" aria-label="Import Letterboxd history">
+  <section id="diary-import-panel" class="diary-panel" hidden aria-label="Import Letterboxd history">
     <article class="diary-card diary-import-card">
       <span class="diary-card-kicker">Import history</span>
       <h3>Import Letterboxd History</h3>
@@ -154,10 +102,6 @@
         <button type="submit" class="diary-action diary-action-primary">Import Letterboxd History</button>
       </form>
 
-      <div class="diary-note diary-import-note">
-        Imports your complete Letterboxd history. Existing entries are updated and new entries are added. Safe to run multiple times.
-      </div>
-
       <div class="diary-import-progress" data-diary-import-progress hidden>
         <div class="diary-import-progress-row">
           <div class="diary-import-progress-text" data-diary-import-progress-text>Queued...</div>
@@ -171,7 +115,7 @@
     </article>
   </section>
 
-  <section class="diary-review" aria-label="Needs review">
+  <section id="diary-review-panel" class="diary-panel" hidden aria-label="Needs review">
     <article class="diary-card diary-review-card">
       <span class="diary-card-kicker">Needs review</span>
       <h3>Manual TMDb matching</h3>

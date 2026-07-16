@@ -250,8 +250,9 @@ class DiaryPageTests(TransactionTestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Diary")
-		self.assertContains(response, "Not set")
-		self.assertContains(response, "Not connected")
+		self.assertContains(response, "Letterboxd Username")
+		self.assertContains(response, "Calendar View")
+		self.assertContains(response, "List View")
 
 	def test_diary_settings_saves_username(self) -> None:
 		response = self.client.post(reverse("diary_settings"), {"letterboxd_username": "@example_user"})
@@ -407,7 +408,32 @@ class DiaryPageTests(TransactionTestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Diary List")
 		self.assertContains(response, "Come and See")
-		self.assertContains(response, "Matched")
+		self.assertContains(response, "Hold or double-click to edit.")
+
+	def test_diary_entry_update_saves_changes(self) -> None:
+		entry = DiaryEntry.objects.create(
+			user=self.user,
+			original_title="Come and See",
+			original_release_year=1985,
+			watched_date=date(2026, 7, 11),
+		)
+
+		response = self.client.post(
+			reverse("diary_entry_update", kwargs={"entry_id": entry.id}),
+			{
+				"rating": "4.5",
+				"liked": "on",
+				"rewatch": "",
+				"review": "Great film",
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		entry.refresh_from_db()
+		self.assertEqual(str(entry.rating), "4.5")
+		self.assertTrue(entry.liked)
+		self.assertFalse(entry.rewatch)
+		self.assertEqual(entry.review, "Great film")
 
 	def test_diary_manual_match_blocks_duplicate_tmdb_matches(self) -> None:
 		first = DiaryEntry.objects.create(

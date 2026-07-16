@@ -355,6 +355,143 @@
     }
   }
 
+  function initDiaryQuickMenu() {
+    const toggles = document.querySelectorAll('[data-diary-panel-toggle]');
+    toggles.forEach(function (button) {
+      button.addEventListener('click', function () {
+        const targetId = button.getAttribute('data-diary-panel-toggle');
+        const target = targetId ? document.getElementById(targetId) : null;
+        if (!target) return;
+        target.hidden = !target.hidden;
+      });
+    });
+  }
+
+  function initDiaryEntryEditor() {
+    const modal = document.querySelector('[data-diary-editor]');
+    const form = document.querySelector('[data-diary-editor-form]');
+    const titleEl = document.querySelector('[data-diary-editor-title]');
+    const metaEl = document.querySelector('[data-diary-editor-meta]');
+    const posterEl = document.querySelector('[data-diary-editor-poster]');
+    const viewLink = document.querySelector('[data-diary-editor-view]');
+    const ratingInput = form ? form.querySelector('input[name="rating"]') : null;
+    const likedInput = form ? form.querySelector('input[name="liked"]') : null;
+    const rewatchInput = form ? form.querySelector('input[name="rewatch"]') : null;
+    const reviewInput = form ? form.querySelector('textarea[name="review"]') : null;
+    const placeholderPoster = modal ? (modal.getAttribute('data-diary-placeholder-poster') || '') : '';
+    const cards = document.querySelectorAll('[data-diary-entry-card]');
+
+    if (!modal || !form || !titleEl || !metaEl || !posterEl || !viewLink) return;
+
+    let activeCard = null;
+    let longPressTimer = null;
+
+    function setHidden(hidden) {
+      modal.hidden = !!hidden;
+      document.body.classList.toggle('modal-open', !hidden);
+    }
+
+    function closeEditor() {
+      activeCard = null;
+      setHidden(true);
+    }
+
+    function openEditor(card) {
+      if (!(card instanceof HTMLElement)) return;
+      activeCard = card;
+      form.setAttribute('action', card.getAttribute('data-entry-update-url') || '');
+      titleEl.textContent = card.getAttribute('data-entry-title') || 'Diary entry';
+      metaEl.textContent = card.getAttribute('data-entry-date') || '';
+
+      const posterPath = card.getAttribute('data-entry-poster-path') || '';
+      posterEl.src = posterPath ? ('https://image.tmdb.org/t/p/w342' + posterPath) : placeholderPoster;
+      posterEl.alt = '';
+
+      if (ratingInput) {
+        ratingInput.value = card.getAttribute('data-entry-rating') || '';
+      }
+      if (likedInput) {
+        likedInput.checked = (card.getAttribute('data-entry-liked') || '') === '1';
+      }
+      if (rewatchInput) {
+        rewatchInput.checked = (card.getAttribute('data-entry-rewatch') || '') === '1';
+      }
+      if (reviewInput) {
+        reviewInput.value = card.getAttribute('data-entry-review') || '';
+      }
+
+      const movieUrl = card.getAttribute('data-entry-movie-url') || '';
+      if (movieUrl) {
+        viewLink.href = movieUrl;
+        viewLink.hidden = false;
+      } else {
+        viewLink.hidden = true;
+      }
+
+      setHidden(false);
+      if (ratingInput) {
+        ratingInput.focus();
+      } else if (reviewInput) {
+        reviewInput.focus();
+      }
+    }
+
+    function startLongPress(card) {
+      clearTimeout(longPressTimer);
+      longPressTimer = window.setTimeout(function () {
+        openEditor(card);
+      }, 520);
+    }
+
+    function cancelLongPress() {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+
+    cards.forEach(function (card) {
+      card.addEventListener('dblclick', function () {
+        openEditor(card);
+      });
+      card.addEventListener('pointerdown', function (event) {
+        if (event.pointerType === 'touch') {
+          startLongPress(card);
+        }
+      });
+      card.addEventListener('pointerup', cancelLongPress);
+      card.addEventListener('pointercancel', cancelLongPress);
+      card.addEventListener('pointerleave', cancelLongPress);
+      card.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openEditor(card);
+        }
+      });
+    });
+
+    modal.addEventListener('click', function (event) {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.hasAttribute('data-diary-editor-close')) {
+        closeEditor();
+      }
+    });
+
+    window.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && !modal.hidden) {
+        closeEditor();
+      }
+    });
+
+    if (form) {
+      form.addEventListener('submit', function () {
+        if (activeCard) {
+          cancelLongPress();
+        }
+      });
+    }
+  }
+
   initDiaryImportProgress();
   initDiarySyncProgress();
+  initDiaryQuickMenu();
+  initDiaryEntryEditor();
 }());

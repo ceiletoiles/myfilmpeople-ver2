@@ -111,6 +111,7 @@ class DiaryEntry(models.Model):
 
 	tmdb_id = models.PositiveIntegerField(null=True, blank=True, db_index=True)
 	official_title = models.CharField(max_length=255, blank=True, default="")
+	poster_path = models.CharField(max_length=255, blank=True, default="")
 	release_date = models.DateField(null=True, blank=True)
 	match_source = models.CharField(max_length=20, choices=MatchSource.choices, default=MatchSource.AUTO)
 	manual_lock = models.BooleanField(default=False)
