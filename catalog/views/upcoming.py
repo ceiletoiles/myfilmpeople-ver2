@@ -6,6 +6,7 @@ from django.shortcuts import render
 from django.utils import timezone
 
 from ..models import CompanyFollow, PersonFollow
+from .diary import _diary_sync_start_background
 from ._shared import _countdown_text, _normalize_role, _parse_iso_date, _role_category
 
 
@@ -109,6 +110,7 @@ def _crew_job_matches_follow_role(job: str, follow_role: str) -> bool:
 
 @login_required
 def upcoming(request: HttpRequest) -> HttpResponse:
+	_diary_sync_start_background(request.user)
 	today = timezone.now().date()
 
 	follows = (

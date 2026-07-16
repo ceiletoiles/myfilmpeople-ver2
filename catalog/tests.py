@@ -7,7 +7,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import RequestFactory
-from django.test import TestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from django.utils import timezone
@@ -238,7 +238,7 @@ class ConnectPageTests(TestCase):
 		self.assertContains(response, reverse("connect"))
 
 
-class DiaryPageTests(TestCase):
+class DiaryPageTests(TransactionTestCase):
 	def setUp(self) -> None:
 		self.User = get_user_model()
 		self.user = self.User.objects.create_user(username="diary-user", password="testpass123")
@@ -301,6 +301,62 @@ class DiaryPageTests(TestCase):
 		self.assertEqual(entry.match_source, DiaryEntry.MatchSource.AUTO)
 		self.assertEqual(entry.official_title, "Come and See")
 
+	def test_diary_sync_start_imports_rss_entries(self) -> None:
+		rss_xml = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<rss version=\"2.0\">
+  <channel>
+    <title>Letterboxd Diary</title>
+    <item>
+      <title>Come and See</title>
+      <guid>https://letterboxd.com/film/come-and-see/</guid>
+      <pubDate>Fri, 11 Jul 2026 10:00:00 +0000</pubDate>
+      <description><![CDATA[Great film]]></description>
+      <memberRating>5</memberRating>
+      <like>yes</like>
+      <rewatch>no</rewatch>
+      <year>1985</year>
+    </item>
+  </channel>
+</rss>
+"""
+		self.client.post(reverse("diary_settings"), {"letterboxd_username": "@example_user"})
+		with patch("catalog.views.diary.requests.get") as mock_get, patch("catalog.views.diary.TMDbClient.from_settings") as mock_tmdb:
+			mock_response = Mock()
+			mock_response.text = rss_xml
+			mock_response.raise_for_status.return_value = None
+			mock_get.return_value = mock_response
+
+			mock_client = Mock()
+			mock_client.search_movies.return_value = {
+				"results": [
+					{"id": 1, "title": "Come and See", "release_date": "1985-07-01", "poster_path": "/poster.jpg"},
+				]
+			}
+			mock_tmdb.return_value = mock_client
+
+			response = self.client.post(reverse("diary_sync_start"))
+			self.assertEqual(response.status_code, 200)
+			payload = response.json()
+			self.assertTrue(payload["ok"])
+			progress_url = payload["progress_url"]
+
+			progress = None
+			for _ in range(30):
+				progress = self.client.get(progress_url).json()
+				if progress.get("status") != "running":
+					break
+				time.sleep(0.1)
+
+		self.assertIsNotNone(progress)
+		self.assertEqual(progress.get("status"), "done")
+		self.assertEqual(DiaryEntry.objects.filter(user=self.user).count(), 1)
+		entry = DiaryEntry.objects.get(user=self.user)
+		self.assertEqual(entry.original_title, "Come and See")
+		self.assertEqual(entry.rss_guid, "https://letterboxd.com/film/come-and-see/")
+		self.assertEqual(entry.tmdb_id, 1)
+		account = DiaryAccount.objects.get(user=self.user)
+		self.assertIsNotNone(account.last_successful_sync_at)
+
 	def test_diary_review_page_shows_pending_entries(self) -> None:
 		DiaryEntry.objects.create(
 			user=self.user,
@@ -315,6 +371,34 @@ class DiaryPageTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Needs review")
 		self.assertContains(response, "Unknown Film")
+
+	def test_diary_manual_match_blocks_duplicate_tmdb_matches(self) -> None:
+		first = DiaryEntry.objects.create(
+			user=self.user,
+			original_title="Come and See",
+			original_release_year=1985,
+			watched_date=date(2026, 7, 11),
+		)
+		second = DiaryEntry.objects.create(
+			user=self.user,
+			original_title="Come and See Again",
+			original_release_year=1985,
+			watched_date=date(2026, 7, 12),
+		)
+
+		with patch("catalog.views.diary.get_or_sync_movie") as mock_movie:
+			mock_movie.return_value = Mock(tmdb_id=1, title="Come and See", release_date=date(1985, 7, 1))
+			first.tmdb_id = 1
+			first.official_title = "Come and See"
+			first.manual_lock = True
+			first.save(update_fields=["tmdb_id", "official_title", "manual_lock", "updated_at"])
+
+			response = self.client.post(reverse("diary_match_entry"), {"entry_id": second.id, "tmdb_id": "1"})
+
+		self.assertEqual(response.status_code, 302)
+		second.refresh_from_db()
+		self.assertIsNone(second.tmdb_id)
+		self.assertFalse(second.manual_lock)
 
 
 class PersonComebackHelperTests(TestCase):

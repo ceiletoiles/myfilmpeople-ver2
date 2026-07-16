@@ -10,6 +10,7 @@ from django.urls import reverse
 
 from ..models import CompanyFollow, Person, PersonFollow
 from ..services import get_company_homepage, get_person_deathday
+from .diary import _diary_sync_start_background
 
 
 ROLE_TABS = [
@@ -84,6 +85,7 @@ def _build_tab_url(role_key: str, external_key: str) -> str:
 
 @login_required
 def connect(request: HttpRequest) -> HttpResponse:
+	_diary_sync_start_background(request.user)
 	allowed_roles = {item["key"] for item in ROLE_TABS}
 	role_key = _normalize_key(request.GET.get("role", DEFAULT_ROLE_KEY), allowed=allowed_roles, default=DEFAULT_ROLE_KEY)
 	allowed_external = {item["key"] for item in EXTERNAL_ID_TABS}

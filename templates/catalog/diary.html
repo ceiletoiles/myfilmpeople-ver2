@@ -80,10 +80,28 @@
 
       <div class="diary-actions" aria-label="Diary actions">
         <button type="submit" class="diary-action diary-action-primary">Save Username</button>
-        <button type="button" class="diary-action diary-action-secondary" disabled>Sync Now</button>
-        <button type="button" class="diary-action diary-action-secondary" disabled>Import Letterboxd History</button>
+        <button type="button" class="diary-action diary-action-secondary" data-diary-sync-button data-diary-sync-start-url="{% url 'diary_sync_start' %}">Sync Now</button>
       </div>
     </form>
+  </section>
+
+  <section class="diary-sync" aria-label="Diary sync progress">
+    <article class="diary-card diary-sync-card">
+      <span class="diary-card-kicker">Sync status</span>
+      <h3>Letterboxd RSS sync</h3>
+      <p>Use RSS for lightweight refreshes between full imports. The sync runs in the background and updates the diary without disturbing the page.</p>
+
+      <div class="diary-import-progress" data-diary-sync-progress data-diary-sync-progress-url="{{ sync_job.progress_url|default:'' }}" {% if not sync_job %}hidden{% endif %}>
+        <div class="diary-import-progress-row">
+          <div class="diary-import-progress-text" data-diary-sync-progress-text>{{ sync_job.current_label|default:"Queued..." }}</div>
+        </div>
+        <div class="diary-import-progress-current" data-diary-sync-progress-current>{{ sync_job.current_title|default:"" }}</div>
+        <div class="diary-import-progress-bar" data-diary-sync-progress-bar role="progressbar" aria-label="Diary sync progress" aria-valuemin="0" aria-valuemax="100">
+          <div class="diary-import-progress-bar-fill" data-diary-sync-progress-fill></div>
+        </div>
+        <div class="diary-import-progress-meta" data-diary-sync-progress-meta></div>
+      </div>
+    </article>
   </section>
 
   <section class="diary-grid" aria-label="Diary setup summary">

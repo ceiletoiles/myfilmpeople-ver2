@@ -6,11 +6,13 @@ from django.shortcuts import render
 from ..models import CompanyFollow, PersonFollow
 from ..new_movie_helpers import get_person_comeback_info
 from ..services import get_company_status_snapshot, get_person_deathday
+from .diary import _diary_sync_start_background
 from ._shared import _role_category
 
 
 def home(request: HttpRequest) -> HttpResponse:
 	if request.user.is_authenticated:
+		_diary_sync_start_background(request.user)
 		person_follows = (
 			PersonFollow.objects.select_related("person")
 			.defer("person__tmdb_raw")

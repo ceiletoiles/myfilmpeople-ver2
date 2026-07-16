@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import html
 import io
 import os
 import shutil
@@ -8,8 +9,13 @@ import tempfile
 import threading
 import zipfile
 from decimal import Decimal, InvalidOperation
-from datetime import datetime, date
+from datetime import date, datetime, timedelta
+from email.utils import parsedate_to_datetime
 from uuid import UUID, uuid4
+import re
+import xml.etree.ElementTree as ET
+
+import requests
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -28,6 +34,12 @@ from ..tmdb import TMDbClient, TMDbError
 
 DIARY_IMPORT_JOB_TTL_SECONDS = 60 * 60
 DIARY_IMPORT_MAX_BYTES = 25 * 1024 * 1024
+DIARY_SYNC_JOB_TTL_SECONDS = 60 * 60
+DIARY_SYNC_STALE_SECONDS = 60 * 60
+LETTERBOXD_RSS_MAX_ITEMS = 50
+
+_STAR_RE = re.compile(r"[★☆]+")
+_RATING_STAR_RE = re.compile(r"[\u2605\u2606]+")
 
 
 def _get_diary_account(user) -> DiaryAccount:
@@ -68,7 +80,14 @@ def _parse_rating(value: str) -> Decimal | None:
 	text = (value or "").strip()
 	if not text:
 		return None
-	text = text.replace("½", ".5")
+	text = text.replace("\u00c2\u00bd", ".5").replace("\u00bd", ".5")
+	if _RATING_STAR_RE.search(text):
+		full = text.count("★")
+		half = 0.5 if ".5" in text else 0.0
+		try:
+			return Decimal(str(full + half))
+		except (InvalidOperation, ValueError):
+			pass
 	try:
 		return Decimal(text)
 	except (InvalidOperation, ValueError):
@@ -282,7 +301,12 @@ def _upsert_diary_entry(
 	match_candidates: list[dict[str, object]] | None = None,
 ) -> tuple[str, DiaryEntry]:
 	lookup = _diary_entry_lookup(user, row)
-	entry = DiaryEntry.objects.filter(**lookup).first()
+	rss_guid = str(row.get("rss_guid") or "").strip()
+	entry = None
+	if rss_guid:
+		entry = DiaryEntry.objects.filter(user=user, rss_guid=rss_guid).first()
+	if entry is None:
+		entry = DiaryEntry.objects.filter(**lookup).first()
 	if entry is None:
 		entry = DiaryEntry.objects.create(
 			**lookup,
@@ -290,11 +314,11 @@ def _upsert_diary_entry(
 			liked=bool(row["liked"]),
 			rewatch=bool(row["rewatch"]),
 			review=str(row["review"] or ""),
-			rss_guid=str(row["rss_guid"] or ""),
+			rss_guid=rss_guid,
 			tmdb_id=(match_data or {}).get("tmdb_id"),
 			official_title=str((match_data or {}).get("title") or ""),
 			release_date=(match_data or {}).get("release_date") or None,
-			match_source=DiaryEntry.MatchSource.AUTO if match_data else DiaryEntry.MatchSource.AUTO,
+			match_source=DiaryEntry.MatchSource.AUTO,
 			manual_lock=False,
 			match_candidates=match_candidates or [],
 		)
@@ -306,11 +330,28 @@ def _upsert_diary_entry(
 		("liked", bool(row["liked"])),
 		("rewatch", bool(row["rewatch"])),
 		("review", str(row["review"] or "")),
-		("rss_guid", str(row["rss_guid"] or "")),
+		("rss_guid", rss_guid),
 	):
 		if getattr(entry, field_name) != value:
 			setattr(entry, field_name, value)
 			changed_fields.append(field_name)
+
+	if not entry.manual_lock:
+		if match_data:
+			for field_name, value in (
+				("tmdb_id", match_data.get("tmdb_id")),
+				("official_title", str(match_data.get("title") or "")),
+				("release_date", match_data.get("release_date") or None),
+			):
+				if getattr(entry, field_name) != value:
+					setattr(entry, field_name, value)
+					changed_fields.append(field_name)
+		if match_candidates is not None and entry.match_candidates != match_candidates:
+			entry.match_candidates = match_candidates
+			changed_fields.append("match_candidates")
+		if match_data and entry.match_source != DiaryEntry.MatchSource.AUTO:
+			entry.match_source = DiaryEntry.MatchSource.AUTO
+			changed_fields.append("match_source")
 
 	if changed_fields:
 		changed_fields.append("updated_at")
@@ -445,6 +486,326 @@ def _run_diary_import_job(*, job_id: UUID, user_id: int, temp_path: str, source_
 		close_old_connections()
 
 
+def _diary_sync_job_key(job_id: UUID) -> str:
+	return f"diarysync:v1:{str(job_id)}"
+
+
+def _diary_sync_active_key(user_id: int) -> str:
+	return f"diarysync:v1:active:{int(user_id)}"
+
+
+def _diary_sync_get(job_id: UUID) -> dict | None:
+	value = cache.get(_diary_sync_job_key(job_id))
+	return value if isinstance(value, dict) else None
+
+
+def _diary_sync_set(job_id: UUID, data: dict) -> None:
+	cache.set(_diary_sync_job_key(job_id), data, timeout=DIARY_SYNC_JOB_TTL_SECONDS)
+
+
+def _diary_sync_patch(job_id: UUID, **updates) -> dict | None:
+	data = _diary_sync_get(job_id)
+	if data is None:
+		return None
+	data = {**data, **updates}
+	_diary_sync_set(job_id, data)
+	return data
+
+
+def _diary_sync_progress_url(job_id: UUID) -> str:
+	return reverse("diary_sync_progress", kwargs={"job_id": str(job_id)})
+
+
+def _sync_xml_local_name(tag: str) -> str:
+	return tag.rsplit("}", 1)[-1].lower()
+
+
+def _sync_element_text(element: ET.Element, names: set[str]) -> str:
+	for child in list(element):
+		if _sync_xml_local_name(child.tag) in names:
+			text = "".join(child.itertext()).strip()
+			if text:
+				return text
+	return ""
+
+
+def _strip_html(text: str) -> str:
+	cleaned = re.sub(r"<[^>]+>", " ", html.unescape(text or ""))
+	return " ".join(cleaned.split()).strip()
+
+
+def _parse_letterboxd_rss_datetime(value: str) -> datetime | None:
+	text = (value or "").strip()
+	if not text:
+		return None
+	try:
+		return parsedate_to_datetime(text)
+	except Exception:
+		pass
+	for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S"):
+		try:
+			return datetime.strptime(text, fmt)
+		except ValueError:
+			continue
+	return None
+
+
+def _parse_letterboxd_rss_item(item: ET.Element) -> dict[str, object] | None:
+	title = _sync_element_text(item, {"title", "filmtitle", "movietitle"})
+	if not title:
+		return None
+
+	guid = _sync_element_text(item, {"guid", "id", "uri"})
+	link = _sync_element_text(item, {"link"})
+	if not guid:
+		guid = link
+
+	watched_text = _sync_element_text(item, {"watcheddate", "watched", "date", "pubdate"})
+	watched_date = _parse_watch_date(watched_text)
+	if watched_date is None:
+		dt = _parse_letterboxd_rss_datetime(watched_text)
+		if dt is not None:
+			watched_date = dt.date()
+	if watched_date is None:
+		return None
+
+	release_year_text = _sync_element_text(item, {"filmyear", "year", "releaseyear"})
+	release_year = _parse_release_year(release_year_text)
+	if release_year is None:
+		match = re.search(r"\((\d{4})\)\s*$", title)
+		if match:
+			release_year = int(match.group(1))
+
+	review_text = _sync_element_text(item, {"description", "review", "content"})
+	return {
+		"original_title": title,
+		"original_release_year": release_year,
+		"watched_date": watched_date,
+		"rating": _parse_rating(_sync_element_text(item, {"memberrating", "rating", "score"})),
+		"liked": _parse_bool(_sync_element_text(item, {"like", "liked"})),
+		"rewatch": _parse_bool(_sync_element_text(item, {"rewatch", "rewatched"})),
+		"review": _strip_html(review_text),
+		"rss_guid": guid,
+	}
+
+
+def _load_letterboxd_rss_items(xml_text: str) -> list[dict[str, object]]:
+	root = ET.fromstring(xml_text)
+	channel = root.find("channel") if _sync_xml_local_name(root.tag) == "rss" else root
+	if channel is None:
+		return []
+	items: list[dict[str, object]] = []
+	for item in channel.findall("item"):
+		parsed = _parse_letterboxd_rss_item(item)
+		if parsed is not None:
+			items.append(parsed)
+	return items[:LETTERBOXD_RSS_MAX_ITEMS]
+
+
+def _fetch_letterboxd_rss_feed(username: str) -> str:
+	url = f"https://letterboxd.com/{username.strip()}/rss/"
+	response = requests.get(url, timeout=20, headers={"User-Agent": "MyFilmPeople/1.0"})
+	response.raise_for_status()
+	return response.text
+
+
+def _apply_tmdb_match_to_entry(
+	entry: DiaryEntry,
+	*,
+	match_data: dict[str, object] | None,
+	match_candidates: list[dict[str, object]] | None,
+) -> list[str]:
+	changed_fields: list[str] = []
+	if entry.manual_lock and entry.tmdb_id:
+		return changed_fields
+
+	if match_data:
+		for field_name, value in (
+			("tmdb_id", match_data.get("tmdb_id")),
+			("official_title", str(match_data.get("title") or "")),
+			("release_date", match_data.get("release_date") or None),
+		):
+			if getattr(entry, field_name) != value:
+				setattr(entry, field_name, value)
+				changed_fields.append(field_name)
+		if entry.match_source != DiaryEntry.MatchSource.AUTO:
+			entry.match_source = DiaryEntry.MatchSource.AUTO
+			changed_fields.append("match_source")
+
+	if match_candidates is not None and not entry.manual_lock and entry.match_candidates != match_candidates:
+		entry.match_candidates = match_candidates
+		changed_fields.append("match_candidates")
+
+	return changed_fields
+
+
+def _run_diary_sync_job(*, job_id: UUID, user_id: int) -> None:
+	close_old_connections()
+	try:
+		from django.contrib.auth import get_user_model
+
+		User = get_user_model()
+		user = User.objects.get(pk=user_id)
+		account = _get_diary_account(user)
+		username = account.letterboxd_username.strip()
+		if not username:
+			_diary_sync_patch(
+				job_id,
+				status="failed",
+				finished_at=timezone.now().isoformat(),
+				message="No Letterboxd username is configured.",
+				current_label="Sync failed",
+			)
+			return
+
+		_diary_sync_patch(
+			job_id,
+			status="running",
+			started_at=timezone.now().isoformat(),
+			finished_at=None,
+			total_items=0,
+			processed_items=0,
+			created_entries=0,
+			updated_entries=0,
+			skipped_items=0,
+			current_label="Starting sync...",
+			current_title="",
+		)
+
+		try:
+			xml_text = _fetch_letterboxd_rss_feed(username)
+			items = _load_letterboxd_rss_items(xml_text)
+		except Exception as exc:
+			_diary_sync_patch(
+				job_id,
+				status="failed",
+				finished_at=timezone.now().isoformat(),
+				message=str(exc),
+				current_label="Sync failed",
+			)
+			return
+
+		_diary_sync_patch(job_id, total_items=len(items), current_label="Syncing diary entries...")
+
+		created_entries = 0
+		updated_entries = 0
+		skipped_items = 0
+		processed_items = 0
+		last_guid = ""
+
+		for idx, row in enumerate(items, start=1):
+			title = str(row.get("original_title") or "")
+			year = row.get("original_release_year")
+			last_guid = str(row.get("rss_guid") or last_guid)
+			_diary_sync_patch(
+				job_id,
+				current_label=f"Syncing {idx}/{len(items)}...",
+				current_title=title + (f" ({year})" if year else ""),
+			)
+
+			existing_entry = None
+			if last_guid:
+				existing_entry = DiaryEntry.objects.filter(user=user, rss_guid=last_guid).first()
+			if existing_entry is None:
+				existing_entry = DiaryEntry.objects.filter(**_diary_entry_lookup(user, row)).first()
+
+			match_data = None
+			match_candidates: list[dict[str, object]] = []
+			if existing_entry is None or (not existing_entry.tmdb_id and not existing_entry.manual_lock):
+				match_data, match_candidates = _match_tmdb_movie(title=title, release_year=year if isinstance(year, int) else None)
+
+			status, _entry = _upsert_diary_entry(
+				user,
+				row,
+				match_data=match_data,
+				match_candidates=match_candidates,
+			)
+			if status == "created":
+				created_entries += 1
+			elif status == "updated":
+				updated_entries += 1
+			else:
+				skipped_items += 1
+
+			processed_items += 1
+			_diary_sync_patch(
+				job_id,
+				processed_items=processed_items,
+				created_entries=created_entries,
+				updated_entries=updated_entries,
+				skipped_items=skipped_items,
+			)
+
+		account.last_successful_sync_at = timezone.now()
+		if last_guid:
+			account.newest_processed_guid = last_guid
+		account.save(update_fields=["last_successful_sync_at", "newest_processed_guid", "updated_at"])
+
+		_diary_sync_patch(
+			job_id,
+			status="done",
+			finished_at=timezone.now().isoformat(),
+			current_label="Complete",
+			message=f"Synced {created_entries + updated_entries} diary entries.",
+		)
+	finally:
+		try:
+			cache.delete(_diary_sync_active_key(user_id))
+		except Exception:
+			pass
+		close_old_connections()
+
+
+def _diary_sync_is_stale(account: DiaryAccount) -> bool:
+	last_sync = account.last_successful_sync_at
+	if last_sync is None:
+		return True
+	return timezone.now() - last_sync >= timedelta(seconds=DIARY_SYNC_STALE_SECONDS)
+
+
+def _diary_sync_start_background(user) -> dict[str, object] | None:
+	account = _get_diary_account(user)
+	if not account.letterboxd_username.strip():
+		return None
+
+	active = cache.get(_diary_sync_active_key(user.id))
+	try:
+		active_uuid = UUID(str(active)) if active else None
+	except Exception:
+		active_uuid = None
+	if active_uuid is not None:
+		existing = _diary_sync_get(active_uuid)
+		if existing and existing.get("user_id") == user.id and existing.get("status") == "running":
+			return existing
+
+	if not _diary_sync_is_stale(account):
+		return None
+
+	job_id = uuid4()
+	cache.set(_diary_sync_active_key(user.id), str(job_id), timeout=DIARY_SYNC_JOB_TTL_SECONDS)
+	_diary_sync_set(
+		job_id,
+		{
+			"job_id": str(job_id),
+			"user_id": user.id,
+			"status": "running",
+			"started_at": None,
+			"finished_at": None,
+			"total_items": 0,
+			"processed_items": 0,
+			"created_entries": 0,
+			"updated_entries": 0,
+			"skipped_items": 0,
+			"current_label": "Queued...",
+			"current_title": "",
+			"progress_url": _diary_sync_progress_url(job_id),
+		},
+	)
+	thread = threading.Thread(target=_run_diary_sync_job, kwargs={"job_id": job_id, "user_id": user.id}, daemon=True)
+	thread.start()
+	return _diary_sync_get(job_id)
+
+
 def _diary_import_context(account: DiaryAccount, form: DiaryAccountForm | DiaryImportForm) -> dict[str, object]:
 	username = account.letterboxd_username.strip()
 	return {
@@ -484,6 +845,7 @@ def diary(request: HttpRequest) -> HttpResponse:
 	import_form = DiaryImportForm()
 	context = _diary_import_context(account, form)
 	context["import_form"] = import_form
+	context["sync_job"] = _diary_sync_start_background(request.user)
 	context["review_entries"] = _review_entries_for_user(request.user)
 	return render(request, "catalog/diary.html", context)
 
@@ -612,6 +974,54 @@ def diary_import_progress(request: HttpRequest, job_id: str) -> HttpResponse:
 
 
 @login_required
+def diary_sync_start(request: HttpRequest) -> HttpResponse:
+	if request.method != "POST":
+		return JsonResponse({"ok": False, "error": "POST required."}, status=405)
+
+	account = _get_diary_account(request.user)
+	if not account.letterboxd_username.strip():
+		return JsonResponse({"ok": False, "error": "Save a Letterboxd username first."}, status=400)
+
+	active = cache.get(_diary_sync_active_key(request.user.id))
+	try:
+		active_uuid = UUID(str(active)) if active else None
+	except Exception:
+		active_uuid = None
+	if active_uuid is not None:
+		existing = _diary_sync_get(active_uuid)
+		if existing and existing.get("user_id") == request.user.id and existing.get("status") == "running":
+			return JsonResponse(
+				{
+					"ok": True,
+					"status": "running",
+					"job_id": str(active_uuid),
+					"progress_url": _diary_sync_progress_url(active_uuid),
+				}
+			)
+
+	job = _diary_sync_start_background(request.user)
+	if not job:
+		return JsonResponse({"ok": False, "error": "Sync could not be started."}, status=400)
+	return JsonResponse({"ok": True, "status": "running", "job_id": job["job_id"], "progress_url": job["progress_url"]})
+
+
+@login_required
+def diary_sync_progress(request: HttpRequest, job_id: str) -> HttpResponse:
+	try:
+		jid = UUID(str(job_id))
+	except Exception:
+		return JsonResponse({"ok": False, "error": "Invalid job id."}, status=400)
+
+	data = _diary_sync_get(jid)
+	if not data:
+		return JsonResponse({"ok": False, "error": "Job not found."}, status=404)
+	if int(data.get("user_id") or 0) != int(request.user.id):
+		return JsonResponse({"ok": False, "error": "Not allowed."}, status=403)
+
+	return JsonResponse({"ok": True, **data})
+
+
+@login_required
 def diary_match_entry(request: HttpRequest) -> HttpResponse:
 	if request.method != "POST":
 		return redirect("diary")
@@ -637,6 +1047,19 @@ def diary_match_entry(request: HttpRequest) -> HttpResponse:
 		movie = get_or_sync_movie(tmdb_id, force=False)
 	except Exception:
 		messages.error(request, "Could not load the selected movie.")
+		return redirect("diary")
+
+	duplicate = (
+		DiaryEntry.objects.filter(user=request.user, tmdb_id=movie.tmdb_id)
+		.exclude(pk=entry.pk)
+		.only("id", "original_title", "watched_date")
+		.first()
+	)
+	if duplicate is not None:
+		messages.info(
+			request,
+			f"{movie.title} is already linked to another diary entry.",
+		)
 		return redirect("diary")
 
 	entry.tmdb_id = movie.tmdb_id
