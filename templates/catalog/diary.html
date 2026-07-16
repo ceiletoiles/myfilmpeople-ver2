@@ -26,16 +26,6 @@
 {% endblock %}
 
 {% block content %}
-  <section class="diary-hero">
-    <div class="diary-hero-copy">
-      <p class="diary-eyebrow">Letterboxd sync</p>
-      <h2>Keep your watch history aligned without turning this into another movie app.</h2>
-      <p class="diary-intro">
-        Diary keeps the Letterboxd username, Calendar View, and List View close at hand. Everything else sits behind the menu.
-      </p>
-    </div>
-  </section>
-
   <section class="diary-settings" aria-label="Letterboxd settings">
     <form method="post" action="{% url 'diary_settings' %}" class="diary-settings-form">
       {% csrf_token %}
@@ -62,19 +52,21 @@
     </form>
   </section>
 
-  <section class="diary-view-nav" aria-label="Diary views">
-    <a class="diary-view-link" href="{% url 'diary_calendar' %}">Calendar View</a>
-    <a class="diary-view-link" href="{% url 'diary_list' %}">List View</a>
-  </section>
+  <section class="diary-overview-toolbar" aria-label="Diary controls">
+    <nav class="diary-view-nav" aria-label="Diary views">
+      <a class="diary-view-link" href="{% url 'diary_calendar' %}">Calendar View</a>
+      <a class="diary-view-link" href="{% url 'diary_list' %}">List View</a>
+    </nav>
 
-  <details class="diary-quick-menu">
-    <summary class="diary-quick-menu-button" aria-label="Diary menu">...</summary>
-    <div class="diary-quick-menu-panel" role="menu">
-      <button type="button" class="diary-quick-menu-item" data-diary-sync-button data-diary-sync-start-url="{% url 'diary_sync_start' %}">Sync now</button>
-      <button type="button" class="diary-quick-menu-item" data-diary-panel-toggle="diary-import-panel">Import history</button>
-      <button type="button" class="diary-quick-menu-item" data-diary-panel-toggle="diary-review-panel">Review queue</button>
-    </div>
-  </details>
+    <details class="diary-quick-menu">
+      <summary class="diary-quick-menu-button" aria-label="Diary menu">&#8943; More</summary>
+      <div class="diary-quick-menu-panel" role="menu">
+        <button type="button" class="diary-quick-menu-item" data-diary-sync-button data-diary-sync-start-url="{% url 'diary_sync_start' %}">Sync now</button>
+        <button type="button" class="diary-quick-menu-item" data-diary-panel-toggle="diary-import-panel">Import history</button>
+        <button type="button" class="diary-quick-menu-item" data-diary-panel-toggle="diary-review-panel">Review queue</button>
+      </div>
+    </details>
+  </section>
 
   <section id="diary-import-panel" class="diary-panel" hidden aria-label="Import Letterboxd history">
     <article class="diary-card diary-import-card">
