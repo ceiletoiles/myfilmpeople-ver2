@@ -773,7 +773,7 @@ def _diary_sync_is_stale(account: DiaryAccount) -> bool:
 	return timezone.now() - last_sync >= timedelta(seconds=DIARY_SYNC_STALE_SECONDS)
 
 
-def _diary_sync_start_background(user) -> dict[str, object] | None:
+def _diary_sync_start_background(user, *, force: bool = False) -> dict[str, object] | None:
 	account = _get_diary_account(user)
 	if not account.letterboxd_username.strip():
 		return None
@@ -788,7 +788,7 @@ def _diary_sync_start_background(user) -> dict[str, object] | None:
 		if existing and existing.get("user_id") == user.id and existing.get("status") == "running":
 			return existing
 
-	if not _diary_sync_is_stale(account):
+	if not force and not _diary_sync_is_stale(account):
 		return None
 
 	job_id = uuid4()
@@ -839,10 +839,17 @@ def _review_entries_for_user(user) -> list[dict[str, object]]:
 	review_entries: list[dict[str, object]] = []
 	for entry in entries:
 		candidates = entry.match_candidates if isinstance(entry.match_candidates, list) else []
+		candidate_list = [cand for cand in candidates if isinstance(cand, dict)]
+		if not candidate_list:
+			_, live_candidates = _match_tmdb_movie(
+				title=entry.original_title,
+				release_year=entry.original_release_year if isinstance(entry.original_release_year, int) else None,
+			)
+			candidate_list = live_candidates
 		review_entries.append(
 			{
 				"entry": entry,
-				"candidates": [cand for cand in candidates if isinstance(cand, dict)],
+				"candidates": candidate_list,
 			}
 		)
 	return review_entries
@@ -1089,7 +1096,7 @@ def diary_sync_start(request: HttpRequest) -> HttpResponse:
 				}
 			)
 
-	job = _diary_sync_start_background(request.user)
+	job = _diary_sync_start_background(request.user, force=True)
 	if not job:
 		return JsonResponse({"ok": False, "error": "Sync could not be started."}, status=400)
 	return JsonResponse({"ok": True, "status": "running", "job_id": job["job_id"], "progress_url": job["progress_url"]})

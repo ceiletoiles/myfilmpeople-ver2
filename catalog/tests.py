@@ -359,6 +359,59 @@ class DiaryPageTests(TransactionTestCase):
 		account = DiaryAccount.objects.get(user=self.user)
 		self.assertIsNotNone(account.last_successful_sync_at)
 
+	def test_diary_sync_start_forces_recent_sync(self) -> None:
+		rss_xml = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<rss version=\"2.0\">
+  <channel>
+    <title>Letterboxd Diary</title>
+    <item>
+      <title>Come and See</title>
+      <guid>https://letterboxd.com/film/come-and-see/</guid>
+      <pubDate>Fri, 11 Jul 2026 10:00:00 +0000</pubDate>
+      <description><![CDATA[Great film]]></description>
+      <memberRating>5</memberRating>
+      <like>yes</like>
+      <rewatch>no</rewatch>
+      <year>1985</year>
+    </item>
+  </channel>
+</rss>
+"""
+		self.client.post(reverse("diary_settings"), {"letterboxd_username": "@example_user"})
+		account = DiaryAccount.objects.get(user=self.user)
+		account.last_successful_sync_at = timezone.now()
+		account.save(update_fields=["last_successful_sync_at", "updated_at"])
+
+		with patch("catalog.views.diary.requests.get") as mock_get, patch("catalog.views.diary.TMDbClient.from_settings") as mock_tmdb:
+			mock_response = Mock()
+			mock_response.text = rss_xml
+			mock_response.raise_for_status.return_value = None
+			mock_get.return_value = mock_response
+
+			mock_client = Mock()
+			mock_client.search_movies.return_value = {
+				"results": [
+					{"id": 1, "title": "Come and See", "release_date": "1985-07-01", "poster_path": "/poster.jpg"},
+				]
+			}
+			mock_tmdb.return_value = mock_client
+
+			response = self.client.post(reverse("diary_sync_start"))
+			self.assertEqual(response.status_code, 200)
+			payload = response.json()
+			self.assertTrue(payload["ok"])
+
+			progress = None
+			for _ in range(30):
+				progress = self.client.get(payload["progress_url"]).json()
+				if progress.get("status") != "running":
+					break
+				time.sleep(0.1)
+
+		self.assertIsNotNone(progress)
+		self.assertEqual(progress.get("status"), "done")
+		self.assertEqual(DiaryEntry.objects.filter(user=self.user).count(), 1)
+
 	def test_diary_review_page_shows_pending_entries(self) -> None:
 		DiaryEntry.objects.create(
 			user=self.user,
@@ -373,6 +426,28 @@ class DiaryPageTests(TransactionTestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Needs review")
 		self.assertContains(response, "Unknown Film")
+
+	def test_diary_review_page_fetches_live_candidates_when_missing(self) -> None:
+		DiaryEntry.objects.create(
+			user=self.user,
+			original_title="Unknown Film",
+			original_release_year=2024,
+			watched_date=date(2026, 7, 11),
+		)
+
+		with patch("catalog.views.diary.TMDbClient.from_settings") as mock_tmdb:
+			mock_client = Mock()
+			mock_client.search_movies.return_value = {
+				"results": [
+					{"id": 10, "title": "Unknown Film Redux", "release_date": "2024-01-01", "poster_path": "/poster.jpg"},
+				]
+			}
+			mock_tmdb.return_value = mock_client
+
+			response = self.client.get(reverse("diary"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Unknown Film Redux")
 
 	def test_diary_calendar_page_renders(self) -> None:
 		DiaryEntry.objects.create(
