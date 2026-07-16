@@ -301,6 +301,34 @@ def _diary_entry_lookup(user, row: dict[str, object]) -> dict[str, object]:
 	}
 
 
+def _find_diary_entry_for_row(user, row: dict[str, object]) -> DiaryEntry | None:
+	rss_guid = str(row.get("rss_guid") or "").strip()
+	if rss_guid:
+		entry = DiaryEntry.objects.filter(user=user, rss_guid=rss_guid).first()
+		if entry is not None:
+			return entry
+
+	lookup = _diary_entry_lookup(user, row)
+	entry = DiaryEntry.objects.filter(**lookup).first()
+	if entry is not None:
+		return entry
+
+	title_key = _normalize_title(str(row.get("original_title") or ""))
+	if not title_key:
+		return None
+
+	watched_date = row.get("watched_date")
+	release_year = row.get("original_release_year")
+	candidates = DiaryEntry.objects.filter(user=user, watched_date=watched_date)
+	if release_year is not None:
+		candidates = candidates.filter(original_release_year=release_year)
+	for candidate in candidates:
+		if _normalize_title(candidate.original_title) == title_key:
+			return candidate
+
+	return None
+
+
 def _upsert_diary_entry(
 	user,
 	row: dict[str, object],
@@ -309,11 +337,7 @@ def _upsert_diary_entry(
 ) -> tuple[str, DiaryEntry]:
 	lookup = _diary_entry_lookup(user, row)
 	rss_guid = str(row.get("rss_guid") or "").strip()
-	entry = None
-	if rss_guid:
-		entry = DiaryEntry.objects.filter(user=user, rss_guid=rss_guid).first()
-	if entry is None:
-		entry = DiaryEntry.objects.filter(**lookup).first()
+	entry = _find_diary_entry_for_row(user, row)
 	if entry is None:
 		entry = DiaryEntry.objects.create(
 			**lookup,
@@ -429,8 +453,7 @@ def _run_diary_import_job(*, job_id: UUID, user_id: int, temp_path: str, source_
 			title = str(parsed["original_title"])
 			year = parsed["original_release_year"]
 			last_guid = str(parsed["rss_guid"] or last_guid)
-			lookup = _diary_entry_lookup(user, parsed)
-			existing_entry = DiaryEntry.objects.filter(**lookup).first()
+			existing_entry = _find_diary_entry_for_row(user, parsed)
 			match_data: dict[str, object] | None = None
 			match_candidates: list[dict[str, object]] = []
 			if existing_entry is None:
@@ -923,9 +946,9 @@ def diary_calendar(request: HttpRequest) -> HttpResponse:
 	context = _diary_import_context(account, form)
 	context.update(
 		{
-			"entries": entries[:120],
-			"month_groups": _diary_month_groups(entries[:120]),
-			"calendar_cells": _diary_calendar_cells(entries[:120]),
+			"entries": entries,
+			"month_groups": _diary_month_groups(entries),
+			"calendar_cells": _diary_calendar_cells(entries),
 			"entry_count": len(entries),
 		}
 	)
