@@ -665,6 +665,47 @@ class DiaryPageTests(TransactionTestCase):
 		self.assertGreaterEqual(len(payload["results"]), 1)
 		self.assertEqual(payload["results"][0]["title"], "Unknown Film")
 
+	def test_diary_movie_search_supports_tmdb_id_prefix(self) -> None:
+		with patch("catalog.views.diary.TMDbClient.from_settings") as mock_tmdb:
+			mock_client = Mock()
+			mock_client.get_movie.return_value = {
+				"id": 1368337,
+				"title": "Example Movie",
+				"release_date": "2024-01-01",
+				"poster_path": "/poster.jpg",
+			}
+			mock_tmdb.return_value = mock_client
+
+			response = self.client.get(reverse("diary_movie_search"), {"q": "m:1368337"})
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(payload["ok"])
+		self.assertEqual(len(payload["results"]), 1)
+		self.assertEqual(payload["results"][0]["tmdb_id"], 1368337)
+		mock_client.get_movie.assert_called_once_with(1368337)
+		mock_client.search_movies.assert_not_called()
+
+	def test_diary_movie_search_treats_numeric_titles_as_titles(self) -> None:
+		with patch("catalog.views.diary.TMDbClient.from_settings") as mock_tmdb:
+			mock_client = Mock()
+			mock_client.search_movies.return_value = {
+				"results": [
+					{"id": 7, "title": "123456", "release_date": "2024-01-01", "poster_path": "/poster.jpg"},
+				]
+			}
+			mock_tmdb.return_value = mock_client
+
+			response = self.client.get(reverse("diary_movie_search"), {"q": "123456"})
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(payload["ok"])
+		self.assertGreaterEqual(len(payload["results"]), 1)
+		self.assertEqual(payload["results"][0]["title"], "123456")
+		mock_client.get_movie.assert_not_called()
+		mock_client.search_movies.assert_called_once()
+
 	def test_diary_entry_update_replaces_movie(self) -> None:
 		entry = DiaryEntry.objects.create(
 			user=self.user,
@@ -782,33 +823,50 @@ class DiaryPageTests(TransactionTestCase):
 		self.assertFalse(entry.rewatch)
 		self.assertEqual(entry.review, "Great film")
 
-	def test_diary_manual_match_blocks_duplicate_tmdb_matches(self) -> None:
-		first = DiaryEntry.objects.create(
+	def test_diary_entry_update_allows_same_tmdb_for_rewatch_entries(self) -> None:
+		DiaryEntry.objects.create(
 			user=self.user,
 			original_title="Come and See",
 			original_release_year=1985,
 			watched_date=date(2026, 7, 11),
+			tmdb_id=1,
+			official_title="Come and See",
+			release_date=date(1985, 7, 1),
+			manual_lock=True,
 		)
 		second = DiaryEntry.objects.create(
 			user=self.user,
-			original_title="Come and See Again",
+			original_title="Come and See",
 			original_release_year=1985,
 			watched_date=date(2026, 7, 12),
 		)
 
 		with patch("catalog.views.diary.get_or_sync_movie") as mock_movie:
-			mock_movie.return_value = Mock(tmdb_id=1, title="Come and See", release_date=date(1985, 7, 1))
-			first.tmdb_id = 1
-			first.official_title = "Come and See"
-			first.manual_lock = True
-			first.save(update_fields=["tmdb_id", "official_title", "manual_lock", "updated_at"])
-
-			response = self.client.post(reverse("diary_match_entry"), {"entry_id": second.id, "tmdb_id": "1"})
+			mock_movie.return_value = Mock(
+				tmdb_id=1,
+				title="Come and See",
+				poster_path="/poster.jpg",
+				release_date=date(1985, 7, 1),
+			)
+			response = self.client.post(
+				reverse("diary_entry_update", kwargs={"entry_id": second.id}),
+				{
+					"tmdb_id": "1",
+					"rating": "4.5",
+					"liked": "on",
+					"rewatch": "on",
+					"review": "Second watch",
+				},
+			)
 
 		self.assertEqual(response.status_code, 302)
 		second.refresh_from_db()
-		self.assertIsNone(second.tmdb_id)
-		self.assertFalse(second.manual_lock)
+		self.assertEqual(second.tmdb_id, 1)
+		self.assertEqual(second.official_title, "Come and See")
+		self.assertTrue(second.manual_lock)
+		self.assertTrue(second.rewatch)
+		self.assertTrue(second.liked)
+		self.assertEqual(second.review, "Second watch")
 
 
 class PersonComebackHelperTests(TestCase):

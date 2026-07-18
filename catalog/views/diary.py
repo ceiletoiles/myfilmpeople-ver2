@@ -187,6 +187,21 @@ def _build_candidate_payload(movie: dict[str, object], *, score: float) -> dict[
 	}
 
 
+def _lookup_tmdb_movie(movie_id: int) -> dict[str, object] | None:
+	try:
+		client = TMDbClient.from_settings()
+		payload = client.get_movie(movie_id) or {}
+	except Exception:
+		return None
+
+	if not isinstance(payload, dict):
+		return None
+	movie_id_value = payload.get("id")
+	if not isinstance(movie_id_value, int):
+		return None
+	return _build_candidate_payload(payload, score=1.0)
+
+
 def _score_tmdb_candidate(*, query_title: str, query_year: int | None, movie: dict[str, object]) -> float:
 	title = str(movie.get("title") or movie.get("name") or "").strip()
 	if not title:
@@ -245,7 +260,12 @@ def _match_tmdb_movie(*, title: str, release_year: int | None) -> tuple[dict[str
 def _search_tmdb_movies(*, query: str, release_year: int | None = None, limit: int = 8) -> list[dict[str, object]]:
 	try:
 		client = TMDbClient.from_settings()
-		search_query = _strip_trailing_release_year(query, release_year)
+		raw_query = query.strip()
+		id_match = re.match(r"^m:\s*(\d+)\s*$", raw_query, flags=re.IGNORECASE)
+		if id_match:
+			match = _lookup_tmdb_movie(int(id_match.group(1)))
+			return [match] if match is not None else []
+		search_query = _strip_trailing_release_year(raw_query, release_year)
 		payload = client.search_movies(search_query, page=1) or {}
 	except Exception:
 		return []
@@ -1175,19 +1195,6 @@ def diary_match_entry(request: HttpRequest) -> HttpResponse:
 		messages.error(request, "Could not load the selected movie.")
 		return redirect("diary")
 
-	duplicate = (
-		DiaryEntry.objects.filter(user=request.user, tmdb_id=movie.tmdb_id)
-		.exclude(pk=entry.pk)
-		.only("id", "original_title", "watched_date")
-		.first()
-	)
-	if duplicate is not None:
-		messages.info(
-			request,
-			f"{movie.title} is already linked to another diary entry.",
-		)
-		return redirect("diary")
-
 	entry.tmdb_id = movie.tmdb_id
 	entry.official_title = movie.title
 	entry.poster_path = movie.poster_path
@@ -1252,16 +1259,6 @@ def diary_entry_update(request: HttpRequest, entry_id: int) -> HttpResponse:
 				movie = get_or_sync_movie(movie_tmdb_id, force=False)
 			except Exception:
 				messages.error(request, "Could not load the selected movie.")
-				return redirect("diary")
-
-			duplicate = (
-				DiaryEntry.objects.filter(user=request.user, tmdb_id=movie.tmdb_id)
-				.exclude(pk=entry.pk)
-				.only("id", "original_title", "watched_date")
-				.first()
-			)
-			if duplicate is not None:
-				messages.info(request, f"{movie.title} is already linked to another diary entry.")
 				return redirect("diary")
 
 			entry.tmdb_id = movie.tmdb_id

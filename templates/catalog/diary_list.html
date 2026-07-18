@@ -5,11 +5,11 @@
 {% block title %}Diary List{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260718a" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260718b" />
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{{ STATIC_PREFIX }}js/pages/diary.js?v=20260718a"></script>
+  <script src="{{ STATIC_PREFIX }}js/pages/diary.js?v=20260718b"></script>
 {% endblock %}
 
 {% block page_header %}
@@ -72,7 +72,7 @@
                 </div>
                 <div class="diary-badges diary-list-badges">
                   {% if entry.rating %}<span class="diary-badge diary-rating-badge">{% diary_rating_stars entry.rating %}</span>{% endif %}
-                  {% if entry.liked %}<span class="diary-badge diary-icon-badge diary-icon-like" title="Liked" aria-label="Liked">&hearts;</span>{% endif %}
+                  {% if entry.liked %}<span class="diary-badge diary-icon-badge diary-icon-like" title="Liked" aria-label="Liked"><span class="diary-icon-mark" aria-hidden="true">♥</span></span>{% endif %}
                   {% if entry.rewatch %}<span class="diary-badge diary-icon-badge diary-icon-rewatch" title="Rewatch" aria-label="Rewatch">&#10227;</span>{% endif %}
                 </div>
               </div>
