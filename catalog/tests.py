@@ -500,6 +500,100 @@ class DiaryPageTests(TransactionTestCase):
 		self.assertEqual(entry.original_title, "Come and See")
 		self.assertEqual(entry.rss_guid, "https://letterboxd.com/film/come-and-see/")
 
+	def test_diary_import_reimports_refresh_tmdb_match_on_existing_entry(self) -> None:
+		DiaryEntry.objects.create(
+			user=self.user,
+			original_title="Come and See",
+			original_release_year=1985,
+			watched_date=date(2026, 7, 11),
+			rss_guid="https://letterboxd.com/film/come-and-see/",
+			tmdb_id=22,
+			official_title="Old Match",
+			poster_path="/old.jpg",
+			release_date=date(1985, 7, 1),
+			match_source=DiaryEntry.MatchSource.AUTO,
+			manual_lock=False,
+		)
+
+		csv_content = (
+			"Name,Year,Watched Date,Date,Rating,Liked,Rewatch,Review,URI\n"
+			"Come and See,1985,2026-07-11,2026-07-12,5,yes,no,Great film,https://letterboxd.com/film/come-and-see/\n"
+		)
+		upload = SimpleUploadedFile("letterboxd.csv", csv_content.encode("utf-8"), content_type="text/csv")
+		with patch("catalog.views.diary.TMDbClient.from_settings") as mock_tmdb:
+			mock_client = Mock()
+			mock_client.search_movies.return_value = {
+				"results": [
+					{"id": 1, "title": "Come and See", "release_date": "1985-07-01", "poster_path": "/poster.jpg"},
+				]
+			}
+			mock_tmdb.return_value = mock_client
+			response = self.client.post(reverse("diary_import_start"), {"import_file": upload})
+			self.assertEqual(response.status_code, 200)
+			progress_url = response.json()["progress_url"]
+
+			progress = None
+			for _ in range(30):
+				progress = self.client.get(progress_url).json()
+				if progress.get("status") != "running":
+					break
+				time.sleep(0.1)
+
+		self.assertIsNotNone(progress)
+		self.assertEqual(progress.get("status"), "done")
+		entry = DiaryEntry.objects.get(user=self.user, rss_guid="https://letterboxd.com/film/come-and-see/")
+		self.assertEqual(entry.tmdb_id, 1)
+		self.assertEqual(entry.official_title, "Come and See")
+		self.assertEqual(entry.poster_path, "/poster.jpg")
+		self.assertFalse(entry.manual_lock)
+
+	def test_diary_import_keeps_manual_match_on_reimport(self) -> None:
+		entry = DiaryEntry.objects.create(
+			user=self.user,
+			original_title="Come and See",
+			original_release_year=1985,
+			watched_date=date(2026, 7, 11),
+			rss_guid="https://letterboxd.com/film/come-and-see/",
+			tmdb_id=22,
+			official_title="Correct Film",
+			poster_path="/new.jpg",
+			release_date=date(1985, 7, 1),
+			match_source=DiaryEntry.MatchSource.MANUAL,
+			manual_lock=True,
+		)
+
+		csv_content = (
+			"Name,Year,Watched Date,Date,Rating,Liked,Rewatch,Review,URI\n"
+			"Come and See,1985,2026-07-11,2026-07-12,5,yes,no,Great film,https://letterboxd.com/film/come-and-see/\n"
+		)
+		upload = SimpleUploadedFile("letterboxd.csv", csv_content.encode("utf-8"), content_type="text/csv")
+		with patch("catalog.views.diary.TMDbClient.from_settings") as mock_tmdb:
+			mock_client = Mock()
+			mock_client.search_movies.return_value = {
+				"results": [
+					{"id": 1, "title": "Come and See", "release_date": "1985-07-01", "poster_path": "/poster.jpg"},
+				]
+			}
+			mock_tmdb.return_value = mock_client
+			response = self.client.post(reverse("diary_import_start"), {"import_file": upload})
+			self.assertEqual(response.status_code, 200)
+			progress_url = response.json()["progress_url"]
+
+			progress = None
+			for _ in range(30):
+				progress = self.client.get(progress_url).json()
+				if progress.get("status") != "running":
+					break
+				time.sleep(0.1)
+
+		self.assertIsNotNone(progress)
+		self.assertEqual(progress.get("status"), "done")
+		entry.refresh_from_db()
+		self.assertEqual(entry.tmdb_id, 22)
+		self.assertEqual(entry.official_title, "Correct Film")
+		self.assertEqual(entry.poster_path, "/new.jpg")
+		self.assertTrue(entry.manual_lock)
+
 	def test_diary_sync_start_forces_recent_sync(self) -> None:
 		rss_xml = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <rss version=\"2.0\">
@@ -553,35 +647,64 @@ class DiaryPageTests(TransactionTestCase):
 		self.assertEqual(progress.get("status"), "done")
 		self.assertEqual(DiaryEntry.objects.filter(user=self.user).count(), 1)
 
-	def test_diary_review_page_shows_pending_entries(self) -> None:
-		DiaryEntry.objects.create(
-			user=self.user,
-			original_title="Unknown Film",
-			original_release_year=2024,
-			watched_date=date(2026, 7, 11),
-			match_candidates=[{"tmdb_id": 10, "title": "Unknown Film", "release_date": "2024-01-01"}],
-		)
-
-		response = self.client.get(reverse("diary"))
-
-		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, "Needs review")
-		self.assertContains(response, "Unknown Film")
-
-	def test_diary_review_page_does_not_call_tmdb_for_missing_candidates(self) -> None:
-		DiaryEntry.objects.create(
-			user=self.user,
-			original_title="Unknown Film",
-			original_release_year=2024,
-			watched_date=date(2026, 7, 11),
-		)
-
+	def test_diary_movie_search_returns_matches(self) -> None:
 		with patch("catalog.views.diary.TMDbClient.from_settings") as mock_tmdb:
-			response = self.client.get(reverse("diary"))
+			mock_client = Mock()
+			mock_client.search_movies.return_value = {
+				"results": [
+					{"id": 10, "title": "Unknown Film", "release_date": "2024-01-01", "poster_path": "/poster.jpg"},
+				]
+			}
+			mock_tmdb.return_value = mock_client
+
+			response = self.client.get(reverse("diary_movie_search"), {"q": "Unknown Film 2024"})
 
 		self.assertEqual(response.status_code, 200)
-		mock_tmdb.assert_not_called()
-		self.assertContains(response, "No TMDb suggestions saved for this entry yet.")
+		payload = response.json()
+		self.assertTrue(payload["ok"])
+		self.assertGreaterEqual(len(payload["results"]), 1)
+		self.assertEqual(payload["results"][0]["title"], "Unknown Film")
+
+	def test_diary_entry_update_replaces_movie(self) -> None:
+		entry = DiaryEntry.objects.create(
+			user=self.user,
+			original_title="Unknown Film",
+			original_release_year=2024,
+			watched_date=date(2026, 7, 11),
+			tmdb_id=10,
+			official_title="Unknown Film",
+			poster_path="/old.jpg",
+			release_date=date(2024, 1, 1),
+		)
+
+		with patch("catalog.views.diary.get_or_sync_movie") as mock_movie:
+			mock_movie.return_value = Mock(
+				tmdb_id=22,
+				title="Correct Film",
+				poster_path="/new.jpg",
+				release_date=date(2024, 2, 1),
+			)
+			response = self.client.post(
+				reverse("diary_entry_update", kwargs={"entry_id": entry.id}),
+				{
+					"tmdb_id": "22",
+					"rating": "4.5",
+					"liked": "on",
+					"rewatch": "",
+					"review": "Great film",
+				},
+			)
+
+		self.assertEqual(response.status_code, 302)
+		entry.refresh_from_db()
+		self.assertEqual(entry.tmdb_id, 22)
+		self.assertEqual(entry.official_title, "Correct Film")
+		self.assertEqual(entry.poster_path, "/new.jpg")
+		self.assertTrue(entry.manual_lock)
+		self.assertEqual(str(entry.rating), "4.5")
+		self.assertTrue(entry.liked)
+		self.assertFalse(entry.rewatch)
+		self.assertEqual(entry.review, "Great film")
 
 	def test_diary_calendar_page_renders(self) -> None:
 		DiaryEntry.objects.create(

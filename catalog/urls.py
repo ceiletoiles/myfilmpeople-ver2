@@ -27,6 +27,7 @@ urlpatterns = [
     path("diary/import/progress/<uuid:job_id>/", views.diary_import_progress, name="diary_import_progress"),
     path("diary/sync/start/", views.diary_sync_start, name="diary_sync_start"),
     path("diary/sync/progress/<uuid:job_id>/", views.diary_sync_progress, name="diary_sync_progress"),
+    path("diary/movie/search/", views.diary_movie_search, name="diary_movie_search"),
     path("diary/entry/<int:entry_id>/update/", views.diary_entry_update, name="diary_entry_update"),
     path("diary/review/match/", views.diary_match_entry, name="diary_match_entry"),
     path("recent/", views.recent, name="recent"),

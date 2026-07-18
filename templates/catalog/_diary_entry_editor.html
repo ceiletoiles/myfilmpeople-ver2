@@ -1,6 +1,6 @@
 {% load static %}
 
-<div class="diary-editor" data-diary-editor data-diary-placeholder-poster="{% static 'img/placeholder-movie.svg' %}" hidden>
+<div class="diary-editor" data-diary-editor data-diary-placeholder-poster="{% static 'img/placeholder-movie.svg' %}" data-diary-editor-search-url="{% url 'diary_movie_search' %}" hidden>
   <div class="diary-editor-backdrop" data-diary-editor-close></div>
   <div class="diary-editor-dialog card">
     <button type="button" class="secondary diary-editor-close" data-diary-editor-close aria-label="Close" title="Close">&times;</button>
@@ -15,6 +15,25 @@
 
     <form method="post" class="diary-editor-form" data-diary-editor-form>
       {% csrf_token %}
+      <input type="hidden" name="tmdb_id" value="" data-diary-editor-tmdb-id />
+
+      <div class="diary-editor-field">
+        <label for="diary-editor-search">Replace movie match</label>
+        <div class="diary-editor-search-row">
+          <input
+            id="diary-editor-search"
+            type="text"
+            inputmode="search"
+            placeholder="Movie name + year"
+            data-diary-editor-search-input
+          />
+          <button type="button" class="diary-action diary-action-secondary diary-editor-search-button" data-diary-editor-search-button>Search</button>
+        </div>
+        <p class="diary-field-help">Search by title and year, then pick the correct movie to replace the stored match.</p>
+        <div class="diary-editor-search-results" data-diary-editor-search-results hidden></div>
+        <div class="diary-field-errors" data-diary-editor-search-error hidden></div>
+      </div>
+
       <div class="diary-editor-field">
         <label for="diary-editor-rating">Rating</label>
         <input id="diary-editor-rating" name="rating" type="number" min="0" max="5" step="0.5" inputmode="decimal" />

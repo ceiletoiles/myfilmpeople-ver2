@@ -57,12 +57,10 @@
       const total = Number(data.total_rows || 0);
       const created = Number(data.created_entries || 0);
       const updated = Number(data.updated_entries || 0);
-      const review = Number(data.require_review || 0);
       const skipped = Number(data.skipped_rows || 0);
       return [
         processed + '/' + total + ' processed',
         'Imported ' + (created + updated),
-        'Review ' + review,
         'Skipped ' + skipped
       ].join(' | ');
     }
@@ -374,26 +372,192 @@
     const metaEl = document.querySelector('[data-diary-editor-meta]');
     const posterEl = document.querySelector('[data-diary-editor-poster]');
     const viewLink = document.querySelector('[data-diary-editor-view]');
+    const placeholderPoster = modal ? (modal.getAttribute('data-diary-placeholder-poster') || '') : '';
+    const searchUrl = modal ? (modal.getAttribute('data-diary-editor-search-url') || '') : '';
+    const tmdbIdInput = form ? form.querySelector('input[name="tmdb_id"]') : null;
     const ratingInput = form ? form.querySelector('input[name="rating"]') : null;
     const likedInput = form ? form.querySelector('input[name="liked"]') : null;
     const rewatchInput = form ? form.querySelector('input[name="rewatch"]') : null;
     const reviewInput = form ? form.querySelector('textarea[name="review"]') : null;
-    const placeholderPoster = modal ? (modal.getAttribute('data-diary-placeholder-poster') || '') : '';
+    const searchInput = modal ? modal.querySelector('[data-diary-editor-search-input]') : null;
+    const searchButton = modal ? modal.querySelector('[data-diary-editor-search-button]') : null;
+    const searchResults = modal ? modal.querySelector('[data-diary-editor-search-results]') : null;
+    const searchError = modal ? modal.querySelector('[data-diary-editor-search-error]') : null;
     const cards = document.querySelectorAll('[data-diary-entry-card]');
 
-    if (!modal || !form || !titleEl || !metaEl || !posterEl || !viewLink) return;
+    if (
+      !modal ||
+      !form ||
+      !titleEl ||
+      !metaEl ||
+      !posterEl ||
+      !viewLink ||
+      !tmdbIdInput ||
+      !searchInput ||
+      !searchButton ||
+      !searchResults ||
+      !searchError
+    ) {
+      return;
+    }
 
     let activeCard = null;
     let longPressTimer = null;
+    let searchToken = 0;
+    let searchDebounceTimer = null;
 
     function setHidden(hidden) {
       modal.hidden = !!hidden;
       document.body.classList.toggle('modal-open', !hidden);
     }
 
+    function setSearchError(message) {
+      if (!message) {
+        searchError.hidden = true;
+        searchError.textContent = '';
+        return;
+      }
+      searchError.hidden = false;
+      searchError.textContent = message;
+    }
+
+    function clearSearchResults() {
+      searchResults.innerHTML = '';
+      searchResults.hidden = true;
+    }
+
+    function posterUrl(path) {
+      return path ? ('https://image.tmdb.org/t/p/w154' + path) : placeholderPoster;
+    }
+
     function closeEditor() {
       activeCard = null;
+      searchInput.value = '';
+      clearSearchResults();
+      setSearchError('');
       setHidden(true);
+    }
+
+    function setSelectedMovie(movie) {
+      if (!movie) return;
+      tmdbIdInput.value = String(movie.tmdb_id || '');
+      if (movie.url) {
+        viewLink.href = movie.url;
+        viewLink.hidden = false;
+      }
+      if (movie.poster_path) {
+        posterEl.src = 'https://image.tmdb.org/t/p/w342' + movie.poster_path;
+      }
+      const selectedLabel = movie.title || 'movie';
+      setSearchError('Selected ' + selectedLabel + '. Save changes to replace the stored match.');
+    }
+
+    function renderSearchResults(results) {
+      searchResults.innerHTML = '';
+      if (!results || !results.length) {
+        clearSearchResults();
+        setSearchError('No TMDb results found for that search.');
+        return;
+      }
+
+      results.forEach(function (movie) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'diary-editor-search-result';
+
+        const poster = document.createElement('img');
+        poster.className = 'diary-editor-search-poster';
+        poster.src = posterUrl(movie.poster_path || '');
+        poster.alt = '';
+        poster.loading = 'lazy';
+        button.appendChild(poster);
+
+        const body = document.createElement('span');
+        body.className = 'diary-editor-search-body';
+
+        const title = movie.title || 'Untitled';
+        const releaseDate = movie.release_date || '';
+        const releaseYear = releaseDate ? releaseDate.slice(0, 4) : '';
+        const titleLine = document.createElement('strong');
+        titleLine.textContent = title;
+        body.appendChild(titleLine);
+
+        if (releaseYear) {
+          const yearLine = document.createElement('span');
+          yearLine.className = 'muted';
+          yearLine.textContent = releaseYear;
+          body.appendChild(yearLine);
+        }
+
+        button.appendChild(body);
+
+        button.addEventListener('click', function () {
+          setSelectedMovie(movie);
+          searchInput.value = movie.title + (releaseYear ? ' ' + releaseYear : '');
+        });
+
+        searchResults.appendChild(button);
+      });
+
+      searchResults.hidden = false;
+      setSearchError('');
+    }
+
+    function queueSearch() {
+      if (searchDebounceTimer) {
+        window.clearTimeout(searchDebounceTimer);
+      }
+      searchDebounceTimer = window.setTimeout(function () {
+        searchDebounceTimer = null;
+        searchMovies();
+      }, 300);
+    }
+
+    async function searchMovies() {
+      const raw = (searchInput.value || '').trim();
+      if (!raw) {
+        setSearchError('Enter a movie title first.');
+        return;
+      }
+
+      const yearMatch = raw.match(/\b(19|20)\d{2}\b/);
+      const year = yearMatch ? yearMatch[0] : '';
+      const token = ++searchToken;
+      searchButton.disabled = true;
+      clearSearchResults();
+      searchResults.hidden = false;
+      setSearchError('Searching TMDb...');
+
+      try {
+        const url = new URL(searchUrl || window.location.href, window.location.origin);
+        url.searchParams.set('q', raw);
+        if (year) {
+          url.searchParams.set('year', year);
+        }
+        const resp = await fetch(url.toString(), {
+          method: 'GET',
+          credentials: 'same-origin',
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        });
+        const data = await resp.json().catch(() => null);
+        if (token !== searchToken) return;
+        if (!resp.ok || !data || data.ok === false) {
+          setSearchError((data && (data.error || data.message)) || ('Search failed (' + resp.status + ')'));
+          return;
+        }
+        renderSearchResults(data.results || []);
+      } catch (_) {
+        if (token === searchToken) {
+          setSearchError('Network error while searching TMDb.');
+        }
+      } finally {
+        if (token === searchToken) {
+          searchButton.disabled = false;
+        }
+      }
     }
 
     function openEditor(card) {
@@ -402,6 +566,7 @@
       form.setAttribute('action', card.getAttribute('data-entry-update-url') || '');
       titleEl.textContent = card.getAttribute('data-entry-title') || 'Diary entry';
       metaEl.textContent = card.getAttribute('data-entry-date') || '';
+      tmdbIdInput.value = '';
 
       const posterPath = card.getAttribute('data-entry-poster-path') || '';
       posterEl.src = posterPath ? ('https://image.tmdb.org/t/p/w342' + posterPath) : placeholderPoster;
@@ -420,6 +585,12 @@
         reviewInput.value = card.getAttribute('data-entry-review') || '';
       }
 
+      const title = card.getAttribute('data-entry-title') || '';
+      const year = card.getAttribute('data-entry-year') || '';
+      searchInput.value = year ? (title + ' ' + year) : title;
+      clearSearchResults();
+      setSearchError('');
+
       const movieUrl = card.getAttribute('data-entry-movie-url') || '';
       if (movieUrl) {
         viewLink.href = movieUrl;
@@ -429,11 +600,8 @@
       }
 
       setHidden(false);
-      if (ratingInput) {
-        ratingInput.focus();
-      } else if (reviewInput) {
-        reviewInput.focus();
-      }
+      searchInput.focus();
+      searchInput.select();
     }
 
     function startLongPress(card) {
@@ -468,6 +636,31 @@
       });
     });
 
+    searchButton.addEventListener('click', function () {
+      searchMovies();
+    });
+
+      searchInput.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        searchMovies();
+      }
+    });
+
+    searchInput.addEventListener('input', function () {
+      const value = (searchInput.value || '').trim();
+      if (value.length < 3) {
+        if (searchDebounceTimer) {
+          window.clearTimeout(searchDebounceTimer);
+          searchDebounceTimer = null;
+        }
+        clearSearchResults();
+        setSearchError('');
+        return;
+      }
+      queueSearch();
+    });
+
     modal.addEventListener('click', function (event) {
       const target = event.target;
       if (target instanceof HTMLElement && target.hasAttribute('data-diary-editor-close')) {
@@ -481,13 +674,11 @@
       }
     });
 
-    if (form) {
-      form.addEventListener('submit', function () {
-        if (activeCard) {
-          cancelLongPress();
-        }
-      });
-    }
+    form.addEventListener('submit', function () {
+      if (activeCard) {
+        cancelLongPress();
+      }
+    });
   }
 
   initDiaryImportProgress();

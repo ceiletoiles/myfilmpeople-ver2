@@ -5,11 +5,11 @@
 {% block title %}Diary List{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260716b" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260718a" />
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{{ STATIC_PREFIX }}js/pages/diary.js?v=20260716b"></script>
+  <script src="{{ STATIC_PREFIX }}js/pages/diary.js?v=20260718a"></script>
 {% endblock %}
 
 {% block page_header %}
@@ -43,6 +43,7 @@
             data-diary-entry-card
             data-entry-id="{{ entry.id }}"
             data-entry-title="{{ entry.original_title|escape }}"
+            data-entry-year="{{ entry.original_release_year|default_if_none:'' }}"
             data-entry-date="{{ entry.watched_date|date:'j M Y' }}"
             data-entry-rating="{{ entry.rating|default_if_none:'' }}"
             data-entry-liked="{{ entry.liked|yesno:'1,0' }}"
