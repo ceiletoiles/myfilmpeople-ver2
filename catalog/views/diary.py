@@ -353,6 +353,14 @@ def _diary_import_progress_url(job_id: UUID) -> str:
 	return reverse("diary_import_progress", kwargs={"job_id": str(job_id)})
 
 
+def _diary_source_rss_guid(value: str) -> str:
+	return str(value or "").strip()
+
+
+def _diary_entry_rss_guid(entry: DiaryEntry) -> str:
+	return _diary_source_rss_guid(entry.rss_guid)
+
+
 def _diary_entry_lookup(user, row: dict[str, object]) -> dict[str, object]:
 	return {
 		"user": user,
@@ -455,6 +463,16 @@ def _upsert_diary_entry(
 	return "skipped", entry
 
 
+def _delete_stale_diary_entries(*, user, seen_rss_guids: set[str]) -> int:
+	if not seen_rss_guids:
+		return 0
+	stale_entries = DiaryEntry.objects.filter(user=user).exclude(rss_guid="").exclude(rss_guid__in=seen_rss_guids)
+	deleted_count = stale_entries.count()
+	if deleted_count:
+		stale_entries.delete()
+	return deleted_count
+
+
 def _run_diary_import_job(*, job_id: UUID, user_id: int, temp_path: str, source_name: str) -> None:
 	close_old_connections()
 	try:
@@ -496,6 +514,7 @@ def _run_diary_import_job(*, job_id: UUID, user_id: int, temp_path: str, source_
 		skipped_rows = 0
 		processed_rows = 0
 		last_guid = ""
+		seen_rss_guids: set[str] = set()
 
 		for idx, raw_row in enumerate(rows, start=1):
 			parsed = _parse_diary_row(raw_row)
@@ -513,6 +532,27 @@ def _run_diary_import_job(*, job_id: UUID, user_id: int, temp_path: str, source_
 			title = str(parsed["original_title"])
 			year = parsed["original_release_year"]
 			last_guid = str(parsed["rss_guid"] or last_guid)
+			existing_entry = _find_diary_entry_for_row(user, parsed)
+			if existing_entry is not None:
+				existing_guid = _diary_entry_rss_guid(existing_entry)
+				if existing_guid:
+					seen_rss_guids.add(existing_guid)
+			else:
+				row_guid = _diary_source_rss_guid(parsed.get("rss_guid") or "")
+				if row_guid:
+					seen_rss_guids.add(row_guid)
+			if existing_entry is not None:
+				skipped_rows += 1
+				processed_rows += 1
+				_diary_import_patch(
+					job_id,
+					processed_rows=processed_rows,
+					skipped_rows=skipped_rows,
+					current_label=f"Skipping already imported row {idx}/{total_rows}...",
+					current_title=title + (f" ({year})" if year else ""),
+				)
+				continue
+
 			match_data, match_candidates = _match_tmdb_movie(title=title, release_year=year)
 			_diary_import_patch(
 				job_id,
@@ -543,6 +583,7 @@ def _run_diary_import_job(*, job_id: UUID, user_id: int, temp_path: str, source_
 			)
 
 		account = _get_diary_account(user)
+		deleted_entries = _delete_stale_diary_entries(user=user, seen_rss_guids=seen_rss_guids)
 		if last_guid:
 			account.newest_processed_guid = last_guid
 			account.save(update_fields=["newest_processed_guid", "updated_at"])
@@ -553,7 +594,7 @@ def _run_diary_import_job(*, job_id: UUID, user_id: int, temp_path: str, source_
 			status="done",
 			finished_at=finished_at,
 			current_label="Complete",
-			message=f"Imported {created_entries + updated_entries} entries.",
+			message=f"Imported {created_entries + updated_entries} entries, removed {deleted_entries}.",
 		)
 	finally:
 		try:
@@ -784,6 +825,7 @@ def _run_diary_sync_job(*, job_id: UUID, user_id: int) -> None:
 		skipped_items = 0
 		processed_items = 0
 		last_guid = ""
+		seen_rss_guids: set[str] = set()
 
 		for idx, row in enumerate(items, start=1):
 			title = str(row.get("original_title") or "")
@@ -800,6 +842,25 @@ def _run_diary_sync_job(*, job_id: UUID, user_id: int) -> None:
 				existing_entry = DiaryEntry.objects.filter(user=user, rss_guid=last_guid).first()
 			if existing_entry is None:
 				existing_entry = DiaryEntry.objects.filter(**_diary_entry_lookup(user, row)).first()
+			if existing_entry is not None:
+				existing_guid = _diary_entry_rss_guid(existing_entry)
+				if existing_guid:
+					seen_rss_guids.add(existing_guid)
+			else:
+				row_guid = _diary_source_rss_guid(row.get("rss_guid") or "")
+				if row_guid:
+					seen_rss_guids.add(row_guid)
+			if existing_entry is not None:
+				processed_items += 1
+				skipped_items += 1
+				_diary_sync_patch(
+					job_id,
+					processed_items=processed_items,
+					skipped_items=skipped_items,
+					current_label=f"Skipping already imported item {idx}/{len(items)}...",
+					current_title=title + (f" ({year})" if year else ""),
+				)
+				continue
 
 			match_data, match_candidates = _match_tmdb_movie(title=title, release_year=year if isinstance(year, int) else None)
 
@@ -826,6 +887,7 @@ def _run_diary_sync_job(*, job_id: UUID, user_id: int) -> None:
 			)
 
 		account.last_successful_sync_at = timezone.now()
+		deleted_entries = _delete_stale_diary_entries(user=user, seen_rss_guids=seen_rss_guids)
 		if last_guid:
 			account.newest_processed_guid = last_guid
 		account.save(update_fields=["last_successful_sync_at", "newest_processed_guid", "updated_at"])
@@ -835,7 +897,7 @@ def _run_diary_sync_job(*, job_id: UUID, user_id: int) -> None:
 			status="done",
 			finished_at=timezone.now().isoformat(),
 			current_label="Complete",
-			message=f"Synced {created_entries + updated_entries} diary entries.",
+			message=f"Synced {created_entries + updated_entries} diary entries, removed {deleted_entries}.",
 		)
 	finally:
 		try:
