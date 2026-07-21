@@ -707,7 +707,7 @@ class DiaryPageTests(TransactionTestCase):
 		self.assertEqual(progress.get("status"), "done")
 		self.assertEqual(DiaryEntry.objects.filter(user=self.user).count(), 1)
 
-	def test_diary_sync_deletes_missing_entries_from_letterboxd_feed(self) -> None:
+	def test_diary_sync_preserves_missing_old_entries_from_letterboxd_feed(self) -> None:
 		DiaryEntry.objects.create(
 			user=self.user,
 			original_title="Come and See",
@@ -781,8 +781,8 @@ class DiaryPageTests(TransactionTestCase):
 
 		self.assertIsNotNone(progress)
 		self.assertEqual(progress.get("status"), "done")
-		self.assertFalse(DiaryEntry.objects.filter(pk=stale.pk).exists())
-		self.assertEqual(DiaryEntry.objects.filter(user=self.user).count(), 1)
+		self.assertTrue(DiaryEntry.objects.filter(pk=stale.pk).exists())
+		self.assertEqual(DiaryEntry.objects.filter(user=self.user).count(), 2)
 		mock_client.search_movies.assert_not_called()
 
 	def test_diary_movie_search_returns_matches(self) -> None:

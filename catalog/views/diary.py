@@ -825,7 +825,6 @@ def _run_diary_sync_job(*, job_id: UUID, user_id: int) -> None:
 		skipped_items = 0
 		processed_items = 0
 		last_guid = ""
-		seen_rss_guids: set[str] = set()
 
 		for idx, row in enumerate(items, start=1):
 			title = str(row.get("original_title") or "")
@@ -842,14 +841,6 @@ def _run_diary_sync_job(*, job_id: UUID, user_id: int) -> None:
 				existing_entry = DiaryEntry.objects.filter(user=user, rss_guid=last_guid).first()
 			if existing_entry is None:
 				existing_entry = DiaryEntry.objects.filter(**_diary_entry_lookup(user, row)).first()
-			if existing_entry is not None:
-				existing_guid = _diary_entry_rss_guid(existing_entry)
-				if existing_guid:
-					seen_rss_guids.add(existing_guid)
-			else:
-				row_guid = _diary_source_rss_guid(row.get("rss_guid") or "")
-				if row_guid:
-					seen_rss_guids.add(row_guid)
 			if existing_entry is not None:
 				processed_items += 1
 				skipped_items += 1
@@ -887,7 +878,6 @@ def _run_diary_sync_job(*, job_id: UUID, user_id: int) -> None:
 			)
 
 		account.last_successful_sync_at = timezone.now()
-		deleted_entries = _delete_stale_diary_entries(user=user, seen_rss_guids=seen_rss_guids)
 		if last_guid:
 			account.newest_processed_guid = last_guid
 		account.save(update_fields=["last_successful_sync_at", "newest_processed_guid", "updated_at"])
@@ -897,7 +887,7 @@ def _run_diary_sync_job(*, job_id: UUID, user_id: int) -> None:
 			status="done",
 			finished_at=timezone.now().isoformat(),
 			current_label="Complete",
-			message=f"Synced {created_entries + updated_entries} diary entries, removed {deleted_entries}.",
+			message=f"Synced {created_entries + updated_entries} diary entries.",
 		)
 	finally:
 		try:
