@@ -428,13 +428,12 @@
     let searchDebounceTimer = null;
     const scrollStorageKey = 'diary-scroll:' + window.location.pathname;
 
-    function formatRatingValue(value) {
+    function formatRatingStarsText(value) {
       const raw = Number(value || 0);
       if (!raw) return 'Not rated';
-      if (Math.abs(raw - Math.round(raw)) < 0.001) {
-        return String(Math.round(raw)) + '/5';
-      }
-      return String(raw) + '/5';
+      const fullStars = Math.max(0, Math.min(5, Math.floor(raw)));
+      const hasHalf = raw - fullStars >= 0.5;
+      return '\u2605'.repeat(fullStars) + (hasHalf ? '\u00bd' : '');
     }
 
     function setEditorMode(mode) {
@@ -457,7 +456,7 @@
       const reviewValue = (card.getAttribute('data-entry-review') || '').trim();
 
       releaseDisplay.textContent = releaseYear || 'Unknown';
-      ratingDisplay.textContent = formatRatingValue(ratingValue);
+      ratingDisplay.textContent = formatRatingStarsText(ratingValue);
       likedDisplay.textContent = likedValue ? 'Yes' : 'No';
       rewatchDisplay.textContent = rewatchValue ? 'Yes' : 'No';
       reviewDisplay.textContent = reviewValue || 'No review yet.';
@@ -638,10 +637,6 @@
     function navigateToMovie(card) {
       if (!(card instanceof HTMLElement)) return;
       const movieUrl = card.getAttribute('data-entry-movie-url') || '';
-      if (!movieUrl) {
-        openEditor(card);
-        return;
-      }
       window.location.href = movieUrl;
     }
 
@@ -808,6 +803,7 @@
 
     cards.forEach(function (card) {
       const isCalendarCard = card.classList.contains('diary-calendar-entry-button');
+      const isListCard = card.classList.contains('diary-list-entry-button');
 
       card.addEventListener('dblclick', function (event) {
         if (cardClickTimer) {
@@ -826,34 +822,23 @@
       card.addEventListener('pointerup', cancelLongPress);
       card.addEventListener('pointercancel', cancelLongPress);
       card.addEventListener('pointerleave', cancelLongPress);
-      if (isCalendarCard) {
+      if (isCalendarCard || isListCard) {
         card.addEventListener('click', function (event) {
           event.preventDefault();
           if (longPressTriggered) {
             longPressTriggered = false;
             return;
           }
-          if (cardClickTimer) {
-            window.clearTimeout(cardClickTimer);
-          }
-          cardClickTimer = window.setTimeout(function () {
-            cardClickTimer = null;
-            navigateToMovie(card);
-          }, 180);
+          openEditor(card);
         });
       }
       card.addEventListener('keydown', function (event) {
-        if (isCalendarCard && event.key === 'Enter') {
-          event.preventDefault();
-          navigateToMovie(card);
-          return;
-        }
-        if (event.key === ' ') {
+        if ((isCalendarCard || isListCard) && event.key === 'Enter') {
           event.preventDefault();
           openEditor(card);
           return;
         }
-        if (!isCalendarCard && event.key === 'Enter') {
+        if (event.key === ' ') {
           event.preventDefault();
           openEditor(card);
         }
