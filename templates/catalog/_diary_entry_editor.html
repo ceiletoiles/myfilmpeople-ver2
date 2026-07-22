@@ -7,13 +7,44 @@
     <div class="diary-editor-head">
       <img class="diary-editor-poster" data-diary-editor-poster src="{% static 'img/placeholder-movie.svg' %}" alt="" />
       <div class="diary-editor-copy">
-        <span class="diary-card-kicker">Edit entry</span>
+        <span class="diary-card-kicker" data-diary-editor-kicker>Entry details</span>
         <h3 data-diary-editor-title>Diary entry</h3>
         <p class="muted" data-diary-editor-meta></p>
       </div>
     </div>
 
-    <form method="post" class="diary-editor-form" data-diary-editor-form>
+    <section class="diary-editor-overview" data-diary-editor-overview>
+      <div class="diary-editor-summary">
+        <div class="diary-editor-summary-item">
+          <span class="diary-editor-summary-label">Release year</span>
+          <span class="diary-editor-summary-value" data-diary-editor-release>Unknown</span>
+        </div>
+        <div class="diary-editor-summary-item">
+          <span class="diary-editor-summary-label">Rating</span>
+          <span class="diary-editor-summary-value" data-diary-editor-rating-display>Not rated</span>
+        </div>
+        <div class="diary-editor-summary-item">
+          <span class="diary-editor-summary-label">Liked</span>
+          <span class="diary-editor-summary-value" data-diary-editor-liked-display>No</span>
+        </div>
+        <div class="diary-editor-summary-item">
+          <span class="diary-editor-summary-label">Rewatch</span>
+          <span class="diary-editor-summary-value" data-diary-editor-rewatch-display>No</span>
+        </div>
+      </div>
+
+      <div class="diary-editor-field">
+        <span class="diary-editor-summary-label">Review</span>
+        <p class="diary-editor-review-display" data-diary-editor-review-display>No review yet.</p>
+      </div>
+
+      <div class="diary-editor-actions">
+        <a class="diary-editor-view-link" data-diary-editor-view href="#" target="_blank" rel="noreferrer">Open movie</a>
+        <button type="button" class="diary-action diary-action-primary" data-diary-editor-edit>Edit</button>
+      </div>
+    </section>
+
+    <form method="post" class="diary-editor-form" data-diary-editor-form hidden>
       {% csrf_token %}
       <input type="hidden" name="tmdb_id" value="" data-diary-editor-tmdb-id />
       <input type="hidden" name="return_to" value="" data-diary-editor-return-to />
@@ -54,8 +85,7 @@
         <textarea id="diary-editor-review" name="review" rows="5" placeholder="Add notes or a short review..."></textarea>
       </div>
       <div class="diary-editor-actions">
-        <a class="diary-editor-view-link" data-diary-editor-view href="#" target="_blank" rel="noreferrer">Open movie</a>
-        <button type="button" class="diary-action diary-action-secondary" data-diary-editor-close>Cancel</button>
+        <button type="button" class="diary-action diary-action-secondary" data-diary-editor-cancel-edit>Cancel</button>
         <button type="submit" class="diary-action diary-action-primary">Save changes</button>
       </div>
     </form>

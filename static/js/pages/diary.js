@@ -368,10 +368,19 @@
   function initDiaryEntryEditor() {
     const modal = document.querySelector('[data-diary-editor]');
     const form = document.querySelector('[data-diary-editor-form]');
+    const overview = document.querySelector('[data-diary-editor-overview]');
     const titleEl = document.querySelector('[data-diary-editor-title]');
     const metaEl = document.querySelector('[data-diary-editor-meta]');
+    const kickerEl = document.querySelector('[data-diary-editor-kicker]');
     const posterEl = document.querySelector('[data-diary-editor-poster]');
     const viewLink = document.querySelector('[data-diary-editor-view]');
+    const editButton = document.querySelector('[data-diary-editor-edit]');
+    const cancelEditButton = document.querySelector('[data-diary-editor-cancel-edit]');
+    const releaseDisplay = document.querySelector('[data-diary-editor-release]');
+    const ratingDisplay = document.querySelector('[data-diary-editor-rating-display]');
+    const likedDisplay = document.querySelector('[data-diary-editor-liked-display]');
+    const rewatchDisplay = document.querySelector('[data-diary-editor-rewatch-display]');
+    const reviewDisplay = document.querySelector('[data-diary-editor-review-display]');
     const placeholderPoster = modal ? (modal.getAttribute('data-diary-placeholder-poster') || '') : '';
     const searchUrl = modal ? (modal.getAttribute('data-diary-editor-search-url') || '') : '';
     const tmdbIdInput = form ? form.querySelector('input[name="tmdb_id"]') : null;
@@ -389,10 +398,19 @@
     if (
       !modal ||
       !form ||
+      !overview ||
       !titleEl ||
       !metaEl ||
+      !kickerEl ||
       !posterEl ||
       !viewLink ||
+      !editButton ||
+      !cancelEditButton ||
+      !releaseDisplay ||
+      !ratingDisplay ||
+      !likedDisplay ||
+      !rewatchDisplay ||
+      !reviewDisplay ||
       !tmdbIdInput ||
       !searchInput ||
       !searchButton ||
@@ -409,6 +427,68 @@
     let searchToken = 0;
     let searchDebounceTimer = null;
     const scrollStorageKey = 'diary-scroll:' + window.location.pathname;
+
+    function formatRatingValue(value) {
+      const raw = Number(value || 0);
+      if (!raw) return 'Not rated';
+      if (Math.abs(raw - Math.round(raw)) < 0.001) {
+        return String(Math.round(raw)) + '/5';
+      }
+      return String(raw) + '/5';
+    }
+
+    function setEditorMode(mode) {
+      const isEdit = mode === 'edit';
+      overview.hidden = isEdit;
+      form.hidden = !isEdit;
+      kickerEl.textContent = isEdit ? 'Edit entry' : 'Entry details';
+      if (isEdit) {
+        searchInput.focus();
+        searchInput.select();
+      }
+    }
+
+    function populateOverview(card) {
+      if (!(card instanceof HTMLElement)) return;
+      const releaseYear = card.getAttribute('data-entry-year') || '';
+      const ratingValue = card.getAttribute('data-entry-rating') || '';
+      const likedValue = (card.getAttribute('data-entry-liked') || '') === '1';
+      const rewatchValue = (card.getAttribute('data-entry-rewatch') || '') === '1';
+      const reviewValue = (card.getAttribute('data-entry-review') || '').trim();
+
+      releaseDisplay.textContent = releaseYear || 'Unknown';
+      ratingDisplay.textContent = formatRatingValue(ratingValue);
+      likedDisplay.textContent = likedValue ? 'Yes' : 'No';
+      rewatchDisplay.textContent = rewatchValue ? 'Yes' : 'No';
+      reviewDisplay.textContent = reviewValue || 'No review yet.';
+    }
+
+    function populateForm(card) {
+      if (!(card instanceof HTMLElement)) return;
+      form.setAttribute('action', card.getAttribute('data-entry-update-url') || '');
+      tmdbIdInput.value = '';
+      if (returnToInput) {
+        returnToInput.value = window.location.pathname + window.location.search + window.location.hash;
+      }
+      if (ratingInput) {
+        ratingInput.value = card.getAttribute('data-entry-rating') || '';
+      }
+      if (likedInput) {
+        likedInput.checked = (card.getAttribute('data-entry-liked') || '') === '1';
+      }
+      if (rewatchInput) {
+        rewatchInput.checked = (card.getAttribute('data-entry-rewatch') || '') === '1';
+      }
+      if (reviewInput) {
+        reviewInput.value = card.getAttribute('data-entry-review') || '';
+      }
+
+      const title = card.getAttribute('data-entry-title') || '';
+      const year = card.getAttribute('data-entry-year') || '';
+      searchInput.value = year ? (title + ' ' + year) : title;
+      clearSearchResults();
+      setSearchError('');
+    }
 
     function saveScrollPosition() {
       try {
@@ -551,6 +631,7 @@
       searchInput.value = '';
       clearSearchResults();
       setSearchError('');
+      setEditorMode('view');
       setHidden(true);
     }
 
@@ -689,36 +770,15 @@
     function openEditor(card) {
       if (!(card instanceof HTMLElement)) return;
       activeCard = card;
-      form.setAttribute('action', card.getAttribute('data-entry-update-url') || '');
       titleEl.textContent = card.getAttribute('data-entry-title') || 'Diary entry';
       metaEl.textContent = card.getAttribute('data-entry-date') || '';
-      tmdbIdInput.value = '';
-      if (returnToInput) {
-        returnToInput.value = window.location.pathname + window.location.search + window.location.hash;
-      }
 
       const posterPath = card.getAttribute('data-entry-poster-path') || '';
       posterEl.src = posterPath ? ('https://image.tmdb.org/t/p/w342' + posterPath) : placeholderPoster;
       posterEl.alt = '';
 
-      if (ratingInput) {
-        ratingInput.value = card.getAttribute('data-entry-rating') || '';
-      }
-      if (likedInput) {
-        likedInput.checked = (card.getAttribute('data-entry-liked') || '') === '1';
-      }
-      if (rewatchInput) {
-        rewatchInput.checked = (card.getAttribute('data-entry-rewatch') || '') === '1';
-      }
-      if (reviewInput) {
-        reviewInput.value = card.getAttribute('data-entry-review') || '';
-      }
-
-      const title = card.getAttribute('data-entry-title') || '';
-      const year = card.getAttribute('data-entry-year') || '';
-      searchInput.value = year ? (title + ' ' + year) : title;
-      clearSearchResults();
-      setSearchError('');
+      populateOverview(card);
+      populateForm(card);
 
       const movieUrl = card.getAttribute('data-entry-movie-url') || '';
       if (movieUrl) {
@@ -728,9 +788,8 @@
         viewLink.hidden = true;
       }
 
+      setEditorMode('view');
       setHidden(false);
-      searchInput.focus();
-      searchInput.select();
     }
 
     function startLongPress(card) {
@@ -805,6 +864,19 @@
 
     searchButton.addEventListener('click', function () {
       searchMovies();
+    });
+
+    editButton.addEventListener('click', function () {
+      if (!activeCard) return;
+      populateForm(activeCard);
+      setEditorMode('edit');
+    });
+
+    cancelEditButton.addEventListener('click', function () {
+      if (!activeCard) return;
+      populateOverview(activeCard);
+      populateForm(activeCard);
+      setEditorMode('view');
     });
 
       searchInput.addEventListener('keydown', function (event) {
