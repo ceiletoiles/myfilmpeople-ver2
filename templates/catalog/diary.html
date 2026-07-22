@@ -26,47 +26,6 @@
 {% endblock %}
 
 {% block content %}
-  <section class="diary-settings" aria-label="Letterboxd settings">
-    <form method="post" action="{% url 'diary_settings' %}" class="diary-settings-form">
-      {% csrf_token %}
-      <div class="diary-settings-field">
-        <label class="diary-card-kicker" for="{{ form.letterboxd_username.id_for_label }}">Letterboxd Username</label>
-        <div class="diary-input-row">
-          <span class="diary-input-prefix">@</span>
-          {{ form.letterboxd_username }}
-        </div>
-        {% if form.letterboxd_username.help_text %}
-          <p class="diary-field-help">{{ form.letterboxd_username.help_text }}</p>
-        {% endif %}
-        {% if form.letterboxd_username.errors %}
-          <div class="diary-field-errors">
-            {% for error in form.letterboxd_username.errors %}
-              <div>{{ error }}</div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      </div>
-      <div class="diary-actions" aria-label="Diary actions">
-        <button type="submit" class="diary-action diary-action-primary">Save Username</button>
-      </div>
-    </form>
-  </section>
-
-  <section class="diary-overview-toolbar" aria-label="Diary controls">
-    <nav class="diary-view-nav" aria-label="Diary views">
-      <a class="diary-view-link" href="{% url 'diary_calendar' %}">Calendar View</a>
-      <a class="diary-view-link" href="{% url 'diary_list' %}">List View</a>
-    </nav>
-
-    <details class="diary-quick-menu">
-      <summary class="diary-quick-menu-button" aria-label="Diary menu">&#8943; More</summary>
-      <div class="diary-quick-menu-panel" role="menu">
-        <button type="button" class="diary-quick-menu-item" data-diary-sync-button data-diary-sync-start-url="{% url 'diary_sync_start' %}">Sync now</button>
-        <button type="button" class="diary-quick-menu-item" data-diary-panel-toggle="diary-import-panel">Import history</button>
-      </div>
-    </details>
-  </section>
-
   <section class="diary-import-progress diary-sync-progress" data-diary-sync-progress data-diary-sync-progress-url="{% if sync_job %}{{ sync_job.progress_url }}{% endif %}" hidden aria-label="Diary sync progress">
     <div class="diary-import-progress-row">
       <div class="diary-import-progress-text" data-diary-sync-progress-text>Queued...</div>
@@ -78,42 +37,88 @@
     <div class="diary-import-progress-meta" data-diary-sync-progress-meta></div>
   </section>
 
-  <section id="diary-import-panel" class="diary-panel" hidden aria-label="Import Letterboxd history">
-    <article class="diary-card diary-import-card">
-      <span class="diary-card-kicker">Import history</span>
-      <h3>Import Letterboxd History</h3>
-      <p>Upload your exported Letterboxd CSV or ZIP file. The import runs in the background and shows progress while it works.</p>
-
-      <form method="post" action="{% url 'diary_import_start' %}" enctype="multipart/form-data" class="diary-import-form" data-diary-import-form data-diary-import-start-url="{% url 'diary_import_start' %}">
-        {% csrf_token %}
-        <div class="diary-import-field">
-          <label class="diary-card-kicker" for="{{ import_form.import_file.id_for_label }}">Letterboxd export file</label>
-          {{ import_form.import_file }}
-          {% if import_form.import_file.help_text %}
-            <p class="diary-field-help">{{ import_form.import_file.help_text }}</p>
-          {% endif %}
-          {% if import_form.import_file.errors %}
-            <div class="diary-field-errors">
-              {% for error in import_form.import_file.errors %}
-                <div>{{ error }}</div>
-              {% endfor %}
+  <section id="diary-settings-popup" class="diary-popup" data-diary-popup hidden aria-label="Letterboxd settings dialog">
+    <div class="diary-popup-backdrop" data-diary-popup-close="diary-settings-popup"></div>
+    <div class="diary-popup-dialog card">
+      <button type="button" class="diary-popup-close" data-diary-popup-close="diary-settings-popup" aria-label="Close settings">
+        <svg class="diary-popup-close-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M6 6l12 12M18 6 6 18"></path>
+        </svg>
+        <span class="sr-only">Close settings</span>
+      </button>
+      <section class="diary-settings" aria-label="Letterboxd settings">
+        <form method="post" action="{% url 'diary_settings' %}" class="diary-settings-form">
+          {% csrf_token %}
+          <div class="diary-settings-field">
+            <label class="diary-card-kicker" for="{{ form.letterboxd_username.id_for_label }}">Letterboxd Username</label>
+            <div class="diary-input-row">
+              <span class="diary-input-prefix">@</span>
+              {{ form.letterboxd_username }}
             </div>
-          {% endif %}
-        </div>
+            {% if form.letterboxd_username.help_text %}
+              <p class="diary-field-help">{{ form.letterboxd_username.help_text }}</p>
+            {% endif %}
+            {% if form.letterboxd_username.errors %}
+              <div class="diary-field-errors">
+                {% for error in form.letterboxd_username.errors %}
+                  <div>{{ error }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+          <div class="diary-actions" aria-label="Diary actions">
+            <button type="submit" class="diary-action diary-action-primary">Save Username</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </section>
 
-        <button type="submit" class="diary-action diary-action-primary">Import Letterboxd History</button>
-      </form>
+  <section id="diary-import-popup" class="diary-popup" data-diary-popup hidden aria-label="Import Letterboxd history dialog">
+    <div class="diary-popup-backdrop" data-diary-popup-close="diary-import-popup"></div>
+    <div class="diary-popup-dialog card">
+      <button type="button" class="diary-popup-close" data-diary-popup-close="diary-import-popup" aria-label="Close import">
+        <svg class="diary-popup-close-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M6 6l12 12M18 6 6 18"></path>
+        </svg>
+        <span class="sr-only">Close import</span>
+      </button>
+      <article class="diary-card diary-import-card">
+        <span class="diary-card-kicker">Import</span>
+        <h3>Import Letterboxd History</h3>
+        <p>Upload your exported Letterboxd CSV or ZIP file. The import runs in the background and shows progress while it works.</p>
 
-      <div class="diary-import-progress" data-diary-import-progress hidden>
-        <div class="diary-import-progress-row">
-          <div class="diary-import-progress-text" data-diary-import-progress-text>Queued...</div>
+        <form method="post" action="{% url 'diary_import_start' %}" enctype="multipart/form-data" class="diary-import-form" data-diary-import-form data-diary-import-start-url="{% url 'diary_import_start' %}">
+          {% csrf_token %}
+          <div class="diary-import-field">
+            <label class="diary-card-kicker" for="{{ import_form.import_file.id_for_label }}">Letterboxd export file</label>
+            {{ import_form.import_file }}
+            {% if import_form.import_file.help_text %}
+              <p class="diary-field-help">{{ import_form.import_file.help_text }}</p>
+            {% endif %}
+            {% if import_form.import_file.errors %}
+              <div class="diary-field-errors">
+                {% for error in import_form.import_file.errors %}
+                  <div>{{ error }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          <button type="submit" class="diary-action diary-action-primary">Import Letterboxd History</button>
+        </form>
+
+        <div class="diary-import-progress" data-diary-import-progress hidden>
+          <div class="diary-import-progress-row">
+            <div class="diary-import-progress-text" data-diary-import-progress-text>Queued...</div>
+          </div>
+          <div class="diary-import-progress-current" data-diary-import-progress-current></div>
+          <div class="diary-import-progress-bar" data-diary-import-progress-bar role="progressbar" aria-label="Diary import progress" aria-valuemin="0" aria-valuemax="100">
+            <div class="diary-import-progress-bar-fill" data-diary-import-progress-fill></div>
+          </div>
+          <div class="diary-import-progress-meta" data-diary-import-progress-meta></div>
         </div>
-        <div class="diary-import-progress-current" data-diary-import-progress-current></div>
-        <div class="diary-import-progress-bar" data-diary-import-progress-bar role="progressbar" aria-label="Diary import progress" aria-valuemin="0" aria-valuemax="100">
-          <div class="diary-import-progress-bar-fill" data-diary-import-progress-fill></div>
-        </div>
-        <div class="diary-import-progress-meta" data-diary-import-progress-meta></div>
-      </div>
-    </article>
+      </article>
+    </div>
   </section>
 {% endblock %}

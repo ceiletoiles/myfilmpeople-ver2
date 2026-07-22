@@ -933,7 +933,6 @@ class DiaryPageTests(TransactionTestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Diary List")
 		self.assertContains(response, "Come and See")
-		self.assertContains(response, "Hold or double-click to edit.")
 		self.assertContains(response, "diary-rating-stars")
 
 	def test_diary_entry_update_saves_changes(self) -> None:

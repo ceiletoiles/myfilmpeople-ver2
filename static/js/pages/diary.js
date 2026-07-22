@@ -20,9 +20,39 @@
     let pollTimer = null;
     let activeProgressUrl = null;
     let activeButton = null;
+    let syncFinished = false;
 
     function setHidden(hidden) {
       progressWrap.hidden = !!hidden;
+    }
+
+    function resetProgressUi() {
+      setPercent(0);
+      setText('Queued...');
+      setCurrent('');
+      setMeta('');
+    }
+
+    function hideProgressSoon() {
+      window.setTimeout(function () {
+        setHidden(true);
+        resetProgressUi();
+      }, 1200);
+    }
+
+    function finishSync(message, currentTitle, metaText, keepProgress) {
+      clearPolling();
+      if (activeButton) activeButton.disabled = false;
+      setText((message || '').trim() || 'Sync complete.');
+      setCurrent((currentTitle || '').trim());
+      setMeta(metaText || '');
+      activeProgressUrl = '';
+      syncFinished = true;
+      if (keepProgress) {
+        setPercent(100);
+        return;
+      }
+      hideProgressSoon();
     }
 
     function setText(msg) {
@@ -168,7 +198,9 @@
         }
 
         await pollOnce();
-        pollTimer = window.setInterval(pollOnce, 900);
+        if (activeProgressUrl) {
+          pollTimer = window.setInterval(pollOnce, 900);
+        }
       } catch (_) {
         if (activeButton) activeButton.disabled = false;
         setText('Network error.');
@@ -197,9 +229,36 @@
     let pollTimer = null;
     let activeProgressUrl = progressWrap.getAttribute('data-diary-sync-progress-url') || '';
     let activeButton = button;
+    let syncFinished = false;
 
     function setHidden(hidden) {
       progressWrap.hidden = !!hidden;
+    }
+
+    function resetProgressUi() {
+      setPercent(0);
+      setText('Queued...');
+      setCurrent('');
+      setMeta('');
+    }
+
+    function hideProgressSoon() {
+      window.setTimeout(function () {
+        setHidden(true);
+        resetProgressUi();
+      }, 1200);
+    }
+
+    function finishSync(message, currentTitle, metaText) {
+      clearPolling();
+      if (activeButton) activeButton.disabled = false;
+      setText((message || '').trim() || 'Sync complete.');
+      setCurrent((currentTitle || '').trim());
+      setMeta(metaText || '');
+      setPercent(100);
+      activeProgressUrl = '';
+      syncFinished = true;
+      hideProgressSoon();
     }
 
     function setText(msg) {
@@ -264,35 +323,55 @@
           }
         });
         const data = await resp.json().catch(() => null);
+        if (resp.status === 404 || (data && String(data.error || '').toLowerCase() === 'job not found.')) {
+          finishSync('Sync complete.', '', '', false);
+          return;
+        }
         if (!resp.ok || !data || data.ok === false) {
+          if (syncFinished) {
+            clearPolling();
+            activeProgressUrl = '';
+            hideProgressSoon();
+            return;
+          }
           clearPolling();
           if (activeButton) activeButton.disabled = false;
           setText('Sync status unavailable.');
           setCurrent('');
+          setMeta('');
+          activeProgressUrl = '';
+          hideProgressSoon();
           return;
         }
 
         applyProgress(data);
         const status = String(data.status || '');
         if (status === 'done' || status === 'done_with_errors' || status === 'failed') {
-          clearPolling();
-          if (status === 'done' || status === 'done_with_errors') {
-            setPercent(100);
-          }
-          if (activeButton) activeButton.disabled = false;
-          setText((data.message || '').trim() || 'Sync complete.');
-          setCurrent((data.current_title || '').trim());
-          setMeta(formatSummary(data));
-          activeProgressUrl = '';
+          finishSync(
+            (data.message || '').trim() || 'Sync complete.',
+            data.current_title,
+            formatSummary(data)
+          );
         }
       } catch (_) {
+        if (syncFinished) {
+          clearPolling();
+          activeProgressUrl = '';
+          hideProgressSoon();
+          return;
+        }
         clearPolling();
         if (activeButton) activeButton.disabled = false;
         setText('Network error while syncing.');
+        setCurrent('');
+        setMeta('');
+        activeProgressUrl = '';
+        hideProgressSoon();
       }
     }
 
     async function startSync() {
+      syncFinished = false;
       if (activeButton) activeButton.disabled = true;
       clearPolling();
       setHidden(false);
@@ -318,6 +397,7 @@
           setCurrent('');
           setMeta('');
           activeProgressUrl = '';
+          hideProgressSoon();
           return;
         }
 
@@ -327,11 +407,15 @@
           setText('Could not start sync progress polling.');
           setCurrent('');
           setMeta('');
+          syncFinished = true;
+          hideProgressSoon();
           return;
         }
 
         await pollOnce();
-        pollTimer = window.setInterval(pollOnce, 900);
+        if (activeProgressUrl) {
+          pollTimer = window.setInterval(pollOnce, 900);
+        }
       } catch (_) {
         if (activeButton) activeButton.disabled = false;
         setText('Network error.');
@@ -354,14 +438,66 @@
   }
 
   function initDiaryQuickMenu() {
+    const menu = document.querySelector('.diary-quick-menu');
     const toggles = document.querySelectorAll('[data-diary-panel-toggle]');
+    const closeButtons = document.querySelectorAll('[data-diary-popup-close]');
+    const popups = document.querySelectorAll('[data-diary-popup]');
+
+    if (!menu) return;
+
+    function closeMenu() {
+      menu.open = false;
+    }
+
+    function closePopups() {
+      popups.forEach(function (popup) {
+        popup.hidden = true;
+      });
+    }
+
+    function openPopup(targetId) {
+      if (!targetId) return;
+      closePopups();
+      closeMenu();
+      const popup = document.getElementById(targetId);
+      if (popup) {
+        popup.hidden = false;
+      }
+    }
+
     toggles.forEach(function (button) {
       button.addEventListener('click', function () {
         const targetId = button.getAttribute('data-diary-panel-toggle');
-        const target = targetId ? document.getElementById(targetId) : null;
-        if (!target) return;
-        target.hidden = !target.hidden;
+        openPopup(targetId);
       });
+    });
+
+    closeButtons.forEach(function (button) {
+      button.addEventListener('click', function () {
+        const targetId = button.getAttribute('data-diary-popup-close');
+        const popup = targetId ? document.getElementById(targetId) : null;
+        if (popup) {
+          popup.hidden = true;
+        }
+      });
+    });
+
+    document.addEventListener('pointerdown', function (event) {
+      if (!menu.open) return;
+      if (menu.contains(event.target)) return;
+      menu.open = false;
+    });
+
+    document.addEventListener('focusin', function (event) {
+      if (!menu.open) return;
+      if (menu.contains(event.target)) return;
+      menu.open = false;
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key !== 'Escape') return;
+      closeMenu();
+      closePopups();
     });
   }
 

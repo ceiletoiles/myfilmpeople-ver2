@@ -1022,14 +1022,18 @@ def _diary_calendar_cells(entries: list[DiaryEntry]) -> list[dict[str, object]]:
 def diary(request: HttpRequest) -> HttpResponse:
 	account = _get_diary_account(request.user)
 	form = DiaryAccountForm(initial={"letterboxd_username": account.letterboxd_username})
-	import_form = DiaryImportForm()
+	entries = _diary_entries_for_user(request.user)
 	context = _diary_import_context(account, form)
-	context["import_form"] = import_form
-	context["sync_job"] = _diary_sync_start_background(request.user)
-	all_entries = _diary_entries_for_user(request.user)
-	context["recent_entries"] = all_entries[:12]
-	context["entry_count"] = len(all_entries)
-	return render(request, "catalog/diary.html", context)
+	context.update(
+		{
+			"entries": entries,
+			"month_groups": _diary_month_groups(entries),
+			"calendar_cells": _diary_calendar_cells(entries),
+			"entry_count": len(entries),
+			"sync_job": _diary_sync_start_background(request.user),
+		}
+	)
+	return render(request, "catalog/diary_calendar.html", context)
 
 
 @login_required
@@ -1044,6 +1048,7 @@ def diary_calendar(request: HttpRequest) -> HttpResponse:
 			"month_groups": _diary_month_groups(entries),
 			"calendar_cells": _diary_calendar_cells(entries),
 			"entry_count": len(entries),
+			"sync_job": _diary_sync_start_background(request.user),
 		}
 	)
 	return render(request, "catalog/diary_calendar.html", context)
@@ -1059,6 +1064,7 @@ def diary_list(request: HttpRequest) -> HttpResponse:
 		{
 			"entries": entries,
 			"entry_count": len(entries),
+			"sync_job": _diary_sync_start_background(request.user),
 		}
 	)
 	return render(request, "catalog/diary_list.html", context)
