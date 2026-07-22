@@ -16,6 +16,7 @@
     <form method="post" class="diary-editor-form" data-diary-editor-form>
       {% csrf_token %}
       <input type="hidden" name="tmdb_id" value="" data-diary-editor-tmdb-id />
+      <input type="hidden" name="return_to" value="" data-diary-editor-return-to />
 
       <div class="diary-editor-field">
         <label for="diary-editor-search">Replace movie match</label>

@@ -25,6 +25,7 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from ..forms import DiaryAccountForm, DiaryImportForm
 from ..models import DiaryAccount, DiaryEntry
@@ -961,6 +962,17 @@ def _diary_import_context(account: DiaryAccount, form: DiaryAccountForm | DiaryI
 	}
 
 
+def _diary_redirect_target(request: HttpRequest, default_url_name: str = "diary") -> str:
+	target = (request.POST.get("return_to") or request.GET.get("next") or "").strip()
+	if target and url_has_allowed_host_and_scheme(
+		target,
+		allowed_hosts={request.get_host()},
+		require_https=request.is_secure(),
+	):
+		return target
+	return reverse(default_url_name)
+
+
 def _diary_entries_for_user(user) -> list[DiaryEntry]:
 	return list(
 		DiaryEntry.objects.filter(user=user)
@@ -1234,18 +1246,18 @@ def diary_match_entry(request: HttpRequest) -> HttpResponse:
 		tmdb_id = int(tmdb_id_raw)
 	except ValueError:
 		messages.error(request, "Invalid match selection.")
-		return redirect("diary")
+		return redirect(_diary_redirect_target(request))
 
 	entry = DiaryEntry.objects.filter(user=request.user, pk=entry_id).first()
 	if entry is None:
 		messages.error(request, "Diary entry not found.")
-		return redirect("diary")
+		return redirect(_diary_redirect_target(request))
 
 	try:
 		movie = get_or_sync_movie(tmdb_id, force=False)
 	except Exception:
 		messages.error(request, "Could not load the selected movie.")
-		return redirect("diary")
+		return redirect(_diary_redirect_target(request))
 
 	entry.tmdb_id = movie.tmdb_id
 	entry.official_title = movie.title
@@ -1267,7 +1279,7 @@ def diary_match_entry(request: HttpRequest) -> HttpResponse:
 		]
 	)
 	messages.success(request, f"Updated {entry.original_title} to {movie.title}.")
-	return redirect("diary")
+	return redirect(_diary_redirect_target(request))
 
 
 @login_required
@@ -1297,7 +1309,7 @@ def diary_entry_update(request: HttpRequest, entry_id: int) -> HttpResponse:
 	entry = DiaryEntry.objects.filter(user=request.user, pk=entry_id).first()
 	if entry is None:
 		messages.error(request, "Diary entry not found.")
-		return redirect("diary")
+		return redirect(_diary_redirect_target(request))
 
 	movie_tmdb_id_raw = (request.POST.get("tmdb_id") or "").strip()
 	if movie_tmdb_id_raw:
@@ -1305,13 +1317,13 @@ def diary_entry_update(request: HttpRequest, entry_id: int) -> HttpResponse:
 			movie_tmdb_id = int(movie_tmdb_id_raw)
 		except ValueError:
 			messages.error(request, "Invalid movie selection.")
-			return redirect("diary")
+			return redirect(_diary_redirect_target(request))
 		if entry.tmdb_id != movie_tmdb_id:
 			try:
 				movie = get_or_sync_movie(movie_tmdb_id, force=False)
 			except Exception:
 				messages.error(request, "Could not load the selected movie.")
-				return redirect("diary")
+				return redirect(_diary_redirect_target(request))
 
 			entry.tmdb_id = movie.tmdb_id
 			entry.official_title = movie.title
@@ -1334,10 +1346,10 @@ def diary_entry_update(request: HttpRequest, entry_id: int) -> HttpResponse:
 			rating = Decimal(rating_raw)
 		except (InvalidOperation, ValueError):
 			messages.error(request, "Rating must be a number.")
-			return redirect("diary")
+			return redirect(_diary_redirect_target(request))
 		if rating < 0 or rating > 5:
 			messages.error(request, "Rating must be between 0 and 5.")
-			return redirect("diary")
+			return redirect(_diary_redirect_target(request))
 	else:
 		rating = None
 
@@ -1358,5 +1370,21 @@ def diary_entry_update(request: HttpRequest, entry_id: int) -> HttpResponse:
 			*update_fields,
 		]
 	entry.save(update_fields=update_fields)
-	messages.success(request, f"Updated {entry.original_title}.")
-	return redirect("diary")
+	if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in (request.headers.get("accept") or ""):
+		return JsonResponse(
+			{
+				"ok": True,
+				"entry": {
+					"id": entry.id,
+					"tmdb_id": entry.tmdb_id,
+					"official_title": entry.official_title,
+					"poster_path": entry.poster_path,
+					"release_date": entry.release_date.isoformat() if entry.release_date else "",
+					"rating": str(entry.rating) if entry.rating is not None else "",
+					"liked": entry.liked,
+					"rewatch": entry.rewatch,
+					"review": entry.review,
+				},
+			}
+		)
+	return redirect(_diary_redirect_target(request))

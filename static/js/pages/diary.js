@@ -379,6 +379,7 @@
     const likedInput = form ? form.querySelector('input[name="liked"]') : null;
     const rewatchInput = form ? form.querySelector('input[name="rewatch"]') : null;
     const reviewInput = form ? form.querySelector('textarea[name="review"]') : null;
+    const returnToInput = form ? form.querySelector('input[name="return_to"]') : null;
     const searchInput = modal ? modal.querySelector('[data-diary-editor-search-input]') : null;
     const searchButton = modal ? modal.querySelector('[data-diary-editor-search-button]') : null;
     const searchResults = modal ? modal.querySelector('[data-diary-editor-search-results]') : null;
@@ -405,6 +406,30 @@
     let longPressTimer = null;
     let searchToken = 0;
     let searchDebounceTimer = null;
+    const scrollStorageKey = 'diary-scroll:' + window.location.pathname;
+
+    function saveScrollPosition() {
+      try {
+        window.sessionStorage.setItem(scrollStorageKey, String(window.scrollY || window.pageYOffset || 0));
+      } catch (_) {}
+    }
+
+    function restoreScrollPosition() {
+      let stored = null;
+      try {
+        stored = window.sessionStorage.getItem(scrollStorageKey);
+      } catch (_) {
+        stored = null;
+      }
+      if (!stored) return;
+      const y = Math.max(0, Number(stored || 0));
+      try {
+        window.sessionStorage.removeItem(scrollStorageKey);
+      } catch (_) {}
+      window.requestAnimationFrame(function () {
+        window.scrollTo(0, y);
+      });
+    }
 
     function setHidden(hidden) {
       modal.hidden = !!hidden;
@@ -428,6 +453,95 @@
 
     function posterUrl(path) {
       return path ? ('https://image.tmdb.org/t/p/w154' + path) : placeholderPoster;
+    }
+
+    function buildStars(rating) {
+      const value = Number(rating || 0);
+      const fullStars = Math.max(0, Math.min(5, Math.floor(value)));
+      const hasHalf = value - fullStars >= 0.5;
+      const result = document.createElement('span');
+      result.className = 'diary-rating-stars';
+      for (let idx = 0; idx < 5; idx += 1) {
+        const star = document.createElement('span');
+        star.className = 'diary-star' + (idx < fullStars ? ' is-filled' : (idx === fullStars && hasHalf ? ' is-half' : ' is-empty'));
+        star.setAttribute('aria-hidden', 'true');
+        star.textContent = idx < fullStars ? '★' : '☆';
+        result.appendChild(star);
+      }
+      return result;
+    }
+
+    function updateEntryCardFromResponse(data) {
+      if (!activeCard || !data || !data.entry) return;
+      const entry = data.entry;
+      activeCard.setAttribute('data-entry-rating', entry.rating || '');
+      activeCard.setAttribute('data-entry-liked', entry.liked ? '1' : '0');
+      activeCard.setAttribute('data-entry-rewatch', entry.rewatch ? '1' : '0');
+      activeCard.setAttribute('data-entry-review', entry.review || '');
+      activeCard.setAttribute('data-entry-poster-path', entry.poster_path || '');
+      activeCard.setAttribute('data-entry-movie-url', entry.tmdb_id ? ('/movie/' + String(entry.tmdb_id) + '/') : '');
+
+      const titleEl = activeCard.querySelector('.diary-entry-title');
+      if (titleEl && entry.official_title) {
+        titleEl.textContent = titleEl.textContent || entry.official_title;
+      }
+
+      const posterEl = activeCard.querySelector('.diary-entry-poster');
+      if (posterEl) {
+        posterEl.src = entry.poster_path ? ('https://image.tmdb.org/t/p/w342' + entry.poster_path) : placeholderPoster;
+      }
+
+      const linkEl = activeCard.parentElement ? activeCard.parentElement.querySelector('.diary-entry-link') : null;
+      if (linkEl) {
+        if (entry.tmdb_id) {
+          linkEl.href = '/movie/' + String(entry.tmdb_id) + '/';
+          linkEl.hidden = false;
+        } else {
+          linkEl.hidden = true;
+        }
+      }
+
+      const badgesEl = activeCard.querySelector('.diary-badges');
+      if (badgesEl) {
+        badgesEl.innerHTML = '';
+        if (entry.rating) {
+          const badge = document.createElement('span');
+          badge.className = 'diary-badge diary-rating-badge';
+          badge.appendChild(buildStars(entry.rating));
+          badgesEl.appendChild(badge);
+        }
+        if (entry.liked) {
+          const likedBadge = document.createElement('span');
+          likedBadge.className = 'diary-badge diary-icon-badge diary-icon-like';
+          likedBadge.title = 'Liked';
+          likedBadge.setAttribute('aria-label', 'Liked');
+          const heart = document.createElement('span');
+          heart.className = 'diary-icon-mark';
+          heart.setAttribute('aria-hidden', 'true');
+          heart.textContent = '♥';
+          likedBadge.appendChild(heart);
+          badgesEl.appendChild(likedBadge);
+        }
+        if (entry.rewatch) {
+          const rewatchBadge = document.createElement('span');
+          rewatchBadge.className = 'diary-badge diary-icon-badge diary-icon-rewatch';
+          rewatchBadge.title = 'Rewatch';
+          rewatchBadge.setAttribute('aria-label', 'Rewatch');
+          rewatchBadge.textContent = '↻';
+          badgesEl.appendChild(rewatchBadge);
+        }
+      }
+
+      const reviewEl = activeCard.parentElement ? activeCard.parentElement.querySelector('.diary-list-review') : null;
+      if (reviewEl) {
+        if (entry.review) {
+          reviewEl.textContent = entry.review;
+          reviewEl.hidden = false;
+        } else {
+          reviewEl.textContent = '';
+          reviewEl.hidden = true;
+        }
+      }
     }
 
     function closeEditor() {
@@ -567,6 +681,9 @@
       titleEl.textContent = card.getAttribute('data-entry-title') || 'Diary entry';
       metaEl.textContent = card.getAttribute('data-entry-date') || '';
       tmdbIdInput.value = '';
+      if (returnToInput) {
+        returnToInput.value = window.location.pathname + window.location.search + window.location.hash;
+      }
 
       const posterPath = card.getAttribute('data-entry-poster-path') || '';
       posterEl.src = posterPath ? ('https://image.tmdb.org/t/p/w342' + posterPath) : placeholderPoster;
@@ -636,6 +753,8 @@
       });
     });
 
+    restoreScrollPosition();
+
     searchButton.addEventListener('click', function () {
       searchMovies();
     });
@@ -674,9 +793,43 @@
       }
     });
 
-    form.addEventListener('submit', function () {
+    form.addEventListener('submit', async function (event) {
+      event.preventDefault();
+      saveScrollPosition();
       if (activeCard) {
         cancelLongPress();
+      }
+
+      const submitButton = form.querySelector('button[type="submit"]');
+      if (submitButton) {
+        submitButton.disabled = true;
+      }
+
+      try {
+        const resp = await fetch(form.getAttribute('action') || window.location.href, {
+          method: 'POST',
+          credentials: 'same-origin',
+          body: new FormData(form),
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': getCookie('csrftoken')
+          }
+        });
+        const data = await resp.json().catch(() => null);
+        if (!resp.ok || !data || data.ok === false) {
+          setSearchError((data && (data.error || data.message)) || ('Save failed (' + resp.status + ')'));
+          return;
+        }
+
+        updateEntryCardFromResponse(data);
+        closeEditor();
+      } catch (_) {
+        setSearchError('Network error while saving.');
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+        }
       }
     });
   }

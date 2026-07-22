@@ -961,6 +961,55 @@ class DiaryPageTests(TransactionTestCase):
 		self.assertFalse(entry.rewatch)
 		self.assertEqual(entry.review, "Great film")
 
+	def test_diary_entry_update_returns_to_current_view(self) -> None:
+		entry = DiaryEntry.objects.create(
+			user=self.user,
+			original_title="Come and See",
+			original_release_year=1985,
+			watched_date=date(2026, 7, 11),
+		)
+
+		response = self.client.post(
+			reverse("diary_entry_update", kwargs={"entry_id": entry.id}),
+			{
+				"rating": "4.5",
+				"liked": "on",
+				"rewatch": "",
+				"review": "Great film",
+				"return_to": reverse("diary_calendar"),
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		self.assertEqual(response.url, reverse("diary_calendar"))
+
+	def test_diary_entry_update_returns_json_for_ajax(self) -> None:
+		entry = DiaryEntry.objects.create(
+			user=self.user,
+			original_title="Come and See",
+			original_release_year=1985,
+			watched_date=date(2026, 7, 11),
+		)
+
+		response = self.client.post(
+			reverse("diary_entry_update", kwargs={"entry_id": entry.id}),
+			{
+				"rating": "4.5",
+				"liked": "on",
+				"rewatch": "",
+				"review": "Great film",
+				"return_to": reverse("diary_calendar"),
+			},
+			HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+			HTTP_ACCEPT="application/json",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(payload["ok"])
+		self.assertEqual(payload["entry"]["review"], "Great film")
+		self.assertTrue(payload["entry"]["liked"])
+
 	def test_diary_entry_update_allows_same_tmdb_for_rewatch_entries(self) -> None:
 		DiaryEntry.objects.create(
 			user=self.user,
