@@ -5,11 +5,11 @@
 {% block title %}Diary Calendar{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260718b" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260722b" />
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{{ STATIC_PREFIX }}js/pages/diary.js?v=20260718b"></script>
+  <script src="{{ STATIC_PREFIX }}js/pages/diary.js?v=20260722b"></script>
 {% endblock %}
 
 {% block page_header %}
@@ -20,85 +20,76 @@
     </button>
     <div class="page-header-content">
       <h1>Diary Calendar</h1>
-      <p class="page-tagline">A month-by-month view with poster cards and quick editing.</p>
+      <p class="page-tagline">A poster-first monthly journal with quick actions tucked behind the artwork.</p>
     </div>
     <span class="page-header-spacer" aria-hidden="true"></span>
   </div>
 {% endblock %}
 
 {% block content %}
-  <section class="diary-view-nav" aria-label="Diary views">
-    <a class="diary-view-link" href="{% url 'diary' %}">Overview</a>
-    <a class="diary-view-link is-active" href="{% url 'diary_calendar' %}">Calendar View</a>
-    <a class="diary-view-link" href="{% url 'diary_list' %}">List View</a>
-  </section>
+  <div class="diary-calendar-page">
+    <section class="diary-view-nav" aria-label="Diary views">
+      <a class="diary-view-link" href="{% url 'diary' %}">Overview</a>
+      <a class="diary-view-link is-active" href="{% url 'diary_calendar' %}">Calendar View</a>
+      <a class="diary-view-link" href="{% url 'diary_list' %}">List View</a>
+    </section>
 
-  {% if month_groups %}
-    <section class="diary-calendar-shell" aria-label="Diary calendar months">
-      {% for month in month_groups %}
-        <article class="diary-card diary-calendar-month">
-          <div class="diary-calendar-month-head">
-            <div>
-              <span class="diary-card-kicker">Month</span>
+    {% if month_groups %}
+      <section class="diary-calendar-shell" aria-label="Diary calendar months">
+        {% for month in month_groups %}
+          <article class="diary-calendar-month">
+            <div class="diary-calendar-month-head">
               <h3>{{ month.month_label }}</h3>
+              <span class="diary-calendar-month-count">{{ month.entries|length }} entries</span>
             </div>
-            <span class="diary-calendar-month-count">{{ month.entries|length }} entries</span>
-          </div>
 
-          <div class="diary-calendar-grid">
-            {% for entry in month.entries %}
-            <article class="diary-entry-shell diary-calendar-entry-card">
-              <button
-                type="button"
-                class="diary-entry-card diary-calendar-entry-button"
-                data-diary-entry-card
-                data-entry-id="{{ entry.id }}"
-                data-entry-title="{{ entry.original_title|escape }}"
-                data-entry-year="{{ entry.original_release_year|default_if_none:'' }}"
-                data-entry-date="{{ entry.watched_date|date:'j M Y' }}"
-                data-entry-rating="{{ entry.rating|default_if_none:'' }}"
-                data-entry-liked="{{ entry.liked|yesno:'1,0' }}"
-                data-entry-rewatch="{{ entry.rewatch|yesno:'1,0' }}"
-                data-entry-review="{{ entry.review|escape }}"
-                data-entry-poster-path="{{ entry.poster_path|escape }}"
-                data-entry-movie-url="{% if entry.tmdb_id %}{% url 'movie_detail' entry.tmdb_id %}{% endif %}"
-                data-entry-update-url="{% url 'diary_entry_update' entry.id %}"
-              >
-                <div class="diary-entry-poster-frame">
-                  {% if entry.poster_path %}
-                    <img class="diary-entry-poster" src="https://image.tmdb.org/t/p/w342{{ entry.poster_path }}" alt="" />
-                  {% else %}
-                    <img class="diary-entry-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
-                  {% endif %}
-                  <span class="diary-entry-date-chip">{{ entry.watched_date|date:"j" }}</span>
-                </div>
-                <div class="diary-entry-body">
-                  <div class="diary-entry-title">{{ entry.original_title }}</div>
-                  <div class="diary-entry-meta">
-                    {{ entry.watched_date|date:"j M Y" }}
-                    {% if entry.original_release_year %}<span>&bull; {{ entry.original_release_year }}</span>{% endif %}
-                  </div>
-                  <div class="diary-badges">
-                    {% if entry.rating %}<span class="diary-badge diary-rating-badge">{% diary_rating_stars entry.rating %}</span>{% endif %}
-                    {% if entry.liked %}<span class="diary-badge diary-icon-badge diary-icon-like" title="Liked" aria-label="Liked"><span class="diary-icon-mark" aria-hidden="true">♥</span></span>{% endif %}
-                    {% if entry.rewatch %}<span class="diary-badge diary-icon-badge diary-icon-rewatch" title="Rewatch" aria-label="Rewatch">&#10227;</span>{% endif %}
-                  </div>
-                </div>
-              </button>
-              {% if entry.tmdb_id %}
-                <a class="diary-entry-link" href="{% url 'movie_detail' entry.tmdb_id %}">Open movie</a>
-              {% endif %}
-            </article>
-            {% endfor %}
-          </div>
-        </article>
-      {% endfor %}
-    </section>
-  {% else %}
-    <section class="diary-card">
-      <p class="muted">No diary entries yet.</p>
-    </section>
-  {% endif %}
+            <div class="diary-calendar-grid">
+              {% for entry in month.entries %}
+                <article class="diary-entry-shell diary-calendar-entry-card">
+                  <button
+                    type="button"
+                    class="diary-entry-card diary-calendar-entry-button"
+                    data-diary-entry-card
+                    data-entry-id="{{ entry.id }}"
+                    data-entry-title="{{ entry.original_title|escape }}"
+                    data-entry-year="{{ entry.original_release_year|default_if_none:'' }}"
+                    data-entry-date="{{ entry.watched_date|date:'j M Y' }}"
+                    data-entry-rating="{{ entry.rating|default_if_none:'' }}"
+                    data-entry-liked="{{ entry.liked|yesno:'1,0' }}"
+                    data-entry-rewatch="{{ entry.rewatch|yesno:'1,0' }}"
+                    data-entry-review="{{ entry.review|escape }}"
+                    data-entry-poster-path="{{ entry.poster_path|escape }}"
+                    data-entry-movie-url="{% if entry.tmdb_id %}{% url 'movie_detail' entry.tmdb_id %}{% endif %}"
+                    data-entry-update-url="{% url 'diary_entry_update' entry.id %}"
+                    aria-label="Open {{ entry.original_title }}"
+                  >
+                    <div class="diary-entry-poster-frame">
+                      {% if entry.poster_path %}
+                        <img class="diary-entry-poster" src="https://image.tmdb.org/t/p/w342{{ entry.poster_path }}" alt="" />
+                      {% else %}
+                        <img class="diary-entry-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
+                      {% endif %}
+                    </div>
+                    <div class="diary-entry-body diary-calendar-entry-body">
+                      <div class="diary-badges diary-entry-rating-row">
+                        {% if entry.rating %}<span class="diary-badge diary-rating-badge">{% diary_rating_stars entry.rating %}</span>{% endif %}
+                        {% if entry.liked %}<span class="diary-badge diary-icon-badge diary-icon-like" title="Liked" aria-label="Liked"><span class="diary-icon-mark" aria-hidden="true"></span></span>{% endif %}
+                        {% if entry.rewatch %}<span class="diary-badge diary-icon-badge diary-icon-rewatch" title="Rewatch" aria-label="Rewatch"><span class="diary-icon-mark" aria-hidden="true"></span></span>{% endif %}
+                      </div>
+                    </div>
+                  </button>
+                </article>
+              {% endfor %}
+            </div>
+          </article>
+        {% endfor %}
+      </section>
+    {% else %}
+      <section class="diary-card">
+        <p class="muted">No diary entries yet.</p>
+      </section>
+    {% endif %}
+  </div>
 
   {% include 'catalog/_diary_entry_editor.html' %}
 {% endblock %}

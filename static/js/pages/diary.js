@@ -404,6 +404,8 @@
 
     let activeCard = null;
     let longPressTimer = null;
+    let longPressTriggered = false;
+    let cardClickTimer = null;
     let searchToken = 0;
     let searchDebounceTimer = null;
     const scrollStorageKey = 'diary-scroll:' + window.location.pathname;
@@ -550,6 +552,16 @@
       clearSearchResults();
       setSearchError('');
       setHidden(true);
+    }
+
+    function navigateToMovie(card) {
+      if (!(card instanceof HTMLElement)) return;
+      const movieUrl = card.getAttribute('data-entry-movie-url') || '';
+      if (!movieUrl) {
+        openEditor(card);
+        return;
+      }
+      window.location.href = movieUrl;
     }
 
     function setSelectedMovie(movie) {
@@ -723,7 +735,9 @@
 
     function startLongPress(card) {
       clearTimeout(longPressTimer);
+      longPressTriggered = false;
       longPressTimer = window.setTimeout(function () {
+        longPressTriggered = true;
         openEditor(card);
       }, 520);
     }
@@ -734,7 +748,15 @@
     }
 
     cards.forEach(function (card) {
-      card.addEventListener('dblclick', function () {
+      const isCalendarCard = card.classList.contains('diary-calendar-entry-button');
+
+      card.addEventListener('dblclick', function (event) {
+        if (cardClickTimer) {
+          window.clearTimeout(cardClickTimer);
+          cardClickTimer = null;
+        }
+        longPressTriggered = false;
+        event.preventDefault();
         openEditor(card);
       });
       card.addEventListener('pointerdown', function (event) {
@@ -745,8 +767,34 @@
       card.addEventListener('pointerup', cancelLongPress);
       card.addEventListener('pointercancel', cancelLongPress);
       card.addEventListener('pointerleave', cancelLongPress);
+      if (isCalendarCard) {
+        card.addEventListener('click', function (event) {
+          event.preventDefault();
+          if (longPressTriggered) {
+            longPressTriggered = false;
+            return;
+          }
+          if (cardClickTimer) {
+            window.clearTimeout(cardClickTimer);
+          }
+          cardClickTimer = window.setTimeout(function () {
+            cardClickTimer = null;
+            navigateToMovie(card);
+          }, 180);
+        });
+      }
       card.addEventListener('keydown', function (event) {
-        if (event.key === 'Enter' || event.key === ' ') {
+        if (isCalendarCard && event.key === 'Enter') {
+          event.preventDefault();
+          navigateToMovie(card);
+          return;
+        }
+        if (event.key === ' ') {
+          event.preventDefault();
+          openEditor(card);
+          return;
+        }
+        if (!isCalendarCard && event.key === 'Enter') {
           event.preventDefault();
           openEditor(card);
         }
