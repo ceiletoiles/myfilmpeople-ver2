@@ -8,10 +8,12 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.core.cache import cache
 
-from ..models import PersonFollow
+from ..models import Person, PersonFollow
 from ..related_links import build_person_related_links
 from ..new_movie_helpers import (
 	build_person_comeback_event_meta,
@@ -22,9 +24,9 @@ from ..new_movie_helpers import (
 	get_person_comeback_info,
 	record_new_movie_arrivals,
 )
-from ..services import get_or_sync_person, get_person_status_label
+from ..services import get_or_sync_person, get_or_sync_person_images, get_person_status_label
 from ..rate_limit import rate_limit
-from ..tmdb import TMDbClient, TMDbError
+from ..tmdb import TMDbClient, TMDbError, tmdb_image_url
 from ._shared import (
 	SESSION_KEY_HIDE_SELF_APPEARANCES,
 	_countdown_text,
@@ -69,6 +71,43 @@ def _calculate_age(birthday: date | None, deathday: date | None = None) -> int |
 	if (end_date.month, end_date.day) < (birthday.month, birthday.day):
 		age -= 1
 	return age if age >= 0 else None
+
+
+def _person_profile_images_return_to(request: HttpRequest, tmdb_id: int) -> str:
+	return_to = (request.GET.get("return_to") or request.POST.get("return_to") or "").strip()
+	fallback = reverse("person_detail", args=[tmdb_id])
+	if return_to and url_has_allowed_host_and_scheme(return_to, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+		return return_to
+	return fallback
+
+
+def _person_profile_image_candidates(person: Person) -> list[dict[str, object]]:
+	raw = person.tmdb_raw if isinstance(person.tmdb_raw, dict) else {}
+	images = raw.get("images") if isinstance(raw.get("images"), dict) else {}
+	profiles = images.get("profiles") if isinstance(images, dict) else []
+	if not isinstance(profiles, list):
+		return []
+
+	results: list[dict[str, object]] = []
+	seen_paths: set[str] = set()
+	for profile in profiles:
+		if not isinstance(profile, dict):
+			continue
+		file_path = str(profile.get("file_path") or "").strip()
+		if not file_path or file_path in seen_paths:
+			continue
+		seen_paths.add(file_path)
+		results.append(
+			{
+				"file_path": file_path,
+				"width": profile.get("width"),
+				"height": profile.get("height"),
+				"vote_average": profile.get("vote_average"),
+				"vote_count": profile.get("vote_count"),
+				"url": tmdb_image_url(file_path, size="w342"),
+			}
+		)
+	return results
 
 
 @rate_limit(limit=25, window_seconds=60, bucket_name="person_detail")
@@ -181,30 +220,37 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 					source_last_sync_at=getattr(person, "tmdb_last_sync_at", None),
 				)
 	else:
-		# Not followed => live fetch only (do not store in DB).
-		client = TMDbClient.from_settings()
-		try:
-			raw = client.get_person(tmdb_id)
-			credits = client.get_person_credits(tmdb_id)
+		stored_person = Person.objects.filter(tmdb_id=tmdb_id).first()
+		if stored_person is not None:
 			try:
-				external_ids = client.get_person_external_ids(tmdb_id)
+				person = get_or_sync_person(tmdb_id)
 			except Exception:
-				external_ids = {}
-		except Exception:  # noqa: BLE001
-			messages.error(request, "TMDb data is temporarily unavailable. Please try again soon.")
-			return redirect("search")
-		if isinstance(raw, dict):
-			raw = {**raw, "external_ids": external_ids}
+				person = stored_person
 		else:
-			raw = {"external_ids": external_ids}
-		person = SimpleNamespace(
-			tmdb_id=tmdb_id,
-			name=(raw.get("name") or str(tmdb_id)),
-			profile_path=(raw.get("profile_path") or ""),
-			tmdb_raw=raw,
-			tmdb_credits_raw=credits,
-			tmdb_last_sync_at=None,
-		)
+			# Not followed => live fetch only (do not store in DB).
+			client = TMDbClient.from_settings()
+			try:
+				raw = client.get_person(tmdb_id)
+				credits = client.get_person_credits(tmdb_id)
+				try:
+					external_ids = client.get_person_external_ids(tmdb_id)
+				except Exception:
+					external_ids = {}
+			except Exception:  # noqa: BLE001
+				messages.error(request, "TMDb data is temporarily unavailable. Please try again soon.")
+				return redirect("search")
+			if isinstance(raw, dict):
+				raw = {**raw, "external_ids": external_ids}
+			else:
+				raw = {"external_ids": external_ids}
+			person = SimpleNamespace(
+				tmdb_id=tmdb_id,
+				name=(raw.get("name") or str(tmdb_id)),
+				profile_path=(raw.get("profile_path") or ""),
+				tmdb_raw=raw,
+				tmdb_credits_raw=credits,
+				tmdb_last_sync_at=None,
+			)
 
 	credits = person.tmdb_credits_raw or {}
 	if is_followed:
@@ -1189,6 +1235,73 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"filmography_filters": filmography_filters,
 			"default_filmography_filter": default_filmography_filter,
 			"hide_self_appearances": hide_self_appearances,
+		},
+	)
+
+
+@login_required
+def person_profile_images(request: HttpRequest, tmdb_id: int) -> HttpResponse:
+	return_to = _person_profile_images_return_to(request, tmdb_id)
+	load_error = ""
+
+	if request.method == "POST":
+		try:
+			person = get_or_sync_person_images(tmdb_id)
+		except Exception:
+			messages.error(request, "TMDb profile images are temporarily unavailable. Please try again soon.")
+			return redirect(return_to)
+
+		selected_profile_path = (request.POST.get("profile_path") or "").strip()
+		candidates = _person_profile_image_candidates(person)
+		allowed_paths = {str(candidate.get("file_path") or "").strip() for candidate in candidates}
+		if selected_profile_path not in allowed_paths:
+			messages.error(request, "Selected profile image is no longer available.")
+			return redirect(reverse("person_profile_images", args=[tmdb_id]))
+
+		person.profile_path = selected_profile_path
+		person.save(update_fields=["profile_path", "updated_at"])
+		try:
+			cache.delete(f"db:person:v1:{int(tmdb_id)}")
+		except Exception:
+			pass
+		return redirect(return_to)
+
+	try:
+		person = get_or_sync_person_images(tmdb_id)
+		candidates = _person_profile_image_candidates(person)
+	except Exception:
+		load_error = "TMDb profile images are temporarily unavailable right now."
+		candidates = []
+		stored_person = Person.objects.filter(tmdb_id=tmdb_id).first()
+		if stored_person is not None:
+			person = stored_person
+		else:
+			try:
+				person = get_or_sync_person(tmdb_id)
+			except Exception:
+				person = SimpleNamespace(
+					tmdb_id=tmdb_id,
+					name=str(tmdb_id),
+					profile_path="",
+					tmdb_raw={},
+				)
+
+	selected_profile_path = str(getattr(person, "profile_path", "") or "").strip()
+	current_image = next((item for item in candidates if item.get("file_path") == selected_profile_path), None)
+	current_profile_image_url = tmdb_image_url(selected_profile_path, size="w342") if selected_profile_path else ""
+
+	return render(
+		request,
+		"catalog/person_profile_images.html",
+		{
+			"person": person,
+			"images": candidates,
+			"image_count": len(candidates),
+			"current_image": current_image,
+			"selected_profile_path": selected_profile_path,
+			"current_profile_image_url": current_profile_image_url,
+			"return_to": return_to,
+			"load_error": load_error,
 		},
 	)
 

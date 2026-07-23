@@ -98,9 +98,44 @@
           </div>
         </section>
       {% endif %}
+
+      {% if indian_language_posters %}
+        <section class="diary-poster-picker-group" aria-label="Indian language posters">
+          <div class="diary-poster-picker-group-head">
+            <h3>Indian languages</h3>
+            <span>{{ indian_language_posters|length }}</span>
+          </div>
+          <div class="diary-poster-picker-grid">
+            {% for poster in indian_language_posters %}
+              <article class="diary-poster-picker-card{% if poster.file_path == entry.poster_path %} is-selected{% endif %}">
+                <form method="post" action="{% url 'diary_entry_posters' entry.id %}" class="diary-poster-picker-form">
+                  {% csrf_token %}
+                  <input type="hidden" name="poster_path" value="{{ poster.file_path|escape }}" />
+                  <input type="hidden" name="return_to" value="{{ return_to|escape }}" />
+                  <button
+                    type="submit"
+                    class="diary-poster-picker-button"
+                    aria-label="Select Indian language poster {{ forloop.counter }} for {{ entry.original_title }}"
+                  >
+                    <img class="diary-poster-picker-image" src="{{ poster.url }}" alt="" loading="lazy" />
+                  </button>
+                </form>
+                <div class="diary-poster-picker-details">
+                  <span class="diary-poster-picker-meta">
+                    {{ poster.width }}&times;{{ poster.height }} · {{ poster.vote_average|default:"0" }} · {{ poster.vote_count|default:"0" }}
+                  </span>
+                  {% if poster.file_path == entry.poster_path %}
+                    <span class="diary-poster-picker-selected">Current poster</span>
+                  {% endif %}
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
     {% else %}
       <section class="diary-card">
-        <p class="muted">TMDb did not return any English or language-neutral posters for this movie.</p>
+        <p class="muted">TMDb did not return any supported posters for this movie.</p>
       </section>
     {% endif %}
   </section>

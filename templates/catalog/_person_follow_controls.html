@@ -19,6 +19,8 @@
         </button>
       </form>
 
+      <a href="{% url 'person_profile_images' person.tmdb_id %}" role="menuitem">Profile pics</a>
+
       {% if follow_roles %}
         <form
           method="post"

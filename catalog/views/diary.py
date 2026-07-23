@@ -39,6 +39,22 @@ DIARY_SYNC_JOB_TTL_SECONDS = 60 * 60
 DIARY_SYNC_STALE_SECONDS = 60 * 60
 LETTERBOXD_RSS_MAX_ITEMS = 50
 
+_DIARY_POSTER_LANGUAGE_CODES = {
+	"en",
+	"",
+	"xx",
+	"hi",
+	"ta",
+	"te",
+	"kn",
+	"ml",
+	"bn",
+	"mr",
+	"pa",
+	"gu",
+	"or",
+}
+
 _STAR_RE = re.compile(r"[★☆]+")
 _RATING_STAR_RE = re.compile(r"[\u2605\u2606]+")
 
@@ -413,7 +429,11 @@ def _diary_safe_return_to(request: HttpRequest, fallback: str) -> str:
 def _diary_movie_poster_candidates(movie_id: int) -> list[dict[str, object]]:
 	try:
 		client = TMDbClient.from_settings()
-		payload = client.get_movie_images(movie_id, include_image_language="en,null") or {}
+		payload = client.get_movie_images(
+			movie_id,
+			include_image_language="en,null,xx,hi,ta,te,kn,ml,bn,mr,pa,gu,or",
+			include_language=False,
+		) or {}
 	except Exception:
 		return []
 
@@ -426,7 +446,7 @@ def _diary_movie_poster_candidates(movie_id: int) -> list[dict[str, object]]:
 		if not isinstance(poster, dict):
 			continue
 		lang = str(poster.get("iso_639_1") or "").strip().lower()
-		if lang not in {"", "en"}:
+		if lang not in _DIARY_POSTER_LANGUAGE_CODES:
 			continue
 		file_path = str(poster.get("file_path") or "").strip()
 		if not file_path:
@@ -455,13 +475,15 @@ def _diary_movie_poster_candidates(movie_id: int) -> list[dict[str, object]]:
 
 
 def _diary_group_posters(posters: list[dict[str, object]]) -> dict[str, list[dict[str, object]]]:
-	grouped = {"en": [], "none": []}
+	grouped = {"en": [], "none": [], "indian": []}
 	for poster in posters:
 		lang = str(poster.get("iso_639_1") or "").strip().lower()
 		if lang == "en":
 			grouped["en"].append(poster)
-		elif lang == "":
+		elif lang in {"", "xx"}:
 			grouped["none"].append(poster)
+		elif lang in {"hi", "ta", "te", "kn", "ml", "bn", "mr", "pa", "gu", "or"}:
+			grouped["indian"].append(poster)
 	return grouped
 
 
@@ -1373,7 +1395,6 @@ def diary_movie_search(request: HttpRequest) -> HttpResponse:
 	return JsonResponse({"ok": True, "results": results})
 
 
-@login_required
 def diary_entry_posters(request: HttpRequest, entry_id: int) -> HttpResponse:
 	entry = _find_diary_entry_for_user(request.user, entry_id)
 	if entry is None:
@@ -1408,7 +1429,6 @@ def diary_entry_posters(request: HttpRequest, entry_id: int) -> HttpResponse:
 					},
 				}
 			)
-		messages.success(request, "Poster updated.")
 		return redirect(return_to)
 
 	if entry.tmdb_id is None:
@@ -1423,6 +1443,7 @@ def diary_entry_posters(request: HttpRequest, entry_id: int) -> HttpResponse:
 		"poster_count": len(posters),
 		"english_posters": grouped_posters["en"],
 		"no_language_posters": grouped_posters["none"],
+		"indian_language_posters": grouped_posters["indian"],
 		"return_to": return_to,
 		"page_title": f"Choose poster for {entry.original_title}",
 	}

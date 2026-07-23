@@ -35,6 +35,7 @@ urlpatterns = [
     path("recent/", views.recent, name="recent"),
     path("new/", views.new_arrivals, name="new_arrivals"),
     path("person/<int:tmdb_id>/", views.person_detail, name="person_detail"),
+    path("person/<int:tmdb_id>/profile-pics/", views.person_profile_images, name="person_profile_images"),
     path(
         "person/<int:tmdb_id>/toggle-self-appearances/",
         views.person_toggle_self_appearances,

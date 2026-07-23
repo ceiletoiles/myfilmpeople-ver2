@@ -59,15 +59,15 @@ class TMDbClient:
             return {"Authorization": f"Bearer {self.read_access_token}"}
         return {}
 
-    def _get(self, path: str, *, params: dict[str, Any] | None = None) -> Any:
+    def _get(self, path: str, *, params: dict[str, Any] | None = None, include_language: bool = True) -> Any:
         if not self.api_key and not self.read_access_token:
             raise TMDbError(
                 "TMDb API key missing. Set TMDB_API_KEY (or TMDB_API_READ_ACCESS_TOKEN) in .env."
             )
 
-        merged_params: dict[str, Any] = {
-            "language": self.language,
-        }
+        merged_params: dict[str, Any] = {}
+        if include_language:
+            merged_params["language"] = self.language
         if params:
             merged_params.update(params)
         if self.region:
@@ -201,7 +201,9 @@ class TMDbClient:
         This replicates the cache key construction used in `_get` so callers
         can invalidate cached TMDb HTTP responses.
         """
-        merged_params: dict[str, Any] = {"language": self.language}
+        merged_params: dict[str, Any] = {}
+        if True:
+            merged_params["language"] = self.language
         if params:
             merged_params.update(params)
         if self.region:
@@ -278,11 +280,17 @@ class TMDbClient:
             return [item for item in payload if isinstance(item, dict)]
         return []
 
-    def get_movie_images(self, movie_id: int, *, include_image_language: str | None = None) -> dict[str, Any]:
+    def get_movie_images(
+        self,
+        movie_id: int,
+        *,
+        include_image_language: str | None = None,
+        include_language: bool = True,
+    ) -> dict[str, Any]:
         params: dict[str, Any] = {}
         if include_image_language:
             params["include_image_language"] = include_image_language
-        return self._get(f"/movie/{movie_id}/images", params=params or None)
+        return self._get(f"/movie/{movie_id}/images", params=params or None, include_language=include_language)
 
     def get_movie_watch_providers(self, movie_id: int) -> dict[str, Any]:
         return self._get(f"/movie/{movie_id}/watch/providers")

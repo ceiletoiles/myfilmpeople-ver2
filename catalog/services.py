@@ -1207,8 +1207,16 @@ def get_or_sync_person(tmdb_id: int, *, force: bool = False) -> Person:
         else:
             raw = {"credited_roles": credited_roles, "external_ids": external_ids}
 
+        existing_raw = person.tmdb_raw if isinstance(person.tmdb_raw, dict) else {}
+        existing_profile_path = str(getattr(person, "profile_path", "") or "").strip()
+        previous_tmdb_profile_path = str(existing_raw.get("profile_path") or "").strip()
+        current_tmdb_profile_path = str(raw.get("profile_path") or "").strip()
+
         person.name = raw.get("name") or person.name
-        person.profile_path = raw.get("profile_path") or ""
+        if existing_profile_path and existing_profile_path != previous_tmdb_profile_path:
+            person.profile_path = existing_profile_path
+        else:
+            person.profile_path = current_tmdb_profile_path
         person.tmdb_raw = raw
         person.tmdb_credits_raw = credits
         person.tmdb_last_sync_at = timezone.now()

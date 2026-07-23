@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Profile Pics · {{ person.name }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/person_detail.css?v=20260723a" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/person_profile_images.css?v=20260723a" />
+{% endblock %}
+
+{% block page_header %}
+  <div class="page-header person-image-page-header">
+    <button type="button" class="nav-icon-btn" data-menu-toggle aria-controls="site-drawer" aria-expanded="false">
+      <img class="nav-icon" src="{% static 'img/menu.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
+      <span class="sr-only">Open menu</span>
+    </button>
+    <div class="page-header-content">
+      <h1>Choose profile pic</h1>
+    </div>
+    <span class="page-header-spacer" aria-hidden="true"></span>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <section class="person-image-picker">
+    <header class="person-image-picker-head">
+      <div>
+        <div class="person-image-picker-name">{{ person.name }}</div>
+        <div class="person-image-picker-meta">
+          {% if image_count %}
+            {{ image_count }} available image{{ image_count|pluralize }}
+          {% else %}
+            No additional images available
+          {% endif %}
+        </div>
+      </div>
+    </header>
+
+    {% if load_error %}
+      <section class="person-image-error card">
+        <p class="muted">{{ load_error }}</p>
+      </section>
+    {% endif %}
+
+    {% if images %}
+      <form method="post" class="person-image-grid" action="{% url 'person_profile_images' person.tmdb_id %}">
+        {% csrf_token %}
+        <input type="hidden" name="return_to" value="{{ return_to|escape }}" />
+        {% for image in images %}
+          <button
+            type="submit"
+            class="person-image-card{% if image.file_path == selected_profile_path %} is-selected{% endif %}"
+            name="profile_path"
+            value="{{ image.file_path|escape }}"
+            aria-label="Select profile image {{ forloop.counter }} for {{ person.name }}"
+          >
+            <img class="person-image-thumb" src="{{ image.url }}" alt="" loading="lazy" />
+            {% if image.file_path == selected_profile_path %}
+              <span class="person-image-selected">Current image</span>
+            {% endif %}
+          </button>
+        {% endfor %}
+      </form>
+    {% else %}
+      <section class="person-image-empty card">
+        {% if current_profile_image_url %}
+          <img class="person-image-empty-img" src="{{ current_profile_image_url }}" alt="" />
+        {% else %}
+          <img class="person-image-empty-img" src="{% static 'img/placeholder-person.svg' %}" alt="" />
+        {% endif %}
+        <p class="muted">TMDb did not return any selectable profile images for this person.</p>
+      </section>
+    {% endif %}
+  </section>
+{% endblock %}

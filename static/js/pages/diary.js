@@ -763,6 +763,7 @@
       if (!(card instanceof HTMLElement)) return;
       const postersUrl = card.getAttribute('data-entry-posters-url') || '';
       if (!postersUrl) return;
+      saveScrollPosition();
       const returnTo = window.location.pathname + window.location.search + window.location.hash;
       window.location.href = postersUrl + '?return_to=' + encodeURIComponent(returnTo);
     }
