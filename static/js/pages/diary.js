@@ -510,6 +510,7 @@
     const kickerEl = document.querySelector('[data-diary-editor-kicker]');
     const posterEl = document.querySelector('[data-diary-editor-poster]');
     const viewLink = document.querySelector('[data-diary-editor-view]');
+    const postersButton = document.querySelector('[data-diary-editor-posters]');
     const editButton = document.querySelector('[data-diary-editor-edit]');
     const cancelEditButton = document.querySelector('[data-diary-editor-cancel-edit]');
     const releaseDisplay = document.querySelector('[data-diary-editor-release]');
@@ -540,6 +541,7 @@
       !kickerEl ||
       !posterEl ||
       !viewLink ||
+      !postersButton ||
       !editButton ||
       !cancelEditButton ||
       !releaseDisplay ||
@@ -577,10 +579,6 @@
       overview.hidden = isEdit;
       form.hidden = !isEdit;
       kickerEl.textContent = isEdit ? 'Edit entry' : 'Entry details';
-      if (isEdit) {
-        searchInput.focus();
-        searchInput.select();
-      }
     }
 
     function populateOverview(card) {
@@ -761,6 +759,14 @@
       }
     }
 
+    function openPosterPicker(card) {
+      if (!(card instanceof HTMLElement)) return;
+      const postersUrl = card.getAttribute('data-entry-posters-url') || '';
+      if (!postersUrl) return;
+      const returnTo = window.location.pathname + window.location.search + window.location.hash;
+      window.location.href = postersUrl + '?return_to=' + encodeURIComponent(returnTo);
+    }
+
     function closeEditor() {
       activeCard = null;
       searchInput.value = '';
@@ -919,6 +925,17 @@
         viewLink.hidden = true;
       }
 
+      const postersUrl = card.getAttribute('data-entry-posters-url') || '';
+      if (movieUrl && postersUrl) {
+        postersButton.hidden = false;
+        postersButton.disabled = false;
+        postersButton.setAttribute('data-entry-posters-url', postersUrl);
+      } else {
+        postersButton.hidden = true;
+        postersButton.disabled = true;
+        postersButton.removeAttribute('data-entry-posters-url');
+      }
+
       setEditorMode('view');
       setHidden(false);
     }
@@ -991,6 +1008,11 @@
       if (!activeCard) return;
       populateForm(activeCard);
       setEditorMode('edit');
+    });
+
+    postersButton.addEventListener('click', function () {
+      if (!activeCard) return;
+      openPosterPicker(activeCard);
     });
 
     cancelEditButton.addEventListener('click', function () {

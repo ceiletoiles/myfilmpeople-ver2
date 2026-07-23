@@ -5,11 +5,11 @@
 {% block title %}Diary Calendar{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260722d" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260723a" />
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{{ STATIC_PREFIX }}js/pages/diary.js?v=20260722d"></script>
+  <script src="{{ STATIC_PREFIX }}js/pages/diary.js?v=20260723a"></script>
 {% endblock %}
 
 {% block page_header %}
@@ -166,6 +166,7 @@
                     data-entry-review="{{ entry.review|escape }}"
                     data-entry-poster-path="{{ entry.poster_path|escape }}"
                     data-entry-movie-url="{% if entry.tmdb_id %}{% url 'movie_detail' entry.tmdb_id %}{% endif %}"
+                    data-entry-posters-url="{% url 'diary_entry_posters' entry.id %}"
                     data-entry-update-url="{% url 'diary_entry_update' entry.id %}"
                     aria-label="Open {{ entry.original_title }}"
                   >

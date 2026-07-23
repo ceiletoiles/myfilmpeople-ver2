@@ -30,7 +30,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from ..forms import DiaryAccountForm, DiaryImportForm
 from ..models import DiaryAccount, DiaryEntry
 from ..services import get_or_sync_movie
-from ..tmdb import TMDbClient
+from ..tmdb import TMDbClient, tmdb_image_url
 
 
 DIARY_IMPORT_JOB_TTL_SECONDS = 60 * 60
@@ -397,6 +397,72 @@ def _find_diary_entry_for_row(user, row: dict[str, object]) -> DiaryEntry | None
 			return candidate
 
 	return None
+
+
+def _find_diary_entry_for_user(user, entry_id: int) -> DiaryEntry | None:
+	return DiaryEntry.objects.filter(user=user, pk=entry_id).first()
+
+
+def _diary_safe_return_to(request: HttpRequest, fallback: str) -> str:
+	return_to = (request.GET.get("return_to") or request.POST.get("return_to") or "").strip()
+	if return_to and url_has_allowed_host_and_scheme(return_to, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+		return return_to
+	return fallback
+
+
+def _diary_movie_poster_candidates(movie_id: int) -> list[dict[str, object]]:
+	try:
+		client = TMDbClient.from_settings()
+		payload = client.get_movie_images(movie_id, include_image_language="en,null") or {}
+	except Exception:
+		return []
+
+	posters = payload.get("posters") or []
+	if not isinstance(posters, list):
+		return []
+
+	results: list[dict[str, object]] = []
+	for poster in posters:
+		if not isinstance(poster, dict):
+			continue
+		lang = str(poster.get("iso_639_1") or "").strip().lower()
+		if lang not in {"", "en"}:
+			continue
+		file_path = str(poster.get("file_path") or "").strip()
+		if not file_path:
+			continue
+		results.append(
+			{
+				"file_path": file_path,
+				"aspect_ratio": poster.get("aspect_ratio"),
+				"height": poster.get("height"),
+				"width": poster.get("width"),
+				"iso_639_1": lang,
+				"vote_average": poster.get("vote_average"),
+				"vote_count": poster.get("vote_count"),
+				"url": tmdb_image_url(file_path, size="w500"),
+			}
+		)
+
+	results.sort(
+		key=lambda item: (
+			-(float(item.get("vote_average") or 0.0)),
+			-(int(item.get("vote_count") or 0)),
+			str(item.get("file_path") or "").casefold(),
+		)
+	)
+	return results
+
+
+def _diary_group_posters(posters: list[dict[str, object]]) -> dict[str, list[dict[str, object]]]:
+	grouped = {"en": [], "none": []}
+	for poster in posters:
+		lang = str(poster.get("iso_639_1") or "").strip().lower()
+		if lang == "en":
+			grouped["en"].append(poster)
+		elif lang == "":
+			grouped["none"].append(poster)
+	return grouped
 
 
 def _upsert_diary_entry(
@@ -1305,6 +1371,62 @@ def diary_movie_search(request: HttpRequest) -> HttpResponse:
 
 	results = _search_tmdb_movies(query=query, release_year=release_year, limit=8)
 	return JsonResponse({"ok": True, "results": results})
+
+
+@login_required
+def diary_entry_posters(request: HttpRequest, entry_id: int) -> HttpResponse:
+	entry = _find_diary_entry_for_user(request.user, entry_id)
+	if entry is None:
+		messages.error(request, "Diary entry not found.")
+		return redirect(_diary_redirect_target(request))
+
+	fallback_url = reverse("diary_entry_posters", kwargs={"entry_id": entry.id})
+	return_to = _diary_safe_return_to(request, _diary_redirect_target(request))
+
+	if request.method == "POST":
+		if entry.tmdb_id is None:
+			messages.error(request, "Pick a matched movie before choosing a poster.")
+			return redirect(return_to)
+
+		selected_poster_path = (request.POST.get("poster_path") or "").strip()
+		candidates = _diary_movie_poster_candidates(entry.tmdb_id)
+		allowed_paths = {str(candidate.get("file_path") or "").strip() for candidate in candidates}
+		if selected_poster_path not in allowed_paths:
+			messages.error(request, "Selected poster is no longer available.")
+			return redirect(fallback_url)
+
+		entry.poster_path = selected_poster_path
+		entry.save(update_fields=["poster_path", "updated_at"])
+
+		if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in (request.headers.get("accept") or ""):
+			return JsonResponse(
+				{
+					"ok": True,
+					"entry": {
+						"id": entry.id,
+						"poster_path": entry.poster_path,
+					},
+				}
+			)
+		messages.success(request, "Poster updated.")
+		return redirect(return_to)
+
+	if entry.tmdb_id is None:
+		messages.error(request, "Pick a matched movie before choosing a poster.")
+		return redirect(return_to)
+
+	posters = _diary_movie_poster_candidates(entry.tmdb_id)
+	grouped_posters = _diary_group_posters(posters)
+	context = {
+		"entry": entry,
+		"posters": posters,
+		"poster_count": len(posters),
+		"english_posters": grouped_posters["en"],
+		"no_language_posters": grouped_posters["none"],
+		"return_to": return_to,
+		"page_title": f"Choose poster for {entry.original_title}",
+	}
+	return render(request, "catalog/diary_entry_posters.html", context)
 
 
 @login_required

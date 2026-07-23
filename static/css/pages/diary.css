@@ -1728,6 +1728,122 @@ body.modal-open {
 	color: #93c5fd;
 }
 
+.diary-poster-picker {
+	display: grid;
+	gap: 1rem;
+}
+
+.diary-poster-picker-header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.5rem 0.75rem;
+	padding: 0;
+}
+
+.diary-poster-picker-header h2 {
+	margin: 0;
+}
+
+.diary-poster-picker-year,
+.diary-poster-picker-count {
+	color: #94a3b8;
+	font-size: 0.88rem;
+	font-weight: 700;
+}
+
+.diary-poster-picker-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: 1rem;
+	align-items: start;
+}
+
+.diary-poster-picker-group {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.diary-poster-picker-group-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 1rem;
+}
+
+.diary-poster-picker-group-head h3 {
+	margin: 0;
+}
+
+.diary-poster-picker-group-head span {
+	color: #94a3b8;
+	font-size: 0.92rem;
+	font-weight: 700;
+}
+
+.diary-poster-picker-card {
+	display: grid;
+	gap: 0.5rem;
+	border: 0;
+	background: transparent;
+	border-radius: 0;
+	padding: 0;
+}
+
+.diary-poster-picker-card.is-selected {
+	box-shadow: none;
+}
+
+.diary-poster-picker-form {
+	display: block;
+}
+
+.diary-poster-picker-button {
+	display: block;
+	width: 100%;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+}
+
+.diary-poster-picker-image {
+	width: 100%;
+	aspect-ratio: 2 / 3;
+	object-fit: cover;
+	border-radius: 0;
+	background: rgba(2, 6, 23, 0.7);
+}
+
+.diary-poster-picker-details {
+	display: grid;
+	gap: 0.25rem;
+	padding: 0;
+	justify-items: center;
+	text-align: center;
+}
+
+.diary-poster-picker-meta {
+	color: #94a3b8;
+	font-size: 0.82rem;
+	line-height: 1.45;
+}
+
+.diary-poster-picker-selected {
+	width: fit-content;
+	margin-top: 0.1rem;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: #7dd3fc;
+	font-size: 0.68rem;
+	font-weight: 600;
+	line-height: 1.1;
+	letter-spacing: 0.01em;
+	text-transform: none;
+}
+
 @keyframes diary-poster-fade {
 	from {
 		opacity: 0;
@@ -1767,6 +1883,41 @@ body.modal-open {
 	.diary-calendar-month-head {
 		align-items: baseline;
 		flex-direction: row;
+	}
+
+	.diary-poster-picker-header {
+		gap: 0.35rem 0.5rem;
+	}
+
+	.diary-poster-picker-header h2 {
+		font-size: 1.2rem;
+		line-height: 1.2;
+	}
+
+	.diary-poster-picker-year,
+	.diary-poster-picker-count {
+		font-size: 0.8rem;
+	}
+
+	.diary-poster-picker-grid {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 0.45rem;
+	}
+
+	.diary-poster-picker-details {
+		gap: 0.15rem;
+	}
+
+	.diary-poster-picker-meta {
+		font-size: 0.52rem;
+		line-height: 1.25;
+		white-space: nowrap;
+		letter-spacing: -0.03em;
+	}
+
+	.diary-poster-picker-selected {
+		font-size: 0.64rem;
+		padding: 0.25rem 0.45rem;
 	}
 }
 

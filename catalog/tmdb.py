@@ -278,8 +278,11 @@ class TMDbClient:
             return [item for item in payload if isinstance(item, dict)]
         return []
 
-    def get_movie_images(self, movie_id: int) -> dict[str, Any]:
-        return self._get(f"/movie/{movie_id}/images")
+    def get_movie_images(self, movie_id: int, *, include_image_language: str | None = None) -> dict[str, Any]:
+        params: dict[str, Any] = {}
+        if include_image_language:
+            params["include_image_language"] = include_image_language
+        return self._get(f"/movie/{movie_id}/images", params=params or None)
 
     def get_movie_watch_providers(self, movie_id: int) -> dict[str, Any]:
         return self._get(f"/movie/{movie_id}/watch/providers")
