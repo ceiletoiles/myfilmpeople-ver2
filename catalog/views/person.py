@@ -13,8 +13,8 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.core.cache import cache
 
-from ..movie_accent import DEFAULT_MOVIE_ACCENT_COLOR, fallback_movie_accent_color
-from ..models import DiaryEntry, Movie, Person, PersonFollow
+from ..movie_accent import fallback_movie_accent_color
+from ..models import DiaryEntry, Person, PersonFollow
 from ..related_links import build_person_related_links
 from ..new_movie_helpers import (
 	build_person_comeback_event_meta,
@@ -700,16 +700,12 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	# diary rows that may only have a matched title.
 	current_movie_ids: set[int] = set()
 	watched_by_movie_id: dict[int, dict[str, object]] = {}
-	accent_color_by_movie_id: dict[int, str] = {}
 	if filmography_items:
 		current_movie_ids = {
 			int(it.get("id"))
 			for it in filmography_items
 			if isinstance(it, dict) and isinstance(it.get("id"), int)
 		}
-		accent_color_by_movie_id = dict(
-			Movie.objects.filter(tmdb_id__in=current_movie_ids).values_list("tmdb_id", "accent_color")
-		)
 		filmography_title_lookup: dict[tuple[str, int | None], int] = {}
 		for it in filmography_items:
 			mid = int(it.get("id") or 0)
@@ -732,6 +728,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				"original_title",
 				"original_release_year",
 				"poster_path",
+				"accent_color",
 				"watched_date",
 				"created_at",
 				"id",
@@ -758,6 +755,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				continue
 			watched_by_movie_id[movie_id] = {
 				"poster_path": entry.poster_path or "",
+				"accent_color": entry.accent_color or "",
 				"watched_date": entry.watched_date,
 			}
 
@@ -769,10 +767,10 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		display_poster_path = watched_poster_path or str(it.get("poster_path") or "").strip()
 		it["display_poster_path"] = display_poster_path
 		it["watched_date"] = (watch_info or {}).get("watched_date")
-		accent_color = str(accent_color_by_movie_id.get(mid) or "").strip()
-		if not accent_color or accent_color == DEFAULT_MOVIE_ACCENT_COLOR:
+		accent_color = str((watch_info or {}).get("accent_color") or "").strip()
+		if not accent_color:
 			accent_color = fallback_movie_accent_color(display_poster_path or str(mid))
-		it["accent_color"] = accent_color or DEFAULT_MOVIE_ACCENT_COLOR
+		it["accent_color"] = accent_color
 
 	shared_followed_people: list[dict[str, object]] = []
 	try:
@@ -1274,6 +1272,82 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		rd = it.get("release_dt")
 		rd = rd if isinstance(rd, date) else None
 		it["countdown_text"] = _countdown_text(today=today, release_dt=rd) if rd is not None else ""
+
+	# Mark watched films using the user's diary after the filmography list has
+	# been finalized. This must run here so the overlay survives the cached
+	# derived payload assignment above.
+	current_movie_ids = {
+		int(it.get("id"))
+		for it in filmography_items
+		if isinstance(it, dict) and isinstance(it.get("id"), int)
+	}
+	watched_by_movie_id = {}
+	if filmography_items:
+		filmography_title_lookup: dict[tuple[str, int | None], int] = {}
+		for it in filmography_items:
+			mid = int(it.get("id") or 0)
+			if mid <= 0:
+				continue
+			title = str(it.get("title") or "").strip()
+			title_key = _normalize_movie_title(title)
+			if not title_key:
+				continue
+			year_raw = str(it.get("year") or "").strip()
+			year = int(year_raw) if year_raw.isdigit() else None
+			filmography_title_lookup.setdefault((title_key, year), mid)
+			filmography_title_lookup.setdefault((title_key, None), mid)
+
+		diary_entries = (
+			DiaryEntry.objects.filter(user=request.user)
+			.only(
+				"tmdb_id",
+				"official_title",
+				"original_title",
+				"original_release_year",
+				"poster_path",
+				"accent_color",
+				"watched_date",
+				"created_at",
+				"id",
+				"release_date",
+			)
+			.order_by("-watched_date", "-created_at", "-id")
+		)
+		for entry in diary_entries:
+			movie_id = int(entry.tmdb_id or 0)
+			if movie_id not in current_movie_ids:
+				title = (entry.official_title or entry.original_title or "").strip()
+				if title:
+					title_key = _normalize_movie_title(title)
+					if title_key:
+						year = None
+						if entry.release_date is not None:
+							year = entry.release_date.year
+						elif entry.original_release_year is not None:
+							year = int(entry.original_release_year)
+						movie_id = filmography_title_lookup.get((title_key, year), 0)
+						if movie_id <= 0:
+							movie_id = filmography_title_lookup.get((title_key, None), 0)
+			if movie_id <= 0 or movie_id in watched_by_movie_id:
+				continue
+			watched_by_movie_id[movie_id] = {
+				"poster_path": entry.poster_path or "",
+				"accent_color": entry.accent_color or "",
+				"watched_date": entry.watched_date,
+			}
+
+	for it in filmography_items:
+		mid = int(it.get("id") or 0)
+		watch_info = watched_by_movie_id.get(mid)
+		it["is_watched"] = watch_info is not None
+		watched_poster_path = str((watch_info or {}).get("poster_path") or "").strip()
+		display_poster_path = watched_poster_path or str(it.get("poster_path") or "").strip()
+		it["display_poster_path"] = display_poster_path
+		it["watched_date"] = (watch_info or {}).get("watched_date")
+		accent_color = str((watch_info or {}).get("accent_color") or "").strip()
+		if not accent_color:
+			accent_color = fallback_movie_accent_color(display_poster_path or str(mid))
+		it["accent_color"] = accent_color
 
 	def _follow_role_default_filter() -> str:
 		if not follow_roles:

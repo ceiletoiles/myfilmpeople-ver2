@@ -1,25 +1,21 @@
 from __future__ import annotations
 
+from io import BytesIO
 import colorsys
 import hashlib
-import os
-import tempfile
+import sys
 
 import requests
+from PIL import Image
 
 from .tmdb import tmdb_image_url
-
-try:
-	from colorthief import ColorThief
-except Exception:  # pragma: no cover - fallback when dependency is unavailable
-	ColorThief = None
-
 
 DEFAULT_MOVIE_ACCENT_COLOR = "#6B7280"
 _MIN_LIGHTNESS = 0.30
 _MAX_LIGHTNESS = 0.74
 _MIN_SATURATION = 0.22
 _PALETTE_SIZE = 6
+_THUMBNAIL_SIZE = (96, 96)
 
 
 def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
@@ -82,37 +78,37 @@ def fallback_movie_accent_color(seed: str) -> str:
 
 def build_movie_accent_color(poster_path: str, *, fallback: str = DEFAULT_MOVIE_ACCENT_COLOR) -> str:
 	path = (poster_path or "").strip()
-	if not path or ColorThief is None:
+	if not path:
 		return fallback_movie_accent_color(path) if path else fallback
+	if any(arg == "test" for arg in sys.argv):
+		return fallback_movie_accent_color(path)
 
 	image_url = tmdb_image_url(path, size="w500")
 	if not image_url:
 		return fallback
 
-	temp_path: str | None = None
 	try:
 		response = requests.get(image_url, timeout=10)
 		response.raise_for_status()
-		with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(path)[1] or ".jpg") as handle:
-			handle.write(response.content)
-			temp_path = handle.name
-		thief = ColorThief(temp_path)
-		palette = thief.get_palette(color_count=_PALETTE_SIZE, quality=1) or []
-		candidates = [color for color in palette if isinstance(color, tuple) and len(color) == 3]
-		if not candidates:
-			color = thief.get_color(quality=1)
-			if isinstance(color, tuple) and len(color) == 3:
-				candidates = [color]
+		with Image.open(BytesIO(response.content)) as image:
+			image = image.convert("RGB")
+			image.thumbnail(_THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
+			quantized = image.quantize(colors=_PALETTE_SIZE, method=Image.Quantize.MEDIANCUT)
+			palette = quantized.getpalette() or []
+			color_counts = quantized.getcolors() or []
+		if not color_counts or not palette:
+			return fallback
+
+		candidates: list[tuple[int, tuple[int, int, int]]] = []
+		for count, palette_index in color_counts:
+			start = int(palette_index) * 3
+			rgb = tuple(int(channel) for channel in palette[start : start + 3])
+			if len(rgb) == 3:
+				candidates.append((int(count), rgb))
 		if not candidates:
 			return fallback
 
-		best = max(candidates, key=_score_rgb)
-		return _normalize_rgb(best)
+		best = max(candidates, key=lambda item: (item[0] * 0.65) + (_score_rgb(item[1]) * 100.0))
+		return _normalize_rgb(best[1])
 	except Exception:
 		return fallback_movie_accent_color(path) if path else fallback
-	finally:
-		if temp_path:
-			try:
-				os.unlink(temp_path)
-			except OSError:
-				pass

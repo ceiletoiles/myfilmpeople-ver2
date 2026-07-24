@@ -47,7 +47,6 @@ class Movie(models.Model):
 	title = models.CharField(max_length=255, db_index=True)
 	release_date = models.DateField(null=True, blank=True, db_index=True)
 	poster_path = models.CharField(max_length=255, blank=True)
-	accent_color = models.CharField(max_length=7, default=DEFAULT_MOVIE_ACCENT_COLOR)
 	backdrop_path = models.CharField(max_length=255, blank=True)
 	last_accessed_at = models.DateTimeField(default=timezone.now, db_index=True)
 
@@ -60,39 +59,6 @@ class Movie(models.Model):
 
 	def __str__(self) -> str:
 		return f"{self.title} ({self.tmdb_id})"
-
-	def save(self, *args, **kwargs):  # noqa: D401
-		poster_path = str(self.poster_path or "").strip()
-		current_accent = str(self.accent_color or "").strip()
-		update_fields = kwargs.get("update_fields")
-		update_fields_set = set(update_fields) if update_fields is not None else None
-		should_refresh_accent = bool(poster_path) and (
-			self.pk is None or not current_accent or current_accent == DEFAULT_MOVIE_ACCENT_COLOR
-		)
-
-		if self.pk is not None and poster_path and not should_refresh_accent and (
-			update_fields_set is None or "poster_path" in update_fields_set
-		):
-			original = Movie.objects.filter(pk=self.pk).values("poster_path", "accent_color").first() or {}
-			original_poster = str(original.get("poster_path") or "").strip()
-			original_accent = str(original.get("accent_color") or "").strip()
-			if original_poster != poster_path:
-				should_refresh_accent = True
-			elif not original_accent or original_accent == DEFAULT_MOVIE_ACCENT_COLOR:
-				should_refresh_accent = True
-
-		if should_refresh_accent:
-			self.accent_color = build_movie_accent_color(poster_path, fallback=DEFAULT_MOVIE_ACCENT_COLOR)
-			if update_fields_set is not None:
-				update_fields_set.add("accent_color")
-				kwargs["update_fields"] = list(update_fields_set)
-		elif not current_accent:
-			self.accent_color = DEFAULT_MOVIE_ACCENT_COLOR
-			if update_fields_set is not None:
-				update_fields_set.add("accent_color")
-				kwargs["update_fields"] = list(update_fields_set)
-
-		return super().save(*args, **kwargs)
 
 	class Meta:
 		indexes = [
@@ -148,6 +114,7 @@ class DiaryEntry(models.Model):
 	tmdb_id = models.PositiveIntegerField(null=True, blank=True, db_index=True)
 	official_title = models.CharField(max_length=255, blank=True, default="")
 	poster_path = models.CharField(max_length=255, blank=True, default="")
+	accent_color = models.CharField(max_length=7, blank=True, null=True)
 	release_date = models.DateField(null=True, blank=True)
 	match_source = models.CharField(max_length=20, choices=MatchSource.choices, default=MatchSource.AUTO)
 	manual_lock = models.BooleanField(default=False)
@@ -173,6 +140,38 @@ class DiaryEntry(models.Model):
 	def __str__(self) -> str:
 		year = f" ({self.original_release_year})" if self.original_release_year else ""
 		return f"{self.original_title}{year} - {self.watched_date.isoformat()}"
+
+	def save(self, *args, **kwargs):
+		poster_path = str(self.poster_path or "").strip()
+		current_accent = str(self.accent_color or "").strip()
+		update_fields = kwargs.get("update_fields")
+		update_fields_set = set(update_fields) if update_fields is not None else None
+
+		should_refresh_accent = bool(poster_path) and (
+			self.pk is None or not current_accent or current_accent == DEFAULT_MOVIE_ACCENT_COLOR
+		)
+
+		if self.pk is not None and poster_path and not should_refresh_accent and (
+			update_fields_set is None or "poster_path" in update_fields_set
+		):
+			original = DiaryEntry.objects.filter(pk=self.pk).values("poster_path", "accent_color").first() or {}
+			original_poster = str(original.get("poster_path") or "").strip()
+			original_accent = str(original.get("accent_color") or "").strip()
+			if original_poster != poster_path or not original_accent or original_accent == DEFAULT_MOVIE_ACCENT_COLOR:
+				should_refresh_accent = True
+
+		if should_refresh_accent:
+			self.accent_color = build_movie_accent_color(poster_path, fallback=DEFAULT_MOVIE_ACCENT_COLOR)
+			if update_fields_set is not None:
+				update_fields_set.add("accent_color")
+				kwargs["update_fields"] = list(update_fields_set)
+		elif not poster_path and self.accent_color is not None:
+			self.accent_color = None
+			if update_fields_set is not None:
+				update_fields_set.add("accent_color")
+				kwargs["update_fields"] = list(update_fields_set)
+
+		return super().save(*args, **kwargs)
 
 	@property
 	def has_tmdb_match(self) -> bool:

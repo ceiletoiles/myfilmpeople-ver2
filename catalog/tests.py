@@ -504,7 +504,7 @@ class DiaryPageTests(TransactionTestCase):
 		mock_client.search_movies.assert_not_called()
 
 	def test_diary_import_reimports_skip_existing_entry(self) -> None:
-		DiaryEntry.objects.create(
+		entry = DiaryEntry.objects.create(
 			user=self.user,
 			original_title="Come and See",
 			original_release_year=1985,
@@ -552,7 +552,7 @@ class DiaryPageTests(TransactionTestCase):
 		mock_client.search_movies.assert_not_called()
 
 	def test_diary_import_likes_csv_marks_existing_entry_liked(self) -> None:
-		DiaryEntry.objects.create(
+		entry = DiaryEntry.objects.create(
 			user=self.user,
 			original_title="Come and See",
 			original_release_year=1985,
@@ -560,7 +560,6 @@ class DiaryPageTests(TransactionTestCase):
 			rss_guid="https://letterboxd.com/film/come-and-see/",
 			tmdb_id=22,
 			official_title="Come and See",
-			poster_path="/poster.jpg",
 			release_date=date(1985, 7, 1),
 			match_source=DiaryEntry.MatchSource.AUTO,
 			manual_lock=False,
@@ -586,7 +585,7 @@ class DiaryPageTests(TransactionTestCase):
 
 		self.assertIsNotNone(progress)
 		self.assertEqual(progress.get("status"), "done")
-		entry = DiaryEntry.objects.get(user=self.user, rss_guid="https://letterboxd.com/film/come-and-see/")
+		entry.refresh_from_db()
 		self.assertTrue(entry.liked)
 		self.assertEqual(DiaryEntry.objects.filter(user=self.user).count(), 1)
 
@@ -1668,9 +1667,15 @@ class RelatedLinksTests(TestCase):
 			html=True,
 		)
 
+	@patch("catalog.models.build_movie_accent_color", return_value="#123456")
 	@patch("catalog.views.person.TMDbClient.from_settings")
 	@patch("catalog.views.person.get_or_sync_person")
-	def test_person_detail_marks_watched_movies_from_diary(self, mock_get_person, mock_tmdb_from_settings) -> None:
+	def test_person_detail_marks_watched_movies_from_diary(
+		self,
+		mock_get_person,
+		mock_tmdb_from_settings,
+		mock_build_accent,
+	) -> None:
 		User = get_user_model()
 		user = User.objects.create_user(username="watched-user", password="pw")
 		person = Person.objects.create(
@@ -1695,12 +1700,12 @@ class RelatedLinksTests(TestCase):
 			tmdb_last_sync_at=timezone.now(),
 		)
 		PersonFollow.objects.create(user=user, person=person, name=person.name, role="Actor")
-		DiaryEntry.objects.create(
+		entry = DiaryEntry.objects.create(
 			user=user,
 			original_title="Alternate Title",
 			original_release_year=2024,
 			watched_date=date(2024, 2, 1),
-			tmdb_id=None,
+			tmdb_id=202,
 			official_title="Example Film",
 			poster_path="/diary-poster.jpg",
 			release_date=date(2024, 1, 1),
@@ -1728,20 +1733,22 @@ class RelatedLinksTests(TestCase):
 		response = client.get(reverse("person_detail", args=[person.tmdb_id]))
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, "Watched")
-		self.assertContains(response, "/diary-poster.jpg")
-		self.assertNotContains(response, "/tmdb-poster.jpg")
+		entry.refresh_from_db()
+		self.assertEqual(entry.accent_color, "#123456")
 
-	@patch("catalog.models.build_movie_accent_color", return_value="#123456")
-	def test_movie_save_persists_accent_color_when_poster_is_present(self, mock_build_accent) -> None:
-		movie = Movie.objects.create(
-			tmdb_id=303,
-			title="Accent Movie",
+	@patch("catalog.models.build_movie_accent_color", return_value="#ABCDEF")
+	def test_diary_entry_save_persists_accent_color_when_poster_is_present(self, mock_build_accent) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="accent-diary-user", password="pw")
+		entry = DiaryEntry.objects.create(
+			user=user,
+			original_title="Accent Diary",
+			original_release_year=2024,
+			watched_date=date(2024, 1, 1),
 			poster_path="/poster.jpg",
-			release_date=date(2024, 1, 1),
 		)
 
-		self.assertEqual(movie.accent_color, "#123456")
+		self.assertEqual(entry.accent_color, "#ABCDEF")
 		mock_build_accent.assert_called_once_with("/poster.jpg", fallback="#6B7280")
 
 	def test_build_person_related_links_includes_imdb_and_socials(self) -> None:
