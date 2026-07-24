@@ -6,7 +6,6 @@ import io
 import os
 import shutil
 import tempfile
-import threading
 import zipfile
 from decimal import Decimal, InvalidOperation
 from datetime import date, datetime, timedelta
@@ -31,6 +30,7 @@ from ..forms import DiaryAccountForm, DiaryImportForm
 from ..models import DiaryAccount, DiaryEntry
 from ..services import get_or_sync_movie
 from ..tmdb import TMDbClient, tmdb_image_url
+from ._shared import run_background_job
 
 
 DIARY_IMPORT_JOB_TTL_SECONDS = 60 * 60
@@ -1163,8 +1163,7 @@ def _diary_sync_start_background(user, *, force: bool = False) -> dict[str, obje
 			"progress_url": _diary_sync_progress_url(job_id),
 		},
 	)
-	thread = threading.Thread(target=_run_diary_sync_job, kwargs={"job_id": job_id, "user_id": user.id}, daemon=True)
-	thread.start()
+	run_background_job(_run_diary_sync_job, job_id=job_id, user_id=user.id)
 	return _diary_sync_get(job_id)
 
 
@@ -1362,12 +1361,13 @@ def diary_import_start(request: HttpRequest) -> HttpResponse:
 		},
 	)
 
-	thread = threading.Thread(
-		target=_run_diary_import_job,
-		kwargs={"job_id": job_id, "user_id": request.user.id, "temp_path": temp_path, "source_name": file_name},
-		daemon=True,
+	run_background_job(
+		_run_diary_import_job,
+		job_id=job_id,
+		user_id=request.user.id,
+		temp_path=temp_path,
+		source_name=file_name,
 	)
-	thread.start()
 
 	return JsonResponse(
 		{

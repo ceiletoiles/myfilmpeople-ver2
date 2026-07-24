@@ -10,7 +10,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import RequestFactory
-from django.test import TestCase, TransactionTestCase, override_settings
+from django.test import TestCase, override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from django.utils import timezone
@@ -241,7 +241,7 @@ class ConnectPageTests(TestCase):
 		self.assertContains(response, reverse("connect"))
 
 
-class DiaryPageTests(TransactionTestCase):
+class DiaryPageTests(TestCase):
 	def setUp(self) -> None:
 		self.User = get_user_model()
 		self.user = self.User.objects.create_user(username="diary-user", password="testpass123")
@@ -2233,6 +2233,38 @@ class RelatedLinksTests(TestCase):
 		response = self.client.get(reverse("movie_detail", args=[1]))
 
 		self.assertEqual(response.status_code, 200)
+		mock_purge_stale_movies.assert_called_once_with()
+
+	@patch("catalog.views.movie.purge_stale_movies")
+	@patch("catalog.views.movie.TMDbClient.from_settings")
+	@patch("catalog.views.movie.get_or_sync_movie")
+	def test_movie_detail_prefers_diary_poster_for_watched_movie(self, mock_get_or_sync_movie, mock_from_settings, mock_purge_stale_movies) -> None:
+		user = get_user_model().objects.create_user(username="movie-poster-user", password="pw")
+		self.client.force_login(user)
+
+		movie = Movie.objects.create(tmdb_id=2, title="Watched Movie", poster_path="/tmdb-poster.jpg")
+		DiaryEntry.objects.create(
+			user=user,
+			original_title="Watched Movie",
+			original_release_year=2026,
+			watched_date=date(2026, 7, 1),
+			tmdb_id=2,
+			official_title="Watched Movie",
+			poster_path="/diary-poster.jpg",
+		)
+		mock_get_or_sync_movie.return_value = movie
+		mock_from_settings.return_value.get_configuration_countries.return_value = []
+		mock_from_settings.return_value.get_movie_alternative_titles.return_value = {}
+		mock_from_settings.return_value.get_movie_videos.return_value = {}
+		mock_from_settings.return_value.get_movie_credits.return_value = {"cast": [], "crew": []}
+		mock_from_settings.return_value.get_movie.return_value = {"id": 2, "title": "Watched Movie", "release_date": "2026-01-01"}
+
+		response = self.client.get(reverse("movie_detail", args=[2]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "/diary-poster.jpg")
+		self.assertContains(response, "Watched on: Jul 1, 2026")
+		self.assertNotContains(response, "/tmdb-poster.jpg")
 		mock_purge_stale_movies.assert_called_once_with()
 
 	def test_compact_company_filmography_command_compacts_existing_rows(self) -> None:

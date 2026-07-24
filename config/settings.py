@@ -35,6 +35,7 @@ SECRET_KEY = os.getenv(
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "0") == "1"
+TESTING = any(arg == "test" for arg in sys.argv)
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "").split(",") if h.strip()]
 
@@ -102,7 +103,16 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 # Hosted PostgreSQL deployments can be configured through DATABASE_URL.
 
-if os.getenv("DATABASE_URL"):
+if TESTING:
+    # Keep the test suite fast and isolated. The app code does not depend on
+    # MySQL-specific behavior, so SQLite is sufficient for test runs.
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": ":memory:",
+        }
+    }
+elif os.getenv("DATABASE_URL"):
     # Production / hosted PostgreSQL: use DATABASE_URL.
     DATABASES = {
         "default": dj_database_url.config(
@@ -173,7 +183,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # WhiteNoise configuration for production static file serving.
 # During tests, use non-manifest storage so template rendering does not depend
 # on collectstatic having been run.
-if any(arg == "test" for arg in sys.argv):
+if TESTING:
     STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 else:
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
@@ -188,7 +198,7 @@ LOGOUT_REDIRECT_URL = "home"
 # Email delivery for signup OTPs.
 # Brevo works through Django's standard SMTP backend. In development we fall
 # back to console output unless explicit email credentials are configured.
-if any(arg == "test" for arg in sys.argv):
+if TESTING:
     EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 elif os.getenv("EMAIL_HOST") or os.getenv("BREVO_SMTP_HOST"):
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"

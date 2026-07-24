@@ -163,6 +163,12 @@ main {
   gap: 0.3rem;
 }
 
+.movie-watched-date {
+  margin: 0.1rem 0 0;
+  font-size: 14px;
+  color: #334155;
+}
+
 .movie-trailer-embed {
   width: 100%;
   max-width: 560px;

@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from ..services import get_or_sync_movie, purge_stale_movies
 from ..rate_limit import rate_limit
+from ..models import DiaryEntry
 from ..tmdb import TMDbClient, TMDbError
 from ..related_links import build_movie_related_links
 
@@ -389,6 +390,16 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	except Exception:
 		pass
 	client = TMDbClient.from_settings()
+	watched_entry = (
+		DiaryEntry.objects.filter(user=request.user, tmdb_id=tmdb_id)
+		.only("poster_path", "watched_date", "created_at", "id")
+		.first()
+	)
+	movie_display_poster_path = str((watched_entry.poster_path if watched_entry else "") or movie.poster_path or "").strip()
+	movie_watched_date_label = ""
+	if watched_entry and watched_entry.watched_date:
+		watched_date = watched_entry.watched_date
+		movie_watched_date_label = f"Watched on: {watched_date.strftime('%b')} {watched_date.day}, {watched_date.year}"
 
 	cast = []
 	crew_groups = []
@@ -455,6 +466,8 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"movie_budget_text": movie_budget_text,
 			"movie_box_office_text": movie_box_office_text,
 			"related_links": related_links,
+			"movie_display_poster_path": movie_display_poster_path,
+			"movie_watched_date_label": movie_watched_date_label,
 		},
 	)
 

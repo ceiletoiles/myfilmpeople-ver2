@@ -1,9 +1,22 @@
 from __future__ import annotations
 
+import os
 from datetime import date
+import threading
+
+from django.conf import settings
 
 
 SESSION_KEY_HIDE_SELF_APPEARANCES = "catalog_hide_self_appearances"
+
+
+def run_background_job(target, /, **kwargs) -> None:
+	"""Run background work inline during tests to keep DB teardown clean."""
+	if getattr(settings, "TESTING", False) or os.environ.get("PYTEST_CURRENT_TEST"):
+		target(**kwargs)
+		return
+	thread = threading.Thread(target=target, kwargs=kwargs, daemon=True)
+	thread.start()
 
 
 def _get_session_bool(session: object, key: str, default: bool) -> bool:

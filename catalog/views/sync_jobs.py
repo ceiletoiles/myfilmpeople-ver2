@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import threading
 from uuid import UUID, uuid4
 
 from django.conf import settings
@@ -29,6 +28,7 @@ from ..services import (
 	prefetch_company_filmography,
 	prefetch_company_movies,
 )
+from ._shared import run_background_job
 
 SYNC_JOB_TTL_SECONDS = 60 * 60
 
@@ -815,12 +815,7 @@ def person_sync_start(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		},
 	)
 
-	thread = threading.Thread(
-		target=_run_person_sync_job,
-		kwargs={"job_id": job_id, "user_id": request.user.id, "tmdb_id": int(tmdb_id)},
-		daemon=True,
-	)
-	thread.start()
+	run_background_job(_run_person_sync_job, job_id=job_id, user_id=request.user.id, tmdb_id=int(tmdb_id))
 
 	return JsonResponse(
 		{
@@ -889,17 +884,13 @@ def company_sync_start(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		max_pages_int = 0
 	max_company_pages = None if max_pages_int <= 0 else max_pages_int
 
-	thread = threading.Thread(
-		target=_run_company_sync_job,
-		kwargs={
-			"job_id": job_id,
-			"user_id": request.user.id,
-			"tmdb_id": int(tmdb_id),
-			"max_company_pages": max_company_pages,
-		},
-		daemon=True,
+	run_background_job(
+		_run_company_sync_job,
+		job_id=job_id,
+		user_id=request.user.id,
+		tmdb_id=int(tmdb_id),
+		max_company_pages=max_company_pages,
 	)
-	thread.start()
 
 	return JsonResponse(
 		{
@@ -1047,19 +1038,15 @@ def sync_all_followed_start(request: HttpRequest) -> HttpResponse:
 		max_pages_int = 0
 	max_company_pages = None if max_pages_int <= 0 else max_pages_int
 
-	thread = threading.Thread(
-		target=_run_sync_all_followed_job,
-		kwargs={
-			"job_id": job_id,
-			"user_id": request.user.id,
-			"person_ids": person_ids,
-			"company_ids": company_ids,
-			"max_company_pages": max_company_pages,
-			"sync_scope": sync_scope,
-		},
-		daemon=True,
+	run_background_job(
+		_run_sync_all_followed_job,
+		job_id=job_id,
+		user_id=request.user.id,
+		person_ids=person_ids,
+		company_ids=company_ids,
+		max_company_pages=max_company_pages,
+		sync_scope=sync_scope,
 	)
-	thread.start()
 
 	return JsonResponse(
 		{

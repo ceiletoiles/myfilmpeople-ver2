@@ -23,8 +23,8 @@
     <div class="movie-content">
       <div class="movie-info fade-in">
         <div class="movie-poster-container">
-          {% if movie.poster_path %}
-            <img class="movie-poster-image" src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" alt="" />
+          {% if movie_display_poster_path %}
+            <img class="movie-poster-image" src="https://image.tmdb.org/t/p/w500{{ movie_display_poster_path }}" alt="" />
           {% else %}
             <img class="movie-poster-image" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
           {% endif %}
@@ -44,6 +44,10 @@
                 Trailer
               </a>
             </div>
+          {% endif %}
+
+          {% if movie_watched_date_label %}
+            <p class="movie-watched-date">{{ movie_watched_date_label }}</p>
           {% endif %}
         </div>
       </div>
