@@ -1243,6 +1243,10 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 def person_profile_images(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	return_to = _person_profile_images_return_to(request, tmdb_id)
 	load_error = ""
+	is_followed = PersonFollow.objects.filter(user=request.user, person__tmdb_id=tmdb_id).exists()
+	if not is_followed:
+		messages.error(request, "Profile pics are available only for followed people.")
+		return redirect(return_to)
 
 	if request.method == "POST":
 		try:

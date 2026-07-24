@@ -19,9 +19,9 @@
         </button>
       </form>
 
-      <a href="{% url 'person_profile_images' person.tmdb_id %}" role="menuitem">Profile pics</a>
-
       {% if follow_roles %}
+        <a href="{% url 'person_profile_images' person.tmdb_id %}" role="menuitem">Profile pics</a>
+
         <form
           method="post"
           action="{% url 'person_sync' person.tmdb_id %}"

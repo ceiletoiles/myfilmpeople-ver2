@@ -165,6 +165,18 @@ def _parse_diary_row(row: dict[str, str]) -> dict[str, object] | None:
 	}
 
 
+def _parse_diary_like_row(row: dict[str, str]) -> dict[str, object] | None:
+	title = _first_nonempty(row, {"name", "title", "film", "movie"})
+	if not title:
+		return None
+	return {
+		"original_title": title,
+		"original_release_year": _parse_release_year(_first_nonempty(row, {"year", "release year", "release year (film)", "release"})),
+		"rss_guid": _first_nonempty(row, {"guid", "uri", "url", "letterboxd uri", "letterboxd url"}),
+		"liked": True,
+	}
+
+
 def _normalize_title(value: str) -> str:
 	text = (value or "").casefold()
 	for token in ("the ", "a ", "an "):
@@ -309,35 +321,65 @@ def _poster_url(poster_path: str) -> str:
 	return f"https://image.tmdb.org/t/p/w342{path}"
 
 
-def _load_diary_import_rows(temp_path: str) -> tuple[list[dict[str, object]], str]:
+def _diary_import_source_kind(source_name: str, headers: set[str]) -> str | None:
+	name = os.path.basename(source_name).strip().lower()
+	header_keys = {_normalize_header_key(header) for header in headers}
+	if name == "diary.csv":
+		return "diary"
+	if name == "films.csv" or name.endswith("/films.csv") or name.endswith("\\films.csv"):
+		return "likes"
+	if "likes" in name and name.endswith(".csv"):
+		return "likes"
+	if {"watched date", "rating", "rewatch", "review", "date"} & header_keys:
+		return "diary"
+	if {"liked", "like"} <= header_keys and {"watched date", "rating", "review"} & header_keys:
+		return "diary"
+	if {"liked", "like"} & header_keys and not {"watched date", "rating", "review"} & header_keys:
+		return "likes"
+	return None
+
+
+def _load_diary_import_sources(temp_path: str) -> tuple[list[tuple[str, str, list[dict[str, object]]]], str]:
 	if not os.path.exists(temp_path):
 		raise FileNotFoundError("Upload file no longer exists.")
 
 	source_name = os.path.basename(temp_path)
-	rows: list[dict[str, object]] = []
+	sources: list[tuple[str, str, list[dict[str, object]]]] = []
 	if temp_path.lower().endswith(".zip"):
 		with zipfile.ZipFile(temp_path) as archive:
-			csv_name = ""
 			for candidate in archive.namelist():
-				if candidate.lower().endswith(".csv"):
-					csv_name = candidate
-					if os.path.basename(candidate).lower() == "diary.csv":
-						break
-			if not csv_name:
+				archive_path = candidate.replace("\\", "/").strip()
+				archive_path = archive_path.lstrip("./")
+				archive_path_lower = archive_path.lower()
+				if archive_path_lower not in {"diary.csv", "likes/films.csv"}:
+					continue
+				with archive.open(candidate) as raw:
+					text = raw.read().decode("utf-8-sig", errors="replace")
+					reader = csv.DictReader(io.StringIO(text))
+					rows: list[dict[str, object]] = []
+					for row in reader:
+						rows.append({str(k or ""): str(v or "") for k, v in row.items()})
+					kind = _diary_import_source_kind(archive_path, set(reader.fieldnames or []))
+					if rows and kind in {"diary", "likes"}:
+						sources.append((archive_path, kind, rows))
+			if not sources:
 				raise ValueError("ZIP file does not contain a CSV export.")
-			source_name = os.path.basename(csv_name)
-			with archive.open(csv_name) as raw:
-				text = raw.read().decode("utf-8-sig", errors="replace")
-				reader = csv.DictReader(io.StringIO(text))
-				for row in reader:
-					rows.append({str(k or ""): str(v or "") for k, v in row.items()})
 	else:
 		with open(temp_path, "r", encoding="utf-8-sig", newline="") as handle:
 			reader = csv.DictReader(handle)
+			rows: list[dict[str, object]] = []
 			for row in reader:
 				rows.append({str(k or ""): str(v or "") for k, v in row.items()})
+			kind = _diary_import_source_kind(source_name, set(reader.fieldnames or []))
+			if rows and kind in {"diary", "likes"}:
+				sources.append((source_name, kind, rows))
 
-	return rows, source_name
+	if not sources:
+		if temp_path.lower().endswith(".zip"):
+			raise ValueError("ZIP file does not contain diary.csv or likes/films.csv.")
+		raise ValueError("CSV file is not a diary.csv or likes/films.csv export.")
+
+	return sources, source_name
 
 
 def _diary_import_job_key(job_id: UUID) -> str:
@@ -387,6 +429,20 @@ def _diary_entry_lookup(user, row: dict[str, object]) -> dict[str, object]:
 	}
 
 
+def _diary_row_match_tokens(row: dict[str, object]) -> set[str]:
+	tokens: set[str] = set()
+	rss_guid = _diary_source_rss_guid(row.get("rss_guid") or "")
+	if rss_guid:
+		tokens.add(f"guid:{rss_guid.casefold()}")
+	title = _normalize_title(str(row.get("original_title") or ""))
+	if title:
+		tokens.add(f"title:{title}")
+		release_year = row.get("original_release_year")
+		if release_year is not None:
+			tokens.add(f"title-year:{title}:{int(release_year)}")
+	return tokens
+
+
 def _find_diary_entry_for_row(user, row: dict[str, object]) -> DiaryEntry | None:
 	rss_guid = str(row.get("rss_guid") or "").strip()
 	if rss_guid:
@@ -413,6 +469,37 @@ def _find_diary_entry_for_row(user, row: dict[str, object]) -> DiaryEntry | None
 			return candidate
 
 	return None
+
+
+def _find_diary_entries_for_like_row(user, row: dict[str, object]) -> list[DiaryEntry]:
+	rss_guid = _diary_source_rss_guid(row.get("rss_guid") or "")
+	if rss_guid:
+		entry = DiaryEntry.objects.filter(user=user, rss_guid=rss_guid).first()
+		if entry is not None:
+			return [entry]
+
+	title_key = _normalize_title(str(row.get("original_title") or ""))
+	if not title_key:
+		return []
+
+	queryset = DiaryEntry.objects.filter(user=user)
+	release_year = row.get("original_release_year")
+	if release_year is not None:
+		queryset = queryset.filter(original_release_year=release_year)
+
+	matches: list[DiaryEntry] = []
+	for candidate in queryset:
+		if _normalize_title(candidate.original_title) == title_key:
+			matches.append(candidate)
+	return matches
+
+
+def _mark_entry_liked(entry: DiaryEntry) -> bool:
+	if entry.manual_lock or entry.liked:
+		return False
+	entry.liked = True
+	entry.save(update_fields=["liked", "updated_at"])
+	return True
 
 
 def _find_diary_entry_for_user(user, entry_id: int) -> DiaryEntry | None:
@@ -571,7 +658,7 @@ def _run_diary_import_job(*, job_id: UUID, user_id: int, temp_path: str, source_
 		user = User.objects.get(pk=user_id)
 
 		try:
-			rows, detected_source = _load_diary_import_rows(temp_path)
+			source_rows, detected_source = _load_diary_import_sources(temp_path)
 		except Exception as exc:
 			_diary_import_patch(
 				job_id,
@@ -582,13 +669,31 @@ def _run_diary_import_job(*, job_id: UUID, user_id: int, temp_path: str, source_
 			)
 			return
 
-		total_rows = len(rows)
+		import_source_names = [name for name, _kind, rows in source_rows if rows]
+		source_label = detected_source or source_name
+		if import_source_names:
+			source_label = " + ".join(import_source_names)
+
+		diary_rows: list[dict[str, object]] = []
+		like_rows: list[dict[str, object]] = []
+		for _current_source_name, current_kind, current_rows in source_rows:
+			for raw_row in current_rows:
+				if current_kind == "diary":
+					parsed_diary = _parse_diary_row(raw_row)
+					if parsed_diary is not None:
+						diary_rows.append(parsed_diary)
+				elif current_kind == "likes":
+					parsed_like = _parse_diary_like_row(raw_row)
+					if parsed_like is not None:
+						like_rows.append(parsed_like)
+
+		total_rows = len(diary_rows) + len(like_rows)
 		_diary_import_patch(
 			job_id,
 			status="running",
 			started_at=timezone.now().isoformat(),
 			finished_at=None,
-			source_name=detected_source or source_name,
+			source_name=source_label,
 			total_rows=total_rows,
 			processed_rows=0,
 			created_entries=0,
@@ -603,54 +708,48 @@ def _run_diary_import_job(*, job_id: UUID, user_id: int, temp_path: str, source_
 		skipped_rows = 0
 		processed_rows = 0
 		last_guid = ""
-		seen_rss_guids: set[str] = set()
+		liked_tokens: set[str] = set()
+		for liked_row in like_rows:
+			liked_tokens.update(_diary_row_match_tokens(liked_row))
 
-		for idx, raw_row in enumerate(rows, start=1):
-			parsed = _parse_diary_row(raw_row)
-			if parsed is None:
-				skipped_rows += 1
-				processed_rows += 1
-				_diary_import_patch(
-					job_id,
-					processed_rows=processed_rows,
-					skipped_rows=skipped_rows,
-					current_label=f"Skipping row {idx}/{total_rows}...",
-				)
-				continue
-
+		for idx, parsed in enumerate(diary_rows, start=1):
 			title = str(parsed["original_title"])
 			year = parsed["original_release_year"]
 			last_guid = str(parsed["rss_guid"] or last_guid)
 			existing_entry = _find_diary_entry_for_row(user, parsed)
+
+			liked_by_import = bool(parsed["liked"]) or any(token in liked_tokens for token in _diary_row_match_tokens(parsed))
 			if existing_entry is not None:
-				existing_guid = _diary_entry_rss_guid(existing_entry)
-				if existing_guid:
-					seen_rss_guids.add(existing_guid)
-			else:
-				row_guid = _diary_source_rss_guid(parsed.get("rss_guid") or "")
-				if row_guid:
-					seen_rss_guids.add(row_guid)
-			if existing_entry is not None:
-				skipped_rows += 1
+				if not existing_entry.manual_lock and liked_by_import and not existing_entry.liked:
+					existing_entry.liked = True
+					existing_entry.save(update_fields=["liked", "updated_at"])
+					updated_entries += 1
+				else:
+					skipped_rows += 1
 				processed_rows += 1
 				_diary_import_patch(
 					job_id,
 					processed_rows=processed_rows,
+					created_entries=created_entries,
+					updated_entries=updated_entries,
 					skipped_rows=skipped_rows,
-					current_label=f"Skipping already imported row {idx}/{total_rows}...",
+					current_label=f"Skipping diary row {idx}/{len(diary_rows)}...",
 					current_title=title + (f" ({year})" if year else ""),
+					newest_processed_guid=last_guid,
 				)
 				continue
 
 			match_data, match_candidates = _match_tmdb_movie(title=title, release_year=year)
 			_diary_import_patch(
 				job_id,
-				current_label=f"Importing {idx}/{total_rows}...",
+				current_label=f"Importing diary row {idx}/{len(diary_rows)}...",
 				current_title=title + (f" ({year})" if year else ""),
 			)
+			row_to_import = dict(parsed)
+			row_to_import["liked"] = liked_by_import
 			status, _entry = _upsert_diary_entry(
 				user,
-				parsed,
+				row_to_import,
 				match_data=match_data,
 				match_candidates=match_candidates,
 			)
@@ -671,8 +770,37 @@ def _run_diary_import_job(*, job_id: UUID, user_id: int, temp_path: str, source_
 				newest_processed_guid=last_guid,
 			)
 
+		if like_rows:
+			_diary_import_patch(
+				job_id,
+				current_label=f"Applying liked films 0/{len(like_rows)}...",
+				current_title="",
+			)
+
+		for idx, liked_row in enumerate(like_rows, start=1):
+			title = str(liked_row["original_title"])
+			year = liked_row["original_release_year"]
+			matches = _find_diary_entries_for_like_row(user, liked_row)
+			if matches:
+				for entry in matches:
+					if _mark_entry_liked(entry):
+						updated_entries += 1
+			else:
+				skipped_rows += 1
+
+			processed_rows += 1
+			_diary_import_patch(
+				job_id,
+				processed_rows=processed_rows,
+				created_entries=created_entries,
+				updated_entries=updated_entries,
+				skipped_rows=skipped_rows,
+				current_label=f"Applying liked films {idx}/{len(like_rows)}...",
+				current_title=title + (f" ({year})" if year else ""),
+				newest_processed_guid=last_guid,
+			)
+
 		account = _get_diary_account(user)
-		deleted_entries = _delete_stale_diary_entries(user=user, seen_rss_guids=seen_rss_guids)
 		if last_guid:
 			account.newest_processed_guid = last_guid
 			account.save(update_fields=["newest_processed_guid", "updated_at"])
@@ -683,7 +811,7 @@ def _run_diary_import_job(*, job_id: UUID, user_id: int, temp_path: str, source_
 			status="done",
 			finished_at=finished_at,
 			current_label="Complete",
-			message=f"Imported {created_entries + updated_entries} entries, removed {deleted_entries}.",
+			message=f"Imported {created_entries + updated_entries} entries.",
 		)
 	finally:
 		try:
@@ -1200,23 +1328,6 @@ def diary_import_start(request: HttpRequest) -> HttpResponse:
 	suffix = os.path.splitext(file_name)[1].lower()
 	if suffix not in {".csv", ".zip"}:
 		return JsonResponse({"ok": False, "error": "Upload a CSV or ZIP file."}, status=400)
-
-	active = cache.get(_diary_import_active_key(request.user.id))
-	try:
-		active_uuid = UUID(str(active)) if active else None
-	except Exception:
-		active_uuid = None
-	if active_uuid is not None:
-		existing = _diary_import_get(active_uuid)
-		if existing and existing.get("user_id") == request.user.id and existing.get("status") == "running":
-			return JsonResponse(
-				{
-					"ok": True,
-					"status": "running",
-					"job_id": str(active_uuid),
-					"progress_url": _diary_import_progress_url(active_uuid),
-				}
-			)
 
 	job_id = uuid4()
 	cache.set(_diary_import_active_key(request.user.id), str(job_id), timeout=DIARY_IMPORT_JOB_TTL_SECONDS)

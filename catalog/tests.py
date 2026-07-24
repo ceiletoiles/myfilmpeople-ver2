@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import io
+import time
+import zipfile
 from datetime import date
 from decimal import Decimal
-import time
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -549,7 +551,129 @@ class DiaryPageTests(TransactionTestCase):
 		self.assertFalse(entry.manual_lock)
 		mock_client.search_movies.assert_not_called()
 
-	def test_diary_import_deletes_missing_entries_from_letterboxd_export(self) -> None:
+	def test_diary_import_likes_csv_marks_existing_entry_liked(self) -> None:
+		DiaryEntry.objects.create(
+			user=self.user,
+			original_title="Come and See",
+			original_release_year=1985,
+			watched_date=date(2026, 7, 11),
+			rss_guid="https://letterboxd.com/film/come-and-see/",
+			tmdb_id=22,
+			official_title="Come and See",
+			poster_path="/poster.jpg",
+			release_date=date(1985, 7, 1),
+			match_source=DiaryEntry.MatchSource.AUTO,
+			manual_lock=False,
+			liked=False,
+		)
+
+		csv_content = (
+			"Name,Year,URI\n"
+			"Come and See,1985,https://letterboxd.com/film/come-and-see/\n"
+		)
+		upload = SimpleUploadedFile("films.csv", csv_content.encode("utf-8"), content_type="text/csv")
+
+		response = self.client.post(reverse("diary_import_start"), {"import_file": upload})
+		self.assertEqual(response.status_code, 200)
+		progress_url = response.json()["progress_url"]
+
+		progress = None
+		for _ in range(30):
+			progress = self.client.get(progress_url).json()
+			if progress.get("status") != "running":
+				break
+			time.sleep(0.1)
+
+		self.assertIsNotNone(progress)
+		self.assertEqual(progress.get("status"), "done")
+		entry = DiaryEntry.objects.get(user=self.user, rss_guid="https://letterboxd.com/film/come-and-see/")
+		self.assertTrue(entry.liked)
+		self.assertEqual(DiaryEntry.objects.filter(user=self.user).count(), 1)
+
+	def test_diary_import_films_csv_does_not_create_new_diary_entries(self) -> None:
+		csv_content = (
+			"Name,Year,URI\n"
+			"Come and See,1985,https://letterboxd.com/film/come-and-see/\n"
+		)
+		upload = SimpleUploadedFile("films.csv", csv_content.encode("utf-8"), content_type="text/csv")
+
+		response = self.client.post(reverse("diary_import_start"), {"import_file": upload})
+		self.assertEqual(response.status_code, 200)
+		progress_url = response.json()["progress_url"]
+
+		progress = None
+		for _ in range(30):
+			progress = self.client.get(progress_url).json()
+			if progress.get("status") != "running":
+				break
+			time.sleep(0.1)
+
+		self.assertIsNotNone(progress)
+		self.assertEqual(progress.get("status"), "done")
+		self.assertEqual(DiaryEntry.objects.filter(user=self.user).count(), 0)
+
+	def test_diary_import_zip_merges_diary_and_likes_files(self) -> None:
+		zip_buffer = io.BytesIO()
+		with zipfile.ZipFile(zip_buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+			archive.writestr(
+				"diary.csv",
+				(
+					"Name,Year,Watched Date,Date,Rating,Liked,Rewatch,Review,URI\n"
+					"Come and See,1985,2026-07-11,2026-07-12,5,no,no,Great film,https://letterboxd.com/film/come-and-see/\n"
+				),
+			)
+			archive.writestr(
+				"deleted/diary.csv",
+				(
+					"Name,Year,Watched Date,Date,Rating,Liked,Rewatch,Review,URI\n"
+					"Bad Import,2000,2026-07-10,2026-07-10,1,no,no,Ignore me,https://example.com/\n"
+				),
+			)
+			archive.writestr(
+				"likes/films.csv",
+				(
+					"Name,Year,URI\n"
+					"Come and See,1985,https://letterboxd.com/film/come-and-see/\n"
+				),
+			)
+			archive.writestr(
+				"watchlist.csv",
+				(
+					"Name,Year,Date\n"
+					"Unrelated Film,2020,2026-07-11\n"
+				),
+			)
+		zip_buffer.seek(0)
+		upload = SimpleUploadedFile("letterboxd-export.zip", zip_buffer.read(), content_type="application/zip")
+
+		with patch("catalog.views.diary.TMDbClient.from_settings") as mock_tmdb:
+			mock_client = Mock()
+			mock_client.search_movies.return_value = {
+				"results": [
+					{"id": 1, "title": "Come and See", "release_date": "1985-07-01", "poster_path": "/poster.jpg"},
+				]
+			}
+			mock_tmdb.return_value = mock_client
+			response = self.client.post(reverse("diary_import_start"), {"import_file": upload})
+			self.assertEqual(response.status_code, 200)
+			progress_url = response.json()["progress_url"]
+
+			progress = None
+			for _ in range(30):
+				progress = self.client.get(progress_url).json()
+				if progress.get("status") != "running":
+					break
+				time.sleep(0.1)
+
+		self.assertIsNotNone(progress)
+		self.assertEqual(progress.get("status"), "done")
+		entry = DiaryEntry.objects.get(user=self.user)
+		self.assertEqual(entry.original_title, "Come and See")
+		self.assertTrue(entry.liked)
+		self.assertEqual(entry.tmdb_id, 1)
+		self.assertEqual(DiaryEntry.objects.filter(user=self.user).count(), 1)
+
+	def test_diary_import_keeps_missing_entries_from_letterboxd_export(self) -> None:
 		DiaryEntry.objects.create(
 			user=self.user,
 			original_title="Come and See",
@@ -603,8 +727,8 @@ class DiaryPageTests(TransactionTestCase):
 
 		self.assertIsNotNone(progress)
 		self.assertEqual(progress.get("status"), "done")
-		self.assertFalse(DiaryEntry.objects.filter(pk=stale.pk).exists())
-		self.assertEqual(DiaryEntry.objects.filter(user=self.user).count(), 1)
+		self.assertTrue(DiaryEntry.objects.filter(pk=stale.pk).exists())
+		self.assertEqual(DiaryEntry.objects.filter(user=self.user).count(), 2)
 		mock_client.search_movies.assert_not_called()
 
 	def test_diary_import_keeps_manual_match_on_reimport(self) -> None:
