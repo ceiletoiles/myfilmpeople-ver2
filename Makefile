@@ -5,7 +5,7 @@ install:
 	pip install -r requirements.txt
 
 lint:
-	python -m pip install ruff
+	python -m pip install ruff==0.15.13
 	ruff check .
 
 test:
