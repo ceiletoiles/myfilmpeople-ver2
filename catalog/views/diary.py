@@ -339,11 +339,15 @@ def _diary_import_source_kind(source_name: str, headers: set[str]) -> str | None
 	return None
 
 
-def _load_diary_import_sources(temp_path: str) -> tuple[list[tuple[str, str, list[dict[str, object]]]], str]:
+def _load_diary_import_sources(
+	temp_path: str,
+	*,
+	source_name: str | None = None,
+) -> tuple[list[tuple[str, str, list[dict[str, object]]]], str]:
 	if not os.path.exists(temp_path):
 		raise FileNotFoundError("Upload file no longer exists.")
 
-	source_name = os.path.basename(temp_path)
+	source_name = (source_name or os.path.basename(temp_path)).strip() or os.path.basename(temp_path)
 	sources: list[tuple[str, str, list[dict[str, object]]]] = []
 	if temp_path.lower().endswith(".zip"):
 		with zipfile.ZipFile(temp_path) as archive:
@@ -658,7 +662,7 @@ def _run_diary_import_job(*, job_id: UUID, user_id: int, temp_path: str, source_
 		user = User.objects.get(pk=user_id)
 
 		try:
-			source_rows, detected_source = _load_diary_import_sources(temp_path)
+			source_rows, detected_source = _load_diary_import_sources(temp_path, source_name=source_name)
 		except Exception as exc:
 			_diary_import_patch(
 				job_id,

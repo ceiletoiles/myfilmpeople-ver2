@@ -1668,6 +1668,82 @@ class RelatedLinksTests(TestCase):
 			html=True,
 		)
 
+	@patch("catalog.views.person.TMDbClient.from_settings")
+	@patch("catalog.views.person.get_or_sync_person")
+	def test_person_detail_marks_watched_movies_from_diary(self, mock_get_person, mock_tmdb_from_settings) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="watched-user", password="pw")
+		person = Person.objects.create(
+			tmdb_id=101,
+			name="Watched Person",
+			profile_path="/profile.jpg",
+			tmdb_raw={"name": "Watched Person", "external_ids": {}},
+			tmdb_credits_raw={
+				"cast": [
+					{
+						"id": 202,
+						"title": "Example Film",
+						"character": "Lead",
+						"media_type": "movie",
+						"poster_path": "/tmdb-poster.jpg",
+						"release_date": "2024-01-01",
+						"popularity": 1.0,
+					}
+				],
+				"crew": [],
+			},
+			tmdb_last_sync_at=timezone.now(),
+		)
+		PersonFollow.objects.create(user=user, person=person, name=person.name, role="Actor")
+		DiaryEntry.objects.create(
+			user=user,
+			original_title="Alternate Title",
+			original_release_year=2024,
+			watched_date=date(2024, 2, 1),
+			tmdb_id=None,
+			official_title="Example Film",
+			poster_path="/diary-poster.jpg",
+			release_date=date(2024, 1, 1),
+		)
+		mock_get_person.return_value = person
+		mock_client = Mock()
+		mock_client.get_person_credits.return_value = {
+			"cast": [
+				{
+					"id": 202,
+					"title": "Example Film",
+					"character": "Lead",
+					"media_type": "movie",
+					"poster_path": "/tmdb-poster.jpg",
+					"release_date": "2024-01-01",
+					"popularity": 1.0,
+				}
+			],
+			"crew": [],
+		}
+		mock_tmdb_from_settings.return_value = mock_client
+
+		client = self.client
+		client.force_login(user)
+		response = client.get(reverse("person_detail", args=[person.tmdb_id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Watched")
+		self.assertContains(response, "/diary-poster.jpg")
+		self.assertNotContains(response, "/tmdb-poster.jpg")
+
+	@patch("catalog.models.build_movie_accent_color", return_value="#123456")
+	def test_movie_save_persists_accent_color_when_poster_is_present(self, mock_build_accent) -> None:
+		movie = Movie.objects.create(
+			tmdb_id=303,
+			title="Accent Movie",
+			poster_path="/poster.jpg",
+			release_date=date(2024, 1, 1),
+		)
+
+		self.assertEqual(movie.accent_color, "#123456")
+		mock_build_accent.assert_called_once_with("/poster.jpg", fallback="#6B7280")
+
 	def test_build_person_related_links_includes_imdb_and_socials(self) -> None:
 		raw = {
 			"homepage": "https://example.com",

@@ -4,6 +4,8 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+from .movie_accent import DEFAULT_MOVIE_ACCENT_COLOR, build_movie_accent_color
+
 
 class Person(models.Model):
 	tmdb_id = models.PositiveIntegerField(unique=True)
@@ -45,6 +47,7 @@ class Movie(models.Model):
 	title = models.CharField(max_length=255, db_index=True)
 	release_date = models.DateField(null=True, blank=True, db_index=True)
 	poster_path = models.CharField(max_length=255, blank=True)
+	accent_color = models.CharField(max_length=7, default=DEFAULT_MOVIE_ACCENT_COLOR)
 	backdrop_path = models.CharField(max_length=255, blank=True)
 	last_accessed_at = models.DateTimeField(default=timezone.now, db_index=True)
 
@@ -57,6 +60,39 @@ class Movie(models.Model):
 
 	def __str__(self) -> str:
 		return f"{self.title} ({self.tmdb_id})"
+
+	def save(self, *args, **kwargs):  # noqa: D401
+		poster_path = str(self.poster_path or "").strip()
+		current_accent = str(self.accent_color or "").strip()
+		update_fields = kwargs.get("update_fields")
+		update_fields_set = set(update_fields) if update_fields is not None else None
+		should_refresh_accent = bool(poster_path) and (
+			self.pk is None or not current_accent or current_accent == DEFAULT_MOVIE_ACCENT_COLOR
+		)
+
+		if self.pk is not None and poster_path and not should_refresh_accent and (
+			update_fields_set is None or "poster_path" in update_fields_set
+		):
+			original = Movie.objects.filter(pk=self.pk).values("poster_path", "accent_color").first() or {}
+			original_poster = str(original.get("poster_path") or "").strip()
+			original_accent = str(original.get("accent_color") or "").strip()
+			if original_poster != poster_path:
+				should_refresh_accent = True
+			elif not original_accent or original_accent == DEFAULT_MOVIE_ACCENT_COLOR:
+				should_refresh_accent = True
+
+		if should_refresh_accent:
+			self.accent_color = build_movie_accent_color(poster_path, fallback=DEFAULT_MOVIE_ACCENT_COLOR)
+			if update_fields_set is not None:
+				update_fields_set.add("accent_color")
+				kwargs["update_fields"] = list(update_fields_set)
+		elif not current_accent:
+			self.accent_color = DEFAULT_MOVIE_ACCENT_COLOR
+			if update_fields_set is not None:
+				update_fields_set.add("accent_color")
+				kwargs["update_fields"] = list(update_fields_set)
+
+		return super().save(*args, **kwargs)
 
 	class Meta:
 		indexes = [

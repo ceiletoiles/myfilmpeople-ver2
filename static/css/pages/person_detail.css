@@ -871,6 +871,7 @@ main {
 }
 
 .filmography-poster-link {
+  border-radius: 8px;
   display: block;
 }
 
@@ -878,9 +879,43 @@ main {
   width: 170.19px;
   height: 255.28px;
   object-fit: cover;
-  border-radius: 0;
+  border-radius: inherit;
   background: #e2e8f0;
   display: block;
+}
+
+.filmography-watch-strip {
+  display: block;
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--movie-accent, #6b7280);
+  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.16), 0 -2px 7px rgba(0, 0, 0, 0.24);
+  transform: scaleX(0);
+  transform-origin: left center;
+  opacity: 0;
+  transition: transform 200ms ease;
+}
+
+.filmography-watch-strip.is-watched {
+  transform: scaleX(1);
+  opacity: 1;
+}
+
+.filmography-poster-link {
+  overflow: hidden;
+}
+
+.filmography-poster-link,
+.filmography-watch-strip {
+  width: 170.19px;
+}
+
+@media (max-width: 700px) {
+  .filmography-poster-link,
+  .filmography-watch-strip {
+    width: 100%;
+  }
 }
 
 .filmography-meta {
@@ -910,6 +945,12 @@ main {
   overflow: hidden;
   text-overflow: ellipsis;
   min-height: 17.3px;
+}
+
+.filmography-watch-note {
+  font-size: 11.5px;
+  line-height: 1.2;
+  min-height: 0;
 }
 
 .filmography-role {

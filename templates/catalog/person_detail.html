@@ -147,16 +147,26 @@
                 data-depts="{% for k in it.filters %}{{ k }} {% endfor %}"
               >
                 <a class="filmography-poster-link" href="{% url 'movie_detail' it.id %}">
-                  {% if it.poster_path %}
-                    <img class="filmography-poster" src="https://image.tmdb.org/t/p/w342{{ it.poster_path }}" alt="" />
+                  {% if it.display_poster_path %}
+                    <img class="filmography-poster" src="https://image.tmdb.org/t/p/w342{{ it.display_poster_path }}" alt="" />
                   {% else %}
                     <img class="filmography-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
                   {% endif %}
                 </a>
+                <span
+                  class="filmography-watch-strip{% if it.is_watched %} is-watched{% endif %}"
+                  aria-hidden="true"
+                  style="--movie-accent: {{ it.accent_color }};"
+                ></span>
 
                 <div class="filmography-meta">
                   <a class="filmography-title" href="{% url 'movie_detail' it.id %}"><strong>{{ it.title }}</strong></a>
                   <div class="filmography-year muted">{% if it.year %}{{ it.year }}{% else %}TBA{% endif %}</div>
+                  {% if it.is_watched and it.watched_date %}
+                    <div class="filmography-watch-note muted">Watched {{ it.watched_date|date:"M j, Y" }}</div>
+                  {% elif it.is_watched %}
+                    <div class="filmography-watch-note muted">Watched</div>
+                  {% endif %}
                   <div class="muted filmography-role">
                     {% if it.countdown_text %}
                       <div class="film-countdown">{{ it.countdown_text }}</div>
