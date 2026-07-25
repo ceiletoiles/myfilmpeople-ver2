@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import os
+import sys
 from datetime import date
 import threading
 
 from django.conf import settings
+from django.db import close_old_connections
 
 
 SESSION_KEY_HIDE_SELF_APPEARANCES = "catalog_hide_self_appearances"
@@ -12,10 +14,17 @@ SESSION_KEY_HIDE_SELF_APPEARANCES = "catalog_hide_self_appearances"
 
 def run_background_job(target, /, **kwargs) -> None:
 	"""Run background work inline during tests to keep DB teardown clean."""
-	if getattr(settings, "TESTING", False) or os.environ.get("PYTEST_CURRENT_TEST"):
-		target(**kwargs)
+	def _run() -> None:
+		close_old_connections()
+		try:
+			target(**kwargs)
+		finally:
+			close_old_connections()
+
+	if getattr(settings, "TESTING", False) or "test" in sys.argv or os.environ.get("PYTEST_CURRENT_TEST"):
+		_run()
 		return
-	thread = threading.Thread(target=target, kwargs=kwargs, daemon=True)
+	thread = threading.Thread(target=_run, daemon=True)
 	thread.start()
 
 

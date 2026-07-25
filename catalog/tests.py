@@ -1736,6 +1736,78 @@ class RelatedLinksTests(TestCase):
 		entry.refresh_from_db()
 		self.assertEqual(entry.accent_color, "#123456")
 
+	@patch("catalog.models.build_movie_accent_color", return_value="#123456")
+	@patch("catalog.views.person.TMDbClient.from_settings")
+	@patch("catalog.views.person.get_or_sync_person")
+	def test_person_detail_does_not_match_watched_movies_by_title_only(
+		self,
+		mock_get_person,
+		mock_tmdb_from_settings,
+		mock_build_accent,
+	) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="watched-title-only-user", password="pw")
+		person = Person.objects.create(
+			tmdb_id=102,
+			name="Watched Title Only Person",
+			profile_path="/profile.jpg",
+			tmdb_raw={"name": "Watched Title Only Person", "external_ids": {}},
+			tmdb_credits_raw={
+				"cast": [
+					{
+						"id": 303,
+						"title": "Coolie",
+						"character": "Lead",
+						"media_type": "movie",
+						"poster_path": "/tmdb-poster.jpg",
+						"release_date": "1983-02-18",
+						"popularity": 1.0,
+					}
+				],
+				"crew": [],
+			},
+			tmdb_last_sync_at=timezone.now(),
+		)
+		PersonFollow.objects.create(user=user, person=person, name=person.name, role="Actor")
+		DiaryEntry.objects.create(
+			user=user,
+			original_title="Coolie",
+			original_release_year=2025,
+			watched_date=date(2026, 7, 1),
+			tmdb_id=999,
+			official_title="Coolie",
+			poster_path="/diary-poster.jpg",
+			release_date=date(2025, 1, 1),
+		)
+		call_count_before_view = mock_build_accent.call_count
+		mock_get_person.return_value = person
+		mock_client = Mock()
+		mock_client.get_person_credits.return_value = {
+			"cast": [
+				{
+					"id": 303,
+					"title": "Coolie",
+					"character": "Lead",
+					"media_type": "movie",
+					"poster_path": "/tmdb-poster.jpg",
+					"release_date": "1983-02-18",
+					"popularity": 1.0,
+				}
+			],
+			"crew": [],
+		}
+		mock_tmdb_from_settings.return_value = mock_client
+
+		client = self.client
+		client.force_login(user)
+		response = client.get(reverse("person_detail", args=[person.tmdb_id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "/tmdb-poster.jpg")
+		self.assertNotContains(response, "/diary-poster.jpg")
+		self.assertNotContains(response, "Watched on:")
+		self.assertEqual(mock_build_accent.call_count, call_count_before_view)
+
 	@patch("catalog.models.build_movie_accent_color", return_value="#ABCDEF")
 	def test_diary_entry_save_persists_accent_color_when_poster_is_present(self, mock_build_accent) -> None:
 		User = get_user_model()

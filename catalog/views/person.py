@@ -706,52 +706,22 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			for it in filmography_items
 			if isinstance(it, dict) and isinstance(it.get("id"), int)
 		}
-		filmography_title_lookup: dict[tuple[str, int | None], int] = {}
-		for it in filmography_items:
-			mid = int(it.get("id") or 0)
-			if mid <= 0:
-				continue
-			title = str(it.get("title") or "").strip()
-			title_key = _normalize_movie_title(title)
-			if not title_key:
-				continue
-			year_raw = str(it.get("year") or "").strip()
-			year = int(year_raw) if year_raw.isdigit() else None
-			filmography_title_lookup.setdefault((title_key, year), mid)
-			filmography_title_lookup.setdefault((title_key, None), mid)
 
 		diary_entries = (
 			DiaryEntry.objects.filter(user=request.user)
 			.only(
 				"tmdb_id",
-				"official_title",
-				"original_title",
-				"original_release_year",
 				"poster_path",
 				"accent_color",
 				"watched_date",
 				"created_at",
 				"id",
-				"release_date",
 			)
 			.order_by("-watched_date", "-created_at", "-id")
 		)
 		for entry in diary_entries:
 			movie_id = int(entry.tmdb_id or 0)
-			if movie_id not in current_movie_ids:
-				title = (entry.official_title or entry.original_title or "").strip()
-				if title:
-					title_key = _normalize_movie_title(title)
-					if title_key:
-						year = None
-						if entry.release_date is not None:
-							year = entry.release_date.year
-						elif entry.original_release_year is not None:
-							year = int(entry.original_release_year)
-						movie_id = filmography_title_lookup.get((title_key, year), 0)
-						if movie_id <= 0:
-							movie_id = filmography_title_lookup.get((title_key, None), 0)
-			if movie_id <= 0 or movie_id in watched_by_movie_id:
+			if movie_id <= 0 or movie_id not in current_movie_ids or movie_id in watched_by_movie_id:
 				continue
 			watched_by_movie_id[movie_id] = {
 				"poster_path": entry.poster_path or "",
@@ -1283,52 +1253,21 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	}
 	watched_by_movie_id = {}
 	if filmography_items:
-		filmography_title_lookup: dict[tuple[str, int | None], int] = {}
-		for it in filmography_items:
-			mid = int(it.get("id") or 0)
-			if mid <= 0:
-				continue
-			title = str(it.get("title") or "").strip()
-			title_key = _normalize_movie_title(title)
-			if not title_key:
-				continue
-			year_raw = str(it.get("year") or "").strip()
-			year = int(year_raw) if year_raw.isdigit() else None
-			filmography_title_lookup.setdefault((title_key, year), mid)
-			filmography_title_lookup.setdefault((title_key, None), mid)
-
 		diary_entries = (
 			DiaryEntry.objects.filter(user=request.user)
 			.only(
 				"tmdb_id",
-				"official_title",
-				"original_title",
-				"original_release_year",
 				"poster_path",
 				"accent_color",
 				"watched_date",
 				"created_at",
 				"id",
-				"release_date",
 			)
 			.order_by("-watched_date", "-created_at", "-id")
 		)
 		for entry in diary_entries:
 			movie_id = int(entry.tmdb_id or 0)
-			if movie_id not in current_movie_ids:
-				title = (entry.official_title or entry.original_title or "").strip()
-				if title:
-					title_key = _normalize_movie_title(title)
-					if title_key:
-						year = None
-						if entry.release_date is not None:
-							year = entry.release_date.year
-						elif entry.original_release_year is not None:
-							year = int(entry.original_release_year)
-						movie_id = filmography_title_lookup.get((title_key, year), 0)
-						if movie_id <= 0:
-							movie_id = filmography_title_lookup.get((title_key, None), 0)
-			if movie_id <= 0 or movie_id in watched_by_movie_id:
+			if movie_id <= 0 or movie_id not in current_movie_ids or movie_id in watched_by_movie_id:
 				continue
 			watched_by_movie_id[movie_id] = {
 				"poster_path": entry.poster_path or "",
