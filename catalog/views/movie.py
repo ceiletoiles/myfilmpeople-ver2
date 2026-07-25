@@ -393,11 +393,13 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	watched_entries = list(
 		DiaryEntry.objects.filter(user=request.user, tmdb_id=tmdb_id)
 		.only(
+			"tmdb_id",
 			"poster_path",
 			"watched_date",
 			"rating",
 			"liked",
 			"rewatch",
+			"review",
 			"official_title",
 			"original_title",
 			"original_release_year",
@@ -478,6 +480,7 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"related_links": related_links,
 			"movie_display_poster_path": movie_display_poster_path,
 			"watched_entries": watched_entries,
+			"hide_diary_editor_view_link": True,
 		},
 	)
 

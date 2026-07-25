@@ -540,7 +540,6 @@
       !metaEl ||
       !kickerEl ||
       !posterEl ||
-      !viewLink ||
       !postersButton ||
       !editButton ||
       !cancelEditButton ||
@@ -786,7 +785,7 @@
     function setSelectedMovie(movie) {
       if (!movie) return;
       tmdbIdInput.value = String(movie.tmdb_id || '');
-      if (movie.url) {
+      if (viewLink && movie.url) {
         viewLink.href = movie.url;
         viewLink.hidden = false;
       }
@@ -919,10 +918,10 @@
       populateForm(card);
 
       const movieUrl = card.getAttribute('data-entry-movie-url') || '';
-      if (movieUrl) {
+      if (viewLink && movieUrl) {
         viewLink.href = movieUrl;
         viewLink.hidden = false;
-      } else {
+      } else if (viewLink) {
         viewLink.hidden = true;
       }
 

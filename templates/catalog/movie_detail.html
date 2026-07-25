@@ -5,6 +5,7 @@
 {% block title %}{{ movie.title }}{% endblock %}
 
 {% block extra_css %}
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260723a" />
   <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/movie_detail.css" />
   {% if movie.tmdb_raw.backdrop_path %}
     <style>
@@ -152,21 +153,38 @@
           <section class="tab-panel watched-section{% if tab == 'watched' %} active{% endif %}" data-panel="watched" id="watchedSection">
               <div class="watched-list" id="watchedList">
                 {% for entry in watched_entries %}
-                  <article class="watched-entry-card">
+                  <article
+                    class="watched-entry-card diary-list-entry-button"
+                    data-diary-entry-card
+                    data-entry-id="{{ entry.id }}"
+                    data-entry-title="{{ entry.official_title|default:entry.original_title|escape }}"
+                    data-entry-year="{{ entry.original_release_year|default_if_none:'' }}"
+                    data-entry-date="{{ entry.watched_date|date:'j M Y' }}"
+                    data-entry-rating="{{ entry.rating|default_if_none:'' }}"
+                    data-entry-liked="{{ entry.liked|yesno:'1,0' }}"
+                    data-entry-rewatch="{{ entry.rewatch|yesno:'1,0' }}"
+                    data-entry-review="{{ entry.review|escape }}"
+                    data-entry-poster-path="{{ entry.poster_path|escape }}"
+                    data-entry-movie-url="{% if entry.tmdb_id %}{% url 'movie_detail' entry.tmdb_id %}{% endif %}"
+                    data-entry-posters-url="{% url 'diary_entry_posters' entry.id %}"
+                    data-entry-update-url="{% url 'diary_entry_update' entry.id %}"
+                    aria-label="Open {{ entry.official_title|default:entry.original_title }}"
+                    tabindex="0"
+                  >
                     <div class="watched-entry-poster-slot" aria-hidden="true">
                       {% if entry.poster_path %}
-                        <img class="watched-entry-poster" src="https://image.tmdb.org/t/p/w342{{ entry.poster_path }}" alt="" loading="lazy" />
+                        <img class="watched-entry-poster diary-entry-poster diary-list-poster" src="https://image.tmdb.org/t/p/w342{{ entry.poster_path }}" alt="" loading="lazy" />
                       {% else %}
-                        <img class="watched-entry-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" loading="lazy" />
+                        <img class="watched-entry-poster diary-entry-poster diary-list-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" loading="lazy" />
                       {% endif %}
                     </div>
 
-                    <div class="watched-entry-body">
+                    <div class="watched-entry-body diary-list-body">
                       <p class="watched-entry-date">Watched on: {{ entry.watched_date|date:"M j, Y" }}</p>
-                      <div class="watched-entry-title-line">
-                        <span class="watched-entry-title">{{ entry.official_title|default:entry.original_title }}</span>
+                      <div class="watched-entry-title-line diary-list-title-line">
+                        <span class="watched-entry-title diary-list-title diary-entry-title">{{ entry.official_title|default:entry.original_title }}</span>
                         {% if entry.original_release_year %}
-                          <span class="watched-entry-year">{{ entry.original_release_year }}</span>
+                          <span class="watched-entry-year diary-list-year">{{ entry.original_release_year }}</span>
                         {% endif %}
                       </div>
                       {% if entry.rating is not None or entry.liked or entry.rewatch %}
@@ -317,10 +335,13 @@
         </section>
       {% endif %}
 
+      {% include 'catalog/_diary_entry_editor.html' %}
+
     </div>
   </div>
 {% endblock %}
 
 {% block extra_js %}
+  <script src="{{ STATIC_PREFIX }}js/pages/diary.js?v=20260723a"></script>
   <script src="{{ STATIC_PREFIX }}js/pages/movie_detail.js"></script>
 {% endblock %}
