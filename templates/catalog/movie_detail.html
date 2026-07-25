@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load diary_tags %}
 
 {% block title %}{{ movie.title }}{% endblock %}
 
@@ -45,10 +46,6 @@
               </a>
             </div>
           {% endif %}
-
-          {% if movie_watched_date_label %}
-            <p class="movie-watched-date">{{ movie_watched_date_label }}</p>
-          {% endif %}
         </div>
       </div>
 
@@ -69,6 +66,9 @@
           <button type="button" class="movie-tab-btn credits-tab{% if tab == 'cast' %} active{% endif %}" data-tab="cast">Cast</button>
           <button type="button" class="movie-tab-btn credits-tab{% if tab == 'crew' %} active{% endif %}" data-tab="crew">Crew</button>
           <button type="button" class="movie-tab-btn credits-tab{% if tab == 'release' %} active{% endif %}" data-tab="release">Releases</button>
+          {% if watched_entries %}
+            <button type="button" class="movie-tab-btn credits-tab{% if tab == 'watched' %} active{% endif %}" data-tab="watched">Watched</button>
+          {% endif %}
           <button type="button" class="movie-tab-btn credits-tab{% if tab == 'details' %} active{% endif %}" data-tab="details">Details</button>
         </div>
 
@@ -147,6 +147,41 @@
               <p class="muted">No release date data available.</p>
             {% endif %}
           </section>
+
+          {% if watched_entries %}
+          <section class="tab-panel watched-section{% if tab == 'watched' %} active{% endif %}" data-panel="watched" id="watchedSection">
+              <div class="watched-list" id="watchedList">
+                {% for entry in watched_entries %}
+                  <article class="watched-entry-card">
+                    <div class="watched-entry-poster-slot" aria-hidden="true">
+                      {% if entry.poster_path %}
+                        <img class="watched-entry-poster" src="https://image.tmdb.org/t/p/w342{{ entry.poster_path }}" alt="" loading="lazy" />
+                      {% else %}
+                        <img class="watched-entry-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" loading="lazy" />
+                      {% endif %}
+                    </div>
+
+                    <div class="watched-entry-body">
+                      <p class="watched-entry-date">Watched on: {{ entry.watched_date|date:"M j, Y" }}</p>
+                      <div class="watched-entry-title-line">
+                        <span class="watched-entry-title">{{ entry.official_title|default:entry.original_title }}</span>
+                        {% if entry.original_release_year %}
+                          <span class="watched-entry-year">{{ entry.original_release_year }}</span>
+                        {% endif %}
+                      </div>
+                      {% if entry.rating is not None or entry.liked or entry.rewatch %}
+                        <span class="diary-badges diary-list-badges diary-entry-rating-row watched-entry-badges">
+                          {% if entry.rating is not None %}<span class="diary-badge diary-rating-badge">{% diary_rating_stars entry.rating %}</span>{% endif %}
+                          {% if entry.liked %}<span class="diary-badge diary-icon-badge diary-icon-like" title="Liked" aria-label="Liked"><span class="diary-icon-mark" aria-hidden="true"></span></span>{% endif %}
+                          {% if entry.rewatch %}<span class="diary-badge diary-icon-badge diary-icon-rewatch" title="Rewatch" aria-label="Rewatch"><span class="diary-icon-mark" aria-hidden="true"></span></span>{% endif %}
+                        </span>
+                      {% endif %}
+                    </div>
+                  </article>
+                {% endfor %}
+              </div>
+          </section>
+          {% endif %}
 
           <section class="tab-panel details-section{% if tab == 'details' %} active{% endif %}" data-panel="details" id="detailsSection">
             <div class="details-list" id="detailsList">

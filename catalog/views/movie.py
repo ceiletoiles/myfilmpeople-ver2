@@ -369,7 +369,7 @@ def _build_release_groups(tmdb_raw: dict[str, Any], country_name_lookup: dict[st
 @login_required
 def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	tab = (request.GET.get("tab") or "cast").strip().lower()
-	if tab not in {"cast", "crew", "details", "release"}:
+	if tab not in {"cast", "crew", "details", "release", "watched"}:
 		tab = "cast"
 
 	include_credits = True
@@ -390,16 +390,26 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	except Exception:
 		pass
 	client = TMDbClient.from_settings()
-	watched_entry = (
+	watched_entries = list(
 		DiaryEntry.objects.filter(user=request.user, tmdb_id=tmdb_id)
-		.only("poster_path", "watched_date", "created_at", "id")
-		.first()
+		.only(
+			"poster_path",
+			"watched_date",
+			"rating",
+			"liked",
+			"rewatch",
+			"official_title",
+			"original_title",
+			"original_release_year",
+			"id",
+			"created_at",
+		)
+		.order_by("-watched_date", "-created_at", "-id")
 	)
+	watched_entry = watched_entries[0] if watched_entries else None
 	movie_display_poster_path = str((watched_entry.poster_path if watched_entry else "") or movie.poster_path or "").strip()
-	movie_watched_date_label = ""
-	if watched_entry and watched_entry.watched_date:
-		watched_date = watched_entry.watched_date
-		movie_watched_date_label = f"Watched on: {watched_date.strftime('%b')} {watched_date.day}, {watched_date.year}"
+	if tab == "watched" and not watched_entries:
+		tab = "cast"
 
 	cast = []
 	crew_groups = []
@@ -467,7 +477,7 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"movie_box_office_text": movie_box_office_text,
 			"related_links": related_links,
 			"movie_display_poster_path": movie_display_poster_path,
-			"movie_watched_date_label": movie_watched_date_label,
+			"watched_entries": watched_entries,
 		},
 	)
 

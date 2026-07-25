@@ -163,10 +163,209 @@ main {
   gap: 0.3rem;
 }
 
-.movie-watched-date {
-  margin: 0.1rem 0 0;
-  font-size: 14px;
-  color: #334155;
+.watched-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.watched-entry-card {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: center;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.watched-entry-card:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.watched-entry-poster-slot {
+  width: 48px;
+  aspect-ratio: 2 / 3;
+  border-radius: 0;
+  overflow: hidden;
+  background: #0f172a;
+}
+
+.watched-entry-poster {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  object-fit: cover;
+  display: block;
+}
+
+.watched-entry-body {
+  display: grid;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.watched-entry-date {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.watched-entry-title-line {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.watched-entry-title {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #0f172a;
+}
+
+.watched-entry-year {
+  color: #64748b;
+  font-size: 0.84rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.watched-entry-badges {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 1.2rem;
+  width: 100%;
+  gap: 0.28rem;
+  overflow: hidden;
+}
+
+.watched-entry-badges .diary-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.watched-entry-badges .diary-rating-badge {
+  color: #9ca3af;
+  min-width: 0;
+}
+
+.watched-entry-badges .diary-rating-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.06rem;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.watched-entry-badges .diary-star {
+  position: relative;
+  flex: 0 0 auto;
+  width: 0.72rem;
+  height: 0.72rem;
+  font-size: 0;
+  background: #6b7280;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='m12 2.25 2.92 5.92 6.53.95-4.72 4.6 1.11 6.5L12 17.16 6.16 20.22l1.12-6.5-4.72-4.6 6.52-.95L12 2.25Z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='m12 2.25 2.92 5.92 6.53.95-4.72 4.6 1.11 6.5L12 17.16 6.16 20.22l1.12-6.5-4.72-4.6 6.52-.95L12 2.25Z'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.watched-entry-badges .diary-star.is-filled,
+.watched-entry-badges .diary-star.is-half {
+  background: #9ca3af;
+}
+
+.watched-entry-badges .diary-star.is-empty {
+  background: #4b5563;
+}
+
+.watched-entry-badges .diary-star.is-half {
+  position: relative;
+  background: #4b5563;
+}
+
+.watched-entry-badges .diary-star.is-half::before {
+  content: "★";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 50%;
+  overflow: hidden;
+  color: #facc15;
+}
+
+.watched-entry-badges .diary-icon-badge {
+  flex: 0 0 auto;
+  min-width: auto;
+  width: 0.72rem;
+  height: 0.72rem;
+  padding: 0;
+  font-size: 0;
+  background: transparent;
+  border-radius: 0;
+}
+
+.watched-entry-badges .diary-icon-like,
+.watched-entry-badges .diary-icon-rewatch {
+  position: relative;
+}
+
+.watched-entry-badges .diary-icon-like::before,
+.watched-entry-badges .diary-icon-rewatch::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+}
+
+.watched-entry-badges .diary-icon-like {
+  color: #9ca3af;
+}
+
+.watched-entry-badges .diary-icon-like::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 21.35 10.55 20.03C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09A6 6 0 0 1 16.5 3C19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35Z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 21.35 10.55 20.03C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09A6 6 0 0 1 16.5 3C19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35Z'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.watched-entry-badges .diary-icon-rewatch {
+  color: #9ca3af;
+}
+
+.watched-entry-badges .diary-icon-rewatch::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6a6 6 0 0 1-6 6 6 6 0 0 1-5.65-4H4.26A8 8 0 0 0 12 21a8 8 0 0 0 0-16Zm-6 6a6 6 0 0 1 5.65-4H9.74A8 8 0 0 0 4 13c0 .69.09 1.36.26 2h2.09A5.96 5.96 0 0 1 6 13Z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6a6 6 0 0 1-6 6 6 6 0 0 1-5.65-4H4.26A8 8 0 0 0 12 21a8 8 0 0 0 0-16Zm-6 6a6 6 0 0 1 5.65-4H9.74A8 8 0 0 0 4 13c0 .69.09 1.36.26 2h2.09A5.96 5.96 0 0 1 6 13Z'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.watched-entry-badges .diary-icon-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+  transform: translateY(-0.02em);
 }
 
 .movie-trailer-embed {

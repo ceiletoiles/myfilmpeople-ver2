@@ -2339,6 +2339,55 @@ class RelatedLinksTests(TestCase):
 		self.assertNotContains(response, "/tmdb-poster.jpg")
 		mock_purge_stale_movies.assert_called_once_with()
 
+	@patch("catalog.views.movie.purge_stale_movies")
+	@patch("catalog.views.movie.TMDbClient.from_settings")
+	@patch("catalog.views.movie.get_or_sync_movie")
+	def test_movie_detail_watched_tab_lists_all_diary_entries(self, mock_get_or_sync_movie, mock_from_settings, mock_purge_stale_movies) -> None:
+		user = get_user_model().objects.create_user(username="movie-watched-tab-user", password="pw")
+		self.client.force_login(user)
+
+		movie = Movie.objects.create(tmdb_id=3, title="Multi Watch Movie", poster_path="/tmdb-poster.jpg")
+		DiaryEntry.objects.create(
+			user=user,
+			original_title="Multi Watch Movie",
+			original_release_year=2024,
+			watched_date=date(2024, 1, 5),
+			rating=Decimal("4.5"),
+			liked=True,
+			rewatch=True,
+			tmdb_id=3,
+			official_title="Multi Watch Movie",
+			poster_path="/diary-poster-1.jpg",
+		)
+		DiaryEntry.objects.create(
+			user=user,
+			original_title="Multi Watch Movie",
+			original_release_year=2024,
+			watched_date=date(2024, 6, 10),
+			tmdb_id=3,
+			official_title="Multi Watch Movie",
+			poster_path="/diary-poster-2.jpg",
+		)
+		mock_get_or_sync_movie.return_value = movie
+		mock_from_settings.return_value.get_configuration_countries.return_value = []
+		mock_from_settings.return_value.get_movie_alternative_titles.return_value = {}
+		mock_from_settings.return_value.get_movie_videos.return_value = {}
+		mock_from_settings.return_value.get_movie_credits.return_value = {"cast": [], "crew": []}
+		mock_from_settings.return_value.get_movie.return_value = {"id": 3, "title": "Multi Watch Movie", "release_date": "2024-01-01"}
+
+		response = self.client.get(reverse("movie_detail", args=[3]), {"tab": "watched"})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Watched")
+		self.assertContains(response, "Watched on: Jan 5, 2024")
+		self.assertContains(response, "Watched on: Jun 10, 2024")
+		self.assertContains(response, "/diary-poster-1.jpg")
+		self.assertContains(response, "/diary-poster-2.jpg")
+		self.assertContains(response, "diary-rating-badge")
+		self.assertContains(response, "diary-icon-like")
+		self.assertContains(response, "diary-icon-rewatch")
+		mock_purge_stale_movies.assert_called_once_with()
+
 	def test_compact_company_filmography_command_compacts_existing_rows(self) -> None:
 		company = Company.objects.create(
 			tmdb_id=41077,
