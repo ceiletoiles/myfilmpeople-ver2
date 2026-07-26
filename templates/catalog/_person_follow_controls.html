@@ -19,6 +19,14 @@
         </button>
       </form>
 
+      <a href="{{ filmography_sort_toggle_url }}" role="menuitem">
+        {% if filmography_sort == 'popularity' %}
+          Sort normally
+        {% else %}
+          Sort by popularity
+        {% endif %}
+      </a>
+
       {% if follow_roles %}
         <a href="{% url 'person_profile_images' person.tmdb_id %}" role="menuitem">Profile pics</a>
 

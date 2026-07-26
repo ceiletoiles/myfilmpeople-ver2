@@ -1640,6 +1640,116 @@ class RelatedLinksTests(TestCase):
 		self.assertIn("related_links", response.context)
 		self.assertTrue(any(link["label"] == "TMDb" for link in response.context["related_links"]))
 
+	@patch("catalog.views.person.TMDbClient.from_settings")
+	@patch("catalog.views.person.get_or_sync_person")
+	def test_person_detail_sorts_filmography_by_popularity_for_followed_person(
+		self,
+		mock_get_or_sync_person,
+		mock_tmdb_from_settings,
+	) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="followed-sort-user", password="pw")
+		person = Person.objects.create(
+			tmdb_id=104,
+			name="Followed Sort Person",
+			profile_path="/profile.jpg",
+			tmdb_raw={"name": "Followed Sort Person", "external_ids": {}},
+			tmdb_credits_raw={
+				"cast": [
+					{
+						"id": 401,
+						"title": "Low Popularity",
+						"character": "Lead",
+						"media_type": "movie",
+						"poster_path": "/low.jpg",
+						"release_date": "2025-01-01",
+						"popularity": 2.0,
+					},
+					{
+						"id": 402,
+						"title": "High Popularity",
+						"character": "Lead",
+						"media_type": "movie",
+						"poster_path": "/high.jpg",
+						"release_date": "2010-01-01",
+						"popularity": 90.0,
+					},
+				],
+				"crew": [],
+			},
+			tmdb_last_sync_at=timezone.now(),
+		)
+		PersonFollow.objects.create(user=user, person=person, name=person.name, role="Actor")
+		mock_get_or_sync_person.return_value = person
+		mock_client = Mock()
+		mock_client.get_person_credits.return_value = person.tmdb_credits_raw
+		mock_client.get_person_external_ids.return_value = {}
+		mock_tmdb_from_settings.return_value = mock_client
+
+		client = self.client
+		client.force_login(user)
+		response = client.get(reverse("person_detail", args=[person.tmdb_id]), {"filmography_sort": "popularity"})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(
+			[it["title"] for it in response.context["filmography_items"][:2]],
+			["High Popularity", "Low Popularity"],
+		)
+		self.assertContains(response, "Sort normally")
+
+	@patch("catalog.views.person.TMDbClient.from_settings")
+	def test_person_detail_sorts_filmography_by_popularity_for_non_followed_person(
+		self,
+		mock_tmdb_from_settings,
+	) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="unfollowed-sort-user", password="pw")
+		mock_client = Mock()
+		mock_client.get_person.return_value = {
+			"name": "Unfollowed Sort Person",
+			"profile_path": "/profile.jpg",
+			"external_ids": {},
+		}
+		mock_client.get_person_credits.return_value = {
+			"cast": [
+				{
+					"id": 501,
+					"title": "Fallback Popularity",
+					"character": "Lead",
+					"media_type": "movie",
+					"poster_path": "/fallback.jpg",
+					"release_date": "2023-01-01",
+					"vote_average": 8.8,
+					"vote_count": 1200,
+				},
+				{
+					"id": 502,
+					"title": "Low Popularity",
+					"character": "Lead",
+					"media_type": "movie",
+					"poster_path": "/low.jpg",
+					"release_date": "2024-01-01",
+					"popularity": 1.0,
+					"vote_average": 1.0,
+					"vote_count": 1,
+				},
+			],
+			"crew": [],
+		}
+		mock_client.get_person_external_ids.return_value = {}
+		mock_tmdb_from_settings.return_value = mock_client
+
+		client = self.client
+		client.force_login(user)
+		response = client.get(reverse("person_detail", args=[105]), {"filmography_sort": "popularity"})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(
+			[it["title"] for it in response.context["filmography_items"][:2]],
+			["Fallback Popularity", "Low Popularity"],
+		)
+		self.assertContains(response, "Sort normally")
+
 	def test_build_movie_related_links_includes_letterboxd_premiere_search(self) -> None:
 		raw = {
 			"title": "Obsession",

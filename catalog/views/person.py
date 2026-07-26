@@ -120,6 +120,37 @@ def _person_profile_image_candidates(person: Person) -> list[dict[str, object]]:
 	return results
 
 
+def _credit_popularity_score(credit: dict) -> float:
+	if not isinstance(credit, dict):
+		return 0.0
+
+	popularity = credit.get("popularity")
+	try:
+		popularity_value = float(popularity or 0)
+	except (TypeError, ValueError):
+		popularity_value = 0.0
+	if popularity_value > 0:
+		return popularity_value
+
+	try:
+		vote_average = float(credit.get("vote_average") or 0)
+	except (TypeError, ValueError):
+		vote_average = 0.0
+	try:
+		vote_count = min(float(credit.get("vote_count") or 0), 5000.0)
+	except (TypeError, ValueError):
+		vote_count = 0.0
+	return (vote_average * 10.0) + (vote_count / 1000.0)
+
+
+def _person_detail_sort_url(request: HttpRequest, tmdb_id: int, sort_key: str) -> str:
+	params = request.GET.copy()
+	params["filmography_sort"] = sort_key
+	query = params.urlencode()
+	base_url = reverse("person_detail", args=[tmdb_id])
+	return f"{base_url}?{query}" if query else base_url
+
+
 @rate_limit(limit=25, window_seconds=60, bucket_name="person_detail")
 @login_required
 def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
@@ -468,6 +499,11 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		born_display = str(pob)
 	role_options = _person_role_options_from_credits(credits)
 	role_options_remaining = [r for r in role_options if r not in follow_roles_set]
+	filmography_sort = (request.GET.get("filmography_sort") or "").strip().lower()
+	if filmography_sort not in {"normal", "popularity"}:
+		filmography_sort = "normal"
+	filmography_sort_toggle = "popularity" if filmography_sort == "normal" else "normal"
+	filmography_sort_toggle_url = _person_detail_sort_url(request, tmdb_id, filmography_sort_toggle)
 
 	# Build unified filmography (one row per movie), with roles grouped by department.
 	today = timezone.now().date()
@@ -482,6 +518,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				"poster_path": str(item.get("poster_path") or ""),
 				"release_date": str(item.get("release_date") or "").strip(),
 				"release_dt": _parse_iso_date(item.get("release_date")),
+				"popularity_score": _credit_popularity_score(item),
 				"roles_by_filter": {},  # key -> set[str]
 			}
 			movie_map[mid] = m
@@ -493,6 +530,9 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		if not m.get("release_date") and item.get("release_date"):
 			m["release_date"] = str(item.get("release_date") or "").strip()
 			m["release_dt"] = _parse_iso_date(item.get("release_date"))
+		popularity_score = _credit_popularity_score(item)
+		if popularity_score > float(m.get("popularity_score") or 0):
+			m["popularity_score"] = popularity_score
 		return m
 
 	def _add_role(mid: int, item: dict, filter_key: str, role_text: str) -> None:
@@ -645,6 +685,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				"title": m.get("title") or "-",
 				"poster_path": m.get("poster_path") or "",
 				"release_dt": release_dt,
+				"popularity_score": float(m.get("popularity_score") or 0),
 				"year": year,
 				"countdown_text": _countdown_text(today=today, release_dt=release_dt)
 				if release_dt is not None
@@ -657,7 +698,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			}
 		)
 
-	def _film_sort_key(it: dict[str, object]):
+	def _film_sort_key_normal(it: dict[str, object]):
 		# Newest-to-oldest by release date (including future), unknown dates last.
 		rd = it.get("release_dt")
 		rd = rd if isinstance(rd, date) else None
@@ -670,7 +711,23 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		title = str(it.get("title") or "").lower()
 		return (group, ord_key, title)
 
-	filmography_items.sort(key=_film_sort_key)
+	def _film_sort_key_popularity(it: dict[str, object]):
+		popularity_score = float(it.get("popularity_score") or 0)
+		rd = it.get("release_dt")
+		rd = rd if isinstance(rd, date) else None
+		if rd is None:
+			group = 1
+			ord_key = 0
+		else:
+			group = 0
+			ord_key = -rd.toordinal()
+		title = str(it.get("title") or "").lower()
+		return (-popularity_score, group, ord_key, title)
+
+	if filmography_sort == "popularity":
+		filmography_items.sort(key=_film_sort_key_popularity)
+	else:
+		filmography_items.sort(key=_film_sort_key_normal)
 
 	# Filter counts (movies per filter)
 	filter_counts: dict[str, int] = {}
@@ -886,6 +943,8 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"active_info": active_info,
 			"filmography_filters": filmography_filters,
 			"default_filmography_filter": default_filmography_filter,
+			"filmography_sort": filmography_sort,
+			"filmography_sort_toggle_url": filmography_sort_toggle_url,
 			"hide_self_appearances": hide_self_appearances,
 		},
 	)
