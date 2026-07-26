@@ -523,7 +523,7 @@ def _diary_movie_image_candidates(
 	*,
 	image_key: str,
 	image_size: str,
-	sort_by_aspect_ratio: bool = False,
+	sort_by_image_size: bool = False,
 ) -> list[dict[str, object]]:
 	try:
 		client = TMDbClient.from_settings()
@@ -562,10 +562,14 @@ def _diary_movie_image_candidates(
 			}
 		)
 
-	if sort_by_aspect_ratio:
+	if sort_by_image_size:
 		results.sort(
 			key=lambda item: (
-				-(float(item.get("aspect_ratio") or 0.0)),
+				-(
+					int(item.get("width") or 0) * int(item.get("height") or 0)
+				),
+				-(int(item.get("width") or 0)),
+				-(int(item.get("height") or 0)),
 				-(int(item.get("vote_count") or 0)),
 				str(item.get("file_path") or "").casefold(),
 			)
@@ -582,7 +586,12 @@ def _diary_movie_image_candidates(
 
 
 def _diary_movie_poster_candidates(movie_id: int) -> list[dict[str, object]]:
-	return _diary_movie_image_candidates(movie_id, image_key="posters", image_size="w500")
+	return _diary_movie_image_candidates(
+		movie_id,
+		image_key="posters",
+		image_size="w500",
+		sort_by_image_size=True,
+	)
 
 
 def _diary_movie_backdrop_candidates(movie_id: int) -> list[dict[str, object]]:
@@ -590,7 +599,7 @@ def _diary_movie_backdrop_candidates(movie_id: int) -> list[dict[str, object]]:
 		movie_id,
 		image_key="backdrops",
 		image_size="w780",
-		sort_by_aspect_ratio=True,
+		sort_by_image_size=True,
 	)
 
 
