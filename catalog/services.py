@@ -1090,7 +1090,7 @@ def get_or_sync_company_tba_movies_page(
                 mid = m.get("id")
                 if not isinstance(mid, int) or mid in dedup:
                     continue
-                compact: dict[str, Any] = {"id": mid}
+                compact = compact_company_movie(m, include_title=True)
                 if release_date:
                     try:
                         release_dt = date.fromisoformat(release_date)
@@ -1099,6 +1099,8 @@ def get_or_sync_company_tba_movies_page(
                     if release_dt is not None and release_dt < today:
                         continue
                     compact["release_date"] = release_date
+                if "title" not in compact and release_date:
+                    compact["title"] = str(m.get("title") or m.get("name") or mid)
                 dedup[mid] = compact
                 tba_movies.append(compact)
                 if len(tba_movies) >= desired_end:

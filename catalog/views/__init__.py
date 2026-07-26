@@ -7,7 +7,7 @@ from __future__ import annotations
 from .collaboration import collaboration_finder, collaboration_suggest
 from .connect import connect
 from .diary import diary, diary_calendar, diary_entry_backdrops, diary_entry_posters, diary_entry_update, diary_import_progress, diary_import_start, diary_list, diary_match_entry, diary_movie_search, diary_settings, diary_sync_progress, diary_sync_start
-from .company import company_detail, company_logo_images
+from .company import company_detail, company_filmography_page, company_logo_images
 from .follow import (
 	company_note,
 	company_sync,
@@ -55,6 +55,7 @@ __all__ = [
 	"diary_sync_progress",
 	"diary_sync_start",
 	"company_detail",
+	"company_filmography_page",
 	"company_logo_images",
 	"company_note",
 	"company_sync_progress",

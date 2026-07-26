@@ -8,6 +8,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.management import call_command
 from django.test import RequestFactory
 from django.test import TestCase, override_settings
@@ -2160,10 +2161,26 @@ class RelatedLinksTests(TestCase):
 
 		tba_by_id = {m.get("id"): m for m in tba_movies if isinstance(m, dict)}
 		self.assertEqual(set(tba_by_id), {1, 2, 4, 5})
-		self.assertEqual(tba_by_id[1], {"id": 1, "release_date": "2099-01-01"})
-		self.assertEqual(tba_by_id[2], {"id": 2})
-		self.assertEqual(tba_by_id[4], {"id": 4, "release_date": "2100-01-01"})
-		self.assertEqual(tba_by_id[5], {"id": 5})
+		self.assertEqual(
+			tba_by_id[1],
+			{
+				"id": 1,
+				"title": "Future One",
+				"year": 2099,
+				"release_date": "2099-01-01",
+			},
+		)
+		self.assertEqual(tba_by_id[2], {"id": 2, "title": "Announced One"})
+		self.assertEqual(
+			tba_by_id[4],
+			{
+				"id": 4,
+				"title": "Future Two",
+				"year": 2100,
+				"release_date": "2100-01-01",
+			},
+		)
+		self.assertEqual(tba_by_id[5], {"id": 5, "title": "Announced Two"})
 		self.assertEqual(tba_meta.get("scan_page"), 2)
 		self.assertEqual(tba_meta.get("discover_total_pages"), 2)
 		self.assertTrue(tba_meta.get("complete"))
@@ -2394,11 +2411,22 @@ class RelatedLinksTests(TestCase):
 		self.assertEqual(pages["1"]["results"][0]["id"], 777)
 		mock_prefetch_company_filmography.assert_called()
 
-	@patch("catalog.views.company.get_or_sync_company_filmography_page")
 	@patch("catalog.services.TMDbClient.from_settings")
 	@patch("catalog.views.company.get_or_sync_company")
-	def test_company_detail_hydrates_poster_on_later_pages(self, mock_get_company, mock_from_settings, mock_get_page) -> None:
+	def test_company_filmography_page_hydrates_poster_on_later_pages(
+		self,
+		mock_get_company,
+		mock_from_settings,
+	) -> None:
 		client = mock_from_settings.return_value
+		client.discover_movies_by_company.return_value = {
+			"page": 2,
+			"results": [
+				{"id": 321, "title": "Later Page Movie", "release_date": "2026-01-15"}
+			],
+			"total_pages": 2,
+			"total_results": 2,
+		}
 		client.get_movie.return_value = {
 			"id": 321,
 			"title": "Later Page Movie",
@@ -2423,24 +2451,71 @@ class RelatedLinksTests(TestCase):
 			tmdb_last_sync_at=timezone.now(),
 		)
 		mock_get_company.return_value = company
-		mock_get_page.return_value = {
-			"page": 2,
-			"results": [
-				{"id": 321, "title": "Later Page Movie", "release_date": "2026-01-15"}
-			],
-			"total_pages": 2,
-			"total_results": 2,
-		}
 
 		user = get_user_model().objects.create_user(username="poster-user", password="pw")
 		CompanyFollow.objects.create(user=user, company=company, name=company.name)
 		self.client.force_login(user)
+		cache.clear()
 
-		response = self.client.get(reverse("company_detail", args=[company.tmdb_id]), {"page": 2})
+		response = self.client.get(
+			reverse("company_filmography_page", args=[company.tmdb_id]),
+			{"tab": "released", "page": 2},
+		)
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, "/later-poster.jpg")
+		payload = response.json()
+		self.assertEqual(payload["items"][0]["poster_path"], "/later-poster.jpg")
 		client.get_movie.assert_called_once_with(321)
+
+	@patch("catalog.views.company.get_or_sync_company")
+	@patch("catalog.services.TMDbClient.from_settings")
+	def test_company_tba_filmography_page_loads_directly_from_tmdb(
+		self,
+		mock_from_settings,
+		mock_get_company,
+	) -> None:
+		client = mock_from_settings.return_value
+		client.discover_movies_by_company.return_value = {
+			"page": 1,
+			"results": [
+				{"id": 11, "title": "Scheduled Movie", "release_date": "2027-02-14", "poster_path": "/skip.jpg"},
+				{"id": 12, "title": "Announced Movie", "poster_path": "/tmdb.jpg"},
+				{"id": 13, "title": "Expired Movie", "release_date": "2024-01-01", "poster_path": "/skip-too.jpg"},
+			],
+			"total_pages": 3,
+			"total_results": 9,
+		}
+
+		company = Company.objects.create(
+			tmdb_id=92,
+			name="Direct TBA Studio",
+			logo_path="/logo.png",
+			tmdb_raw={
+				"name": "Direct TBA Studio",
+				"tba_movies": [
+					{"id": 99, "title": "Cached TBA Movie", "poster_path": "/cached.jpg"},
+				],
+			},
+			tmdb_last_sync_at=timezone.now(),
+		)
+		mock_get_company.return_value = company
+
+		user = get_user_model().objects.create_user(username="tba-user", password="pw")
+		CompanyFollow.objects.create(user=user, company=company, name=company.name)
+		self.client.force_login(user)
+		cache.clear()
+
+		response = self.client.get(
+			reverse("company_filmography_page", args=[company.tmdb_id]),
+			{"tab": "tba", "page": 1},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertEqual(payload["source"], "tba")
+		self.assertEqual([item["id"] for item in payload["items"]], [12])
+		self.assertEqual(payload["items"][0]["poster_path"], "/tmdb.jpg")
+		client.discover_movies_by_company.assert_called_once()
 
 	@patch("catalog.services.TMDbClient.from_settings")
 	def test_get_or_sync_person_caches_external_ids(self, mock_from_settings) -> None:

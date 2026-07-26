@@ -48,6 +48,7 @@ urlpatterns = [
     path("person/sync/progress/<uuid:job_id>/", views.person_sync_progress, name="person_sync_progress"),
     path("person/<int:tmdb_id>/unfollow/", views.person_unfollow, name="person_unfollow"),
     path("company/<int:tmdb_id>/", views.company_detail, name="company_detail"),
+    path("company/<int:tmdb_id>/filmography/", views.company_filmography_page, name="company_filmography_page"),
     path("company/<int:tmdb_id>/logos/", views.company_logo_images, name="company_logo_images"),
     path("company/<int:tmdb_id>/note/", views.company_note, name="company_note"),
     path("company/<int:tmdb_id>/sync/", views.company_sync, name="company_sync"),

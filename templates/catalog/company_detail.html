@@ -4,7 +4,7 @@
 {% block title %}{{ company.name }}{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/company_detail.css?v=20260510c" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/company_detail.css?v=20260726a" />
 {% endblock %}
 
 {% block extra_js %}
@@ -78,90 +78,72 @@
   {% endif %}
 
   <div class="company-filmography">
-    <h2 class="company-filmography-title">
-      {% if filmography_mode == 'upcoming' %}Upcoming{% else %}Filmography{% endif %}
-    </h2>
-
-    <div class="row company-filmography-header">
-      <div class="muted">
-        {% if filmography_mode == 'upcoming' %}
-          Page {{ page }}{% if upcoming_total_pages %} of {{ upcoming_total_pages }}{% if upcoming_total_pages_plus %}+{% endif %}{% endif %}
-        {% else %}
-          Page {{ page }} of {{ total_pages }}{% if total_results %} · Total: {{ total_results }}{% endif %}
-        {% endif %}
+    <div class="company-filmography-header">
+      <div>
+        <h2 class="company-filmography-title">Filmography</h2>
+        <div class="muted company-filmography-hint">Scroll to load more. Tabs remember your place while you stay on this page.</div>
       </div>
-      <div class="company-filmography-pager">
-        <div class="company-filmography-prev">
-          {% if has_prev %}
-            {% if filmography_mode == 'upcoming' %}
-              <a class="muted" href="{% url 'company_detail' company.tmdb_id %}?mode=upcoming&page={{ prev_page }}">Prev</a>
-            {% else %}
-              <a class="muted" href="{% url 'company_detail' company.tmdb_id %}?page={{ prev_page }}">Prev</a>
-            {% endif %}
-          {% endif %}
-        </div>
 
-        <div class="company-filmography-toggle">
-          {% if filmography_mode == 'upcoming' %}
-            <a class="muted" href="{% url 'company_detail' company.tmdb_id %}?page=1">Filmography</a>
-          {% else %}
-            {% if has_tba %}
-              <a class="muted" href="{% url 'company_detail' company.tmdb_id %}?mode=upcoming&page=1">Upcoming</a>
-            {% endif %}
-          {% endif %}
-        </div>
-
-        <div class="company-filmography-next">
-          {% if has_next %}
-            {% if filmography_mode == 'upcoming' %}
-              <a class="muted" href="{% url 'company_detail' company.tmdb_id %}?mode=upcoming&page={{ next_page }}">Next</a>
-            {% else %}
-              <a class="muted" href="{% url 'company_detail' company.tmdb_id %}?page={{ next_page }}">Next</a>
-            {% endif %}
-          {% endif %}
-        </div>
+      <div class="company-filmography-tabs" role="tablist" aria-label="Company filmography tabs">
+        <button type="button" class="company-filmography-tab{% if filmography_active_tab == 'released' %} active{% endif %}" data-filmography-tab="released" role="tab" aria-selected="{% if filmography_active_tab == 'released' %}true{% else %}false{% endif %}">Released</button>
+        <button type="button" class="company-filmography-tab{% if filmography_active_tab == 'upcoming' %} active{% endif %}" data-filmography-tab="upcoming" role="tab" aria-selected="{% if filmography_active_tab == 'upcoming' %}true{% else %}false{% endif %}">Upcoming</button>
+        <button type="button" class="company-filmography-tab{% if filmography_active_tab == 'tba' %} active{% endif %}" data-filmography-tab="tba" role="tab" aria-selected="{% if filmography_active_tab == 'tba' %}true{% else %}false{% endif %}">TBA</button>
       </div>
     </div>
 
-    {% if filmography_items %}
-      <div class="filmography-grid">
-        {% for m in filmography_items %}
-          <div class="filmography-item">
-            <a class="filmography-poster-link" href="{% url 'movie_detail' m.id %}">
-              {% if m.poster_path %}
-                <img class="filmography-poster" src="https://image.tmdb.org/t/p/w342{{ m.poster_path }}" alt="" />
-              {% else %}
-                <img class="filmography-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" />
-              {% endif %}
-            </a>
+    <div
+      class="company-filmography-shell"
+      data-filmography-shell
+      data-company-id="{{ company.tmdb_id }}"
+      data-page-url="{{ filmography_page_url }}"
+      data-active-tab="{{ filmography_active_tab }}"
+      data-placeholder-poster="{% static 'img/placeholder-movie.svg' %}"
+    >
+      {{ filmography_initial_state|json_script:"company-filmography-state" }}
 
-            <div class="filmography-meta">
-              <a class="filmography-title" href="{% url 'movie_detail' m.id %}"><strong>{% if m.title %}{{ m.title }}{% elif m.name %}{{ m.name }}{% else %}-{% endif %}</strong></a>
-              <div class="filmography-year muted">
-                {% if filmography_mode == 'upcoming' %}
-                  {% if m.release_date %}{{ m.release_date|slice:":4" }}{% elif m.year %}{{ m.year }}{% else %}TBA{% endif %}
-                {% else %}
-                  {% if m.release_date %}{{ m.release_date|slice:":4" }}{% elif m.year %}{{ m.year }}{% else %}TBA{% endif %}
-                {% endif %}
-              </div>
-              {% if filmography_mode != 'upcoming' and m.countdown_text %}
-                <div class="muted filmography-role">
-                  <div class="film-countdown">{{ m.countdown_text }}</div>
-                </div>
-              {% endif %}
-            </div>
-          </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <p class="muted">
-        {% if filmography_mode == 'upcoming' %}
-          No upcoming (TBA) movies found for this company.
-        {% else %}
-          No movies found for this company.
+      <div class="filmography-status" data-filmography-status aria-live="polite">
+        {% if filmography_initial_state.has_more %}
+          <span class="muted">Loading more is available.</span>
         {% endif %}
-      </p>
-    {% endif %}
+      </div>
+
+      <div class="filmography-grid" id="company-filmography-grid" data-filmography-grid>
+        {% if filmography_initial_items %}
+          {% for m in filmography_initial_items %}
+            <div class="filmography-item" data-filmography-item data-movie-id="{{ m.id }}">
+              <a class="filmography-poster-link" href="{% url 'movie_detail' m.id %}">
+                {% if m.poster_path %}
+                  <img class="filmography-poster" src="https://image.tmdb.org/t/p/w342{{ m.poster_path }}" alt="" loading="lazy" decoding="async" />
+                {% else %}
+                  <img class="filmography-poster" src="{% static 'img/placeholder-movie.svg' %}" alt="" loading="lazy" decoding="async" />
+                {% endif %}
+              </a>
+              <div class="filmography-meta">
+                <a class="filmography-title" href="{% url 'movie_detail' m.id %}"><strong>{{ m.title }}</strong></a>
+                <div class="filmography-year muted">{% if m.year %}{{ m.year }}{% elif m.release_date %}{{ m.release_date|slice:":4" }}{% else %}TBA{% endif %}</div>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="muted" data-filmography-empty>Loading filmography...</p>
+        {% endif %}
+      </div>
+
+      <div class="filmography-footer">
+        <div class="muted" data-filmography-footer>
+          {% if filmography_initial_state.has_more %}
+            More movies will load as you scroll.
+          {% elif filmography_initial_items %}
+            No more movies.
+          {% else %}
+            No movies found for this tab.
+          {% endif %}
+        </div>
+        <button type="button" class="secondary filmography-retry" data-filmography-retry hidden>Retry</button>
+      </div>
+
+      <div class="filmography-sentinel" data-filmography-sentinel aria-hidden="true"></div>
+    </div>
   </div>
 
   <div class="company-meta-row">

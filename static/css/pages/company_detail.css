@@ -276,6 +276,10 @@
   margin: 0;
 }
 
+.company-filmography-hint {
+  margin-top: 4px;
+}
+
 .company-title {
   margin: 0;
   grid-column: 1;
@@ -283,33 +287,126 @@
 }
 
 .company-filmography-header {
+  display: flex;
   justify-content: space-between;
-  align-items: center;
+  gap: 16px;
+  align-items: flex-end;
   margin-top: 10px;
   flex-wrap: wrap;
 }
 
-.company-filmography-pager {
+.company-filmography-tabs {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  flex: 1;
-  min-width: 220px;
+  gap: 10px;
+  flex-wrap: wrap;
   align-items: center;
 }
 
-.company-filmography-prev,
-.company-filmography-next {
-  flex: 1;
+.company-filmography-tab {
+  padding: 10px 14px;
+  border: 1px solid #d6deea;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #0f172a;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
 }
 
-.company-filmography-toggle {
+.company-filmography-tab.active {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+}
+
+.company-filmography-shell {
+  margin-top: 14px;
+}
+
+.filmography-status {
+  min-height: 24px;
+  margin-bottom: 8px;
+}
+
+.filmography-footer {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.filmography-retry {
   flex: 0 0 auto;
-  text-align: center;
 }
 
-.company-filmography-next {
-  text-align: right;
+.filmography-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 16px 0;
+}
+
+.filmography-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #0f172a;
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+.filmography-item--skeleton {
+  pointer-events: none;
+}
+
+.filmography-poster--skeleton {
+  background: linear-gradient(90deg, #e2e8f0 0%, #f1f5f9 50%, #e2e8f0 100%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s linear infinite;
+}
+
+.filmography-meta--skeleton {
+  gap: 8px;
+}
+
+.filmography-line {
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e2e8f0 0%, #f1f5f9 50%, #e2e8f0 100%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s linear infinite;
+}
+
+.filmography-line--title {
+  width: 90%;
+  margin: 0 auto;
+}
+
+.filmography-line--year {
+  width: 42%;
+  margin: 0 auto;
+}
+
+.filmography-sentinel {
+  height: 1px;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* Countdown styling (matches person filmography). */
@@ -338,6 +435,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  content-visibility: auto;
+  contain-intrinsic-size: 330px 320px;
 }
 
 .filmography-poster-link {
@@ -386,6 +485,26 @@
   main {
     padding-left: 20px;
     padding-right: 20px;
+  }
+
+  .company-filmography-header {
+    align-items: flex-start;
+  }
+
+  .company-filmography-tabs {
+    width: 100%;
+  }
+
+  .company-filmography-tab {
+    flex: 1 1 calc(33.333% - 8px);
+    text-align: center;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .filmography-footer {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .filmography-grid {

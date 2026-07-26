@@ -6,12 +6,11 @@ from types import SimpleNamespace
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.conf import settings
 
 from ..models import Company, CompanyFollow
 from ..related_links import build_company_related_links
@@ -23,15 +22,15 @@ from ..new_movie_helpers import (
 from ..services import (
 	COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE,
 	COMPANY_FILMOGRAPHY_SORT_BY,
+	COMPANY_TBA_SORT_BY,
 	get_or_sync_company_images,
 	get_or_sync_company,
 	get_or_sync_company_filmography_page,
-	get_or_sync_company_tba_movies_page,
 	hydrate_company_movie_results,
 )
 from ..rate_limit import rate_limit
 from ..tmdb import TMDbClient, TMDbError, tmdb_image_url
-from ._shared import _add_years_safe, _countdown_text, _parse_iso_date
+from ._shared import _add_years_safe, _parse_iso_date
 
 
 def _safe_get_or_sync_company_filmography_page(company, page: int) -> dict:
@@ -83,6 +82,354 @@ def _company_logo_candidates(company: Company) -> list[dict[str, object]]:
 	return sorted(results, key=lambda item: (int(item.get("sort_order") or 99), -int(item.get("vote_count") or 0)))
 
 
+_FILMOGRAPHY_PAGE_SIZE = 20
+_FILMOGRAPHY_CACHE_TTL_SECONDS = 30 * 60
+
+
+def _company_filmography_tab_key(tab: str | None) -> str:
+	value = (tab or "").strip().lower()
+	if value in {"upcoming", "tba", "released"}:
+		return value
+	return "released"
+
+
+def _company_filmography_source_key(tab: str) -> str:
+	return "tba" if tab == "tba" else "filmography"
+
+
+def _company_filmography_cache_key(tmdb_id: int, source: str, page: int) -> str:
+	return f"company:filmography:v1:{int(tmdb_id)}:{source}:page:{int(page)}"
+
+
+def _company_parse_date(value: object) -> date | None:
+	parsed = _parse_iso_date(str(value or "").strip())
+	return parsed if isinstance(parsed, date) else None
+
+
+def _company_movie_display_year(movie: dict[str, object], release_dt: date | None) -> str:
+	if release_dt is not None:
+		return str(release_dt.year)
+	release_date = str(movie.get("release_date") or "").strip()
+	if len(release_date) >= 4 and release_date[:4].isdigit():
+		return release_date[:4]
+	return ""
+
+
+def _company_normalize_movie(movie: dict[str, object], *, release_dt: date | None = None) -> dict[str, object]:
+	mid = movie.get("id")
+	if not isinstance(mid, int):
+		return {}
+	title = str(movie.get("title") or movie.get("name") or "").strip()
+	poster_path = str(movie.get("poster_path") or "").strip()
+	release_date = str(movie.get("release_date") or "").strip()
+	if release_dt is None and release_date:
+		release_dt = _company_parse_date(release_date)
+	return {
+		"id": mid,
+		"title": title or str(mid),
+		"poster_path": poster_path,
+		"release_date": release_date,
+		"release_dt": release_dt,
+		"year": _company_movie_display_year(movie, release_dt),
+	}
+
+
+def _company_sort_filmography_items(items: list[dict[str, object]], *, tab: str) -> list[dict[str, object]]:
+	def _sort_key(item: dict[str, object]):
+		release_dt = item.get("release_dt")
+		release_dt = release_dt if isinstance(release_dt, date) else None
+		title = str(item.get("title") or "").lower()
+		if tab == "upcoming":
+			if release_dt is None:
+				return (1, 0, title)
+			return (0, release_dt.toordinal(), title)
+		if release_dt is None:
+			return (1, 0, title)
+		return (0, -release_dt.toordinal(), title)
+
+	return sorted(items, key=_sort_key)
+
+
+def _company_filter_movie_by_tab(movie: dict[str, object], *, tab: str, today: date) -> bool:
+	release_dt = movie.get("release_dt")
+	release_dt = release_dt if isinstance(release_dt, date) else None
+	if tab == "released":
+		return release_dt is not None and release_dt <= today
+	if tab == "upcoming":
+		return release_dt is not None and release_dt > today
+	return False
+
+
+def _company_filmography_page_payload(
+	company_id: int,
+	*,
+	tab: str,
+	page: int,
+	company: Company | None = None,
+	followed: bool = False,
+	allow_db_cache: bool = True,
+) -> dict[str, object]:
+	"""Load one raw TMDb filmography page without mutating the DB while scrolling."""
+	tab = _company_filmography_tab_key(tab)
+	source = _company_filmography_source_key(tab)
+	page = max(1, int(page or 1))
+	cache_key = _company_filmography_cache_key(company_id, source, page)
+
+	try:
+		cached = cache.get(cache_key)
+		if isinstance(cached, dict) and cached.get("items"):
+			return cached
+	except Exception:
+		pass
+
+	if source == "filmography":
+		if followed and allow_db_cache and page == 1 and company is not None:
+			raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+			pages = raw.get("discover_movies_pages")
+			if isinstance(pages, dict):
+				page_payload = pages.get("1")
+				if isinstance(page_payload, dict):
+					results = [
+						_company_normalize_movie(movie)
+						for movie in (page_payload.get("results") or [])
+						if isinstance(movie, dict)
+					]
+					results = [movie for movie in results if movie]
+					if any(
+						not str(movie.get("title") or "").strip() or not str(movie.get("poster_path") or "").strip()
+						for movie in results
+					):
+						try:
+							results = hydrate_company_movie_results(results)
+						except Exception:
+							pass
+					payload = {
+						"source": "filmography",
+						"page": 1,
+						"items": results,
+						"total_pages": int(page_payload.get("total_pages") or raw.get("discover_movies_meta", {}).get("total_pages") or 1),
+						"total_results": int(page_payload.get("total_results") or raw.get("discover_movies_meta", {}).get("total_results") or len(results)),
+						"has_more": int(raw.get("discover_movies_meta", {}).get("total_pages") or 1) > 1,
+					}
+					try:
+						cache.set(cache_key, payload, _FILMOGRAPHY_CACHE_TTL_SECONDS)
+					except Exception:
+						pass
+					return payload
+
+		client = TMDbClient.from_settings()
+		payload = client.discover_movies_by_company(
+			company_id,
+			page=page,
+			sort_by=COMPANY_FILMOGRAPHY_SORT_BY,
+			extra_params={"release_date.gte": COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE},
+		)
+		results = [
+			_company_normalize_movie(movie)
+			for movie in (payload.get("results") or [])
+			if isinstance(movie, dict)
+		]
+		results = [movie for movie in results if movie]
+		if any(
+			not str(movie.get("title") or "").strip() or not str(movie.get("poster_path") or "").strip()
+			for movie in results
+		):
+			try:
+				results = hydrate_company_movie_results(results)
+			except Exception:
+				pass
+		normalized = {
+			"source": "filmography",
+			"page": page,
+			"items": results,
+			"total_pages": int(payload.get("total_pages") or 1),
+			"total_results": int(payload.get("total_results") or len(results)),
+			"has_more": page < int(payload.get("total_pages") or 1),
+		}
+		try:
+			cache.set(cache_key, normalized, _FILMOGRAPHY_CACHE_TTL_SECONDS)
+		except Exception:
+			pass
+		return normalized
+
+	client = TMDbClient.from_settings()
+	payload = client.discover_movies_by_company(
+		company_id,
+		page=page,
+		sort_by=COMPANY_TBA_SORT_BY,
+	)
+	page_items = [
+		movie
+		for movie in (
+			_company_normalize_movie(movie)
+			for movie in (payload.get("results") or [])
+			if isinstance(movie, dict)
+		)
+		if movie and not _company_parse_date(movie.get("release_date"))
+	]
+	normalized = {
+		"source": "tba",
+		"page": page,
+		"items": page_items,
+		"total_pages": int(payload.get("total_pages") or 1),
+		"total_results": int(payload.get("total_results") or len(page_items)),
+		"has_more": page < int(payload.get("total_pages") or 1),
+	}
+	try:
+		cache.set(cache_key, normalized, _FILMOGRAPHY_CACHE_TTL_SECONDS)
+	except Exception:
+		pass
+	return normalized
+
+
+def _company_filmography_initial_state(
+	request: HttpRequest,
+	company: Company,
+	*,
+	active_tab: str,
+	followed: bool,
+) -> dict[str, object]:
+	tab = _company_filmography_tab_key(active_tab)
+	raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+	source = _company_filmography_source_key(tab)
+	if followed:
+		if source == "filmography":
+			cached_pages = raw.get("discover_movies_pages")
+			has_cached_page_1 = isinstance(cached_pages, dict) and isinstance(cached_pages.get("1"), dict)
+			page_payload = (
+				_company_filmography_page_payload(
+					company.tmdb_id,
+					tab=tab,
+					page=1,
+					company=company,
+					followed=followed,
+					allow_db_cache=True,
+				)
+				if has_cached_page_1
+				else {
+					"source": source,
+					"page": 1,
+					"items": [],
+					"has_more": True,
+					"total_pages": None,
+					"total_results": 0,
+				}
+			)
+		else:
+			page_payload = _company_filmography_page_payload(
+				company.tmdb_id,
+				tab=tab,
+				page=1,
+				company=company,
+				followed=followed,
+				allow_db_cache=False,
+			)
+	else:
+		page_payload = _company_filmography_page_payload(
+			company.tmdb_id,
+			tab=tab,
+			page=1,
+			company=company,
+			followed=followed,
+			allow_db_cache=True,
+		)
+	if tab == "tba":
+		source_items = [
+			item for item in (page_payload.get("items") or []) if isinstance(item, dict)
+		]
+		items = list(source_items)
+	else:
+		today = timezone.now().date()
+		source_items = [
+			item for item in (page_payload.get("items") or []) if isinstance(item, dict)
+		]
+		items = [
+			item for item in source_items if _company_filter_movie_by_tab(item, tab=tab, today=today)
+		]
+		items = _company_sort_filmography_items(items, tab=tab)
+
+	initial_items = [
+		{
+			"id": int(item.get("id") or 0),
+			"title": str(item.get("title") or item.get("name") or item.get("id") or "-"),
+			"poster_path": str(item.get("poster_path") or ""),
+			"release_date": str(item.get("release_date") or ""),
+			"year": str(item.get("year") or ""),
+		}
+		for item in items
+		if isinstance(item, dict) and isinstance(item.get("id"), int)
+	]
+
+	initial_title = {
+		"released": "Released",
+		"upcoming": "Upcoming",
+		"tba": "TBA",
+	}[tab]
+
+	return {
+		"active_tab": tab,
+		"active_title": initial_title,
+		"source_items": [
+			{
+				"id": int(item.get("id") or 0),
+				"title": str(item.get("title") or item.get("name") or item.get("id") or "-"),
+				"poster_path": str(item.get("poster_path") or ""),
+				"release_date": str(item.get("release_date") or ""),
+				"year": str(item.get("year") or ""),
+			}
+			for item in source_items
+			if isinstance(item, dict) and isinstance(item.get("id"), int)
+		],
+		"items": initial_items,
+		"has_more": bool(page_payload.get("has_more")),
+		"page": int(page_payload.get("page") or 1),
+		"total_pages": page_payload.get("total_pages"),
+		"total_results": page_payload.get("total_results"),
+		"source": page_payload.get("source"),
+	}
+
+
+def _company_filmography_page_json(
+	request: HttpRequest,
+	company: Company,
+	*,
+	tab: str,
+	page: int,
+	followed: bool,
+) -> JsonResponse:
+	payload = _company_filmography_page_payload(
+		company.tmdb_id,
+		tab=tab,
+		page=page,
+		company=company,
+		followed=followed,
+		allow_db_cache=True,
+	)
+	items = [
+		{
+			"id": int(item.get("id") or 0),
+			"title": str(item.get("title") or item.get("name") or item.get("id") or "-"),
+			"poster_path": str(item.get("poster_path") or ""),
+			"release_date": str(item.get("release_date") or ""),
+			"year": str(item.get("year") or ""),
+		}
+		for item in (payload.get("items") or [])
+		if isinstance(item, dict) and isinstance(item.get("id"), int)
+	]
+	return JsonResponse(
+		{
+			"ok": True,
+			"tab": _company_filmography_tab_key(tab),
+			"page": int(payload.get("page") or page),
+			"source": payload.get("source"),
+			"items": items,
+			"has_more": bool(payload.get("has_more")),
+			"total_pages": payload.get("total_pages"),
+			"total_results": payload.get("total_results"),
+		}
+	)
+
+
 @rate_limit(limit=25, window_seconds=60, bucket_name="company_detail")
 @login_required
 def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
@@ -126,17 +473,6 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			return "Inactive"
 		return "Idle"
 
-	mode = (request.GET.get("mode") or "").strip().lower()
-	filmography_mode = "upcoming" if mode in {"upcoming", "tba"} else "filmography"
-
-	page_str = (request.GET.get("page") or "1").strip()
-	try:
-		page = int(page_str)
-	except ValueError:
-		page = 1
-	if page < 1:
-		page = 1
-
 	follow = CompanyFollow.objects.select_related("company").filter(
 		user=request.user, company__tmdb_id=tmdb_id
 	).first()
@@ -160,14 +496,11 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		old_pages = old_tmdb_raw.get("discover_movies_pages")
 		old_baseline_present = isinstance(old_pages, dict) and len(old_pages) > 0
 
-		discover_page = _safe_get_or_sync_company_filmography_page(company, page) if filmography_mode == "filmography" else {}
-
 		# If this request refreshed cached filmography via TTL, record any new arrivals.
 		new_last_sync_at = getattr(company, "tmdb_last_sync_at", None)
 		source = (getattr(company, "tmdb_last_sync_source", "") or "").strip().lower()
 		if (
-			filmography_mode == "filmography"
-			and old_baseline_present
+			old_baseline_present
 			and old_last_sync_at is not None
 			and new_last_sync_at is not None
 			and new_last_sync_at != old_last_sync_at
@@ -209,16 +542,6 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		client = TMDbClient.from_settings()
 		try:
 			raw = client.get_company(tmdb_id)
-			discover_page = (
-				client.discover_movies_by_company(
-					tmdb_id,
-					page=page,
-					sort_by=COMPANY_FILMOGRAPHY_SORT_BY,
-					extra_params={"release_date.gte": COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE},
-				)
-				if filmography_mode == "filmography"
-				else {}
-			)
 		except Exception:  # noqa: BLE001
 			messages.error(request, "TMDb data is temporarily unavailable. Please try again soon.")
 			return redirect("search")
@@ -253,253 +576,30 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				seen_names.add(name)
 				alternative_names.append(name)
 
-	filmography_items: list[dict] = []
-	prev_page = page - 1
-	next_page = page + 1
-	has_prev = page > 1
-	has_next = False
-	total_pages: int | None = None
-	total_results: int | None = None
-	upcoming_total_pages: int | None = None
-	upcoming_total_pages_plus = False
-
-	if filmography_mode == "filmography":
-		# Dated filmography: query already excludes null dates.
-		movies_all = discover_page.get("results") or []
-		today = timezone.now().date()
-		movies = [m for m in list(movies_all) if isinstance(m, dict)]
-		for m in movies:
-			release_dt = _parse_iso_date(str(m.get("release_date") or m.get("year") or ""))
-			m["countdown_text"] = (
-				_countdown_text(today=today, release_dt=release_dt)
-				if release_dt is not None
-				else ""
-			)
-		filmography_items = movies
-		total_pages = int(discover_page.get("total_pages") or 1)
-		total_results = int(discover_page.get("total_results") or 0)
-
-		# If user requested a page beyond TMDb totals, refetch the last page.
-		if page > total_pages and total_pages >= 1:
-			page = total_pages
-			has_prev = page > 1
-			prev_page = page - 1
-			next_page = page + 1
-			if follow:
-				discover_page = _safe_get_or_sync_company_filmography_page(company, page)
-				movies_all = discover_page.get("results") or []
-				movies = [m for m in list(movies_all) if isinstance(m, dict)]
-				for m in movies:
-					release_dt = _parse_iso_date(str(m.get("release_date") or m.get("year") or ""))
-					m["countdown_text"] = (
-						_countdown_text(today=today, release_dt=release_dt)
-						if release_dt is not None
-						else ""
-					)
-				filmography_items = movies
-			else:
-				client = TMDbClient.from_settings()
-				discover_page = client.discover_movies_by_company(
-					tmdb_id,
-					page=page,
-					sort_by=COMPANY_FILMOGRAPHY_SORT_BY,
-					extra_params={"release_date.gte": COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE},
-				)
-				movies_all = discover_page.get("results") or []
-				movies = [m for m in list(movies_all) if isinstance(m, dict)]
-				for m in movies:
-					release_dt = _parse_iso_date(str(m.get("release_date") or m.get("year") or ""))
-					m["countdown_text"] = (
-						_countdown_text(today=today, release_dt=release_dt)
-						if release_dt is not None
-						else ""
-					)
-				filmography_items = movies
-				total_pages = int(discover_page.get("total_pages") or total_pages or 1)
-				total_results = int(discover_page.get("total_results") or total_results or 0)
-
-		has_next = page < (total_pages or 1)
-	else:
-		# Upcoming (TBA): browse missing-release-date titles with a normal pager.
-		page_size = 20
-		if follow:
-			filmography_items, has_prev, has_next = get_or_sync_company_tba_movies_page(
-				company,
-				page=page,
-				page_size=page_size,
-			)
-			tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
-			tba_movies_raw = tmdb_raw.get("tba_movies")
-			tba_movies = (
-				[m for m in tba_movies_raw if isinstance(m, dict)]
-				if isinstance(tba_movies_raw, list)
-				else []
-			)
-			tba_count = len(tba_movies)
-			tba_scan_meta = tmdb_raw.get("tba_scan_meta")
-			if not isinstance(tba_scan_meta, dict):
-				tba_scan_meta = {}
-			scan_page = int(tba_scan_meta.get("scan_page") or 0)
-			discover_total_pages = tba_scan_meta.get("discover_total_pages")
-			try:
-				discover_total_pages_int = (
-					int(discover_total_pages) if discover_total_pages is not None else None
-				)
-			except (TypeError, ValueError):
-				discover_total_pages_int = None
-			scan_complete = (
-				discover_total_pages_int is not None and scan_page >= discover_total_pages_int
-			)
-			upcoming_total_pages = max(1, (tba_count + page_size - 1) // page_size)
-			upcoming_total_pages_plus = not scan_complete
-
-			# If scan is complete, clamp out-of-range requests.
-			if scan_complete and page > upcoming_total_pages:
-				page = upcoming_total_pages
-				prev_page = page - 1
-				next_page = page + 1
-				has_prev = page > 1
-				filmography_items, has_prev, has_next = get_or_sync_company_tba_movies_page(
-					company,
-					page=page,
-					page_size=page_size,
-				)
-		else:
-			client = TMDbClient.from_settings()
-			dedup: dict[int, dict] = {}
-			desired_end = page * page_size
-			scan_page = 0
-			discover_total_pages: int | None = None
-			while len(dedup) < desired_end:
-				if discover_total_pages is not None and scan_page >= discover_total_pages:
-					break
-				if scan_page >= 500:
-					break
-				scan_page += 1
-				payload = client.discover_movies_by_company(
-					tmdb_id,
-					page=scan_page,
-					sort_by="popularity.desc",
-				)
-				if discover_total_pages is None:
-					try:
-						discover_total_pages = int(payload.get("total_pages") or 0) or None
-					except (TypeError, ValueError):
-						discover_total_pages = None
-				results = payload.get("results") or []
-				if not results:
-					if discover_total_pages is None:
-						discover_total_pages = scan_page
-					break
-				for m in results:
-					if not isinstance(m, dict):
-						continue
-					mid = m.get("id")
-					if not isinstance(mid, int) or mid in dedup:
-						continue
-					release_date_str = str(m.get("release_date") or "").strip()
-					if release_date_str:
-						release_dt = _parse_iso_date(release_date_str)
-						if release_dt is not None and release_dt < timezone.now().date():
-							continue
-						dedup[mid] = {"id": mid, "release_date": release_date_str}
-					else:
-						dedup[mid] = {"id": mid}
-					if len(dedup) >= desired_end:
-						break
-			tba_movies = list(dedup.values())
-			scan_complete = (
-				discover_total_pages is not None and scan_page >= int(discover_total_pages)
-			)
-			tba_count = len(tba_movies)
-			upcoming_total_pages = max(1, (tba_count + page_size - 1) // page_size)
-			upcoming_total_pages_plus = not scan_complete
-			if scan_complete and page > upcoming_total_pages:
-				page = upcoming_total_pages
-			start = (page - 1) * page_size
-			end = start + page_size
-			filmography_items = tba_movies[start:end]
-			has_prev = page > 1
-			has_next = len(tba_movies) > end or (
-				discover_total_pages is None or scan_page < discover_total_pages
-			)
-
-	if follow and filmography_mode == "filmography" and page > 1 and filmography_items:
-		# Page 1 is stored in DB. Later pages are hydrated on demand from TMDb so
-		# they can still show posters and other movie details.
-		filmography_items = hydrate_company_movie_results(filmography_items)
-	if filmography_mode == "upcoming" and filmography_items:
-		filmography_items = hydrate_company_movie_results(filmography_items)
-	# Determine whether the company has any TBA (upcoming-without-date) titles.
-	# Show the Upcoming toggle only when we can confirm TBA titles exist.
-	def _live_tba_scan(max_pages: int) -> bool:
-		try:
-			client = TMDbClient.from_settings()
-			for scan_page in range(1, max_pages + 1):
-				payload = client.discover_movies_by_company(tmdb_id, page=scan_page, sort_by="popularity.desc")
-				results = payload.get("results") or []
-				for m in results:
-					if not isinstance(m, dict):
-						continue
-					release_date_str = str(m.get("release_date") or "").strip()
-					if not release_date_str:
-						return True
-					release_dt = _parse_iso_date(release_date_str)
-					if release_dt is not None and release_dt >= timezone.now().date():
-						return True
-				try:
-					total_pages = int(payload.get("total_pages") or 0)
-				except (TypeError, ValueError):
-					total_pages = 0
-				if total_pages and scan_page >= total_pages:
-					break
-			return False
-		except Exception:
-			# On errors, assume no TBA (user requested strict behavior).
-			return False
-
+	active_tab = _company_filmography_tab_key(request.GET.get("tab") or request.GET.get("mode"))
+	if request.GET.get("mode") == "upcoming" and not request.GET.get("tab"):
+		active_tab = "tba"
+	filmography_initial_state = _company_filmography_initial_state(
+		request,
+		company,
+		active_tab=active_tab,
+		followed=is_followed,
+	)
+	filmography_initial_items = list(filmography_initial_state.get("items") or [])
+	filmography_page_url = reverse("company_filmography_page", args=[tmdb_id])
 	has_tba = False
-	max_scan = getattr(settings, "TMDB_COMPANY_TBA_LIVE_SCAN_PAGES", 5)
-	try:
-		max_scan_int = max(1, int(max_scan))
-	except (TypeError, ValueError):
-		max_scan_int = 5
-
-	if isinstance(getattr(company, "tmdb_raw", None), dict):
-		tmdb_raw = company.tmdb_raw or {}
-		tba_movies_raw = tmdb_raw.get("tba_movies")
-		if isinstance(tba_movies_raw, list) and any(isinstance(m, dict) for m in tba_movies_raw):
-			has_tba = True
-		else:
-			tba_scan_meta = tmdb_raw.get("tba_scan_meta")
-			if isinstance(tba_scan_meta, dict):
-				scan_page = int(tba_scan_meta.get("scan_page") or 0)
-				discover_total_pages = tba_scan_meta.get("discover_total_pages")
-				try:
-					discover_total_pages_int = (
-						int(discover_total_pages) if discover_total_pages is not None else None
-					)
-				except (TypeError, ValueError):
-					discover_total_pages_int = None
-				if discover_total_pages_int is not None and scan_page >= discover_total_pages_int:
-					# Completed scan; if no cached TBA items, assume none.
-					has_tba = isinstance(tba_movies_raw, list) and any(isinstance(m, dict) for m in tba_movies_raw)
-				else:
-					# Scan incomplete — perform a short live scan to confirm.
-					has_tba = _live_tba_scan(max_scan_int)
-			else:
-				# No scan metadata — perform a short live scan to confirm.
-				has_tba = _live_tba_scan(max_scan_int)
-	else:
-		# No cached company data — perform a short live scan to detect TBA titles.
-		has_tba = _live_tba_scan(max_scan_int)
+	tba_movies_raw = raw_company.get("tba_movies")
+	if isinstance(tba_movies_raw, list) and any(isinstance(movie, dict) for movie in tba_movies_raw):
+		has_tba = True
+	elif active_tab == "tba" and filmography_initial_items:
+		has_tba = True
 
 	company_status_label = ""
 	if is_followed:
 		if isinstance(company.tmdb_raw, dict) and company.tmdb_raw.get("discover_movies_pages"):
 			company_status_label = _get_company_status_label(company=company, has_tba_hint=has_tba)
 		else:
-			fallback_results = filmography_items if filmography_items else None
+			fallback_results = filmography_initial_items if filmography_initial_items else None
 			company_status_label = _get_company_status_label(
 				company=company,
 				fallback_results=fallback_results,
@@ -512,23 +612,59 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		{
 			"has_tba": has_tba,
 			"company": company,
-			"filmography_mode": filmography_mode,
-			"filmography_items": filmography_items,
-			"has_prev": has_prev,
-			"has_next": has_next,
-			"prev_page": prev_page,
-			"next_page": next_page,
-			"page": page,
-			"total_pages": total_pages,
-			"total_results": total_results,
-			"upcoming_total_pages": upcoming_total_pages,
-			"upcoming_total_pages_plus": upcoming_total_pages_plus,
+			"filmography_active_tab": active_tab,
+			"filmography_initial_state": filmography_initial_state,
+			"filmography_initial_items": filmography_initial_items,
+			"filmography_page_url": filmography_page_url,
 			"company_status_label": company_status_label,
 			"is_followed": is_followed,
 			"note_text": note_text,
 			"related_links": related_links,
 			"alternative_names": alternative_names,
 		},
+	)
+
+
+@login_required
+@rate_limit(limit=60, window_seconds=60, bucket_name="company_detail_page")
+def company_filmography_page(request: HttpRequest, tmdb_id: int) -> HttpResponse:
+	tab = _company_filmography_tab_key(request.GET.get("tab") or request.GET.get("mode"))
+	if request.GET.get("mode") == "upcoming" and not request.GET.get("tab"):
+		tab = "tba"
+
+	page_str = (request.GET.get("page") or "1").strip()
+	try:
+		page = max(1, int(page_str))
+	except ValueError:
+		page = 1
+
+	follow = CompanyFollow.objects.select_related("company").filter(
+		user=request.user, company__tmdb_id=tmdb_id
+	).first()
+	followed = bool(follow)
+
+	if follow:
+		company = follow.company
+	else:
+		company = Company.objects.filter(tmdb_id=tmdb_id).only("tmdb_id", "tmdb_raw", "name").first()
+		if company is None:
+			client = TMDbClient.from_settings()
+			try:
+				raw = client.get_company(tmdb_id)
+			except Exception:  # noqa: BLE001
+				return JsonResponse({"ok": False, "error": "TMDb data is temporarily unavailable."}, status=503)
+			company = SimpleNamespace(
+				tmdb_id=tmdb_id,
+				name=(raw.get("name") or str(tmdb_id)),
+				tmdb_raw=raw if isinstance(raw, dict) else {},
+			)
+
+	return _company_filmography_page_json(
+		request,
+		company,
+		tab=tab,
+		page=page,
+		followed=followed,
 	)
 
 
