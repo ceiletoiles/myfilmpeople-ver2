@@ -1,0 +1,66 @@
+.diary-backdrop-picker-image {
+	aspect-ratio: 16 / 9;
+	object-fit: cover;
+}
+
+.diary-backdrop-picker-page .diary-poster-picker-grid {
+	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	gap: 1rem;
+}
+
+.diary-backdrop-picker-page .diary-poster-picker-details {
+	align-items: center;
+}
+
+.diary-backdrop-picker-page .diary-poster-picker-meta {
+	font-size: 0.84rem;
+	line-height: 1.35;
+}
+
+@media (max-width: 900px) {
+	.diary-backdrop-picker-page .diary-poster-picker-header {
+		align-items: flex-start;
+	}
+
+	.diary-backdrop-picker-page .diary-poster-picker-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.8rem;
+	}
+
+	.diary-backdrop-picker-page .diary-poster-picker-details {
+		gap: 0.2rem;
+	}
+
+	.diary-backdrop-picker-page .diary-poster-picker-meta {
+		font-size: 0.72rem;
+		line-height: 1.25;
+		white-space: normal;
+	}
+
+	.diary-backdrop-picker-image {
+		aspect-ratio: 16 / 9;
+	}
+}
+
+@media (max-width: 420px) {
+	.diary-backdrop-picker-page .diary-poster-picker-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.diary-backdrop-picker-page .diary-poster-picker-header {
+		gap: 0.25rem 0.4rem;
+	}
+
+	.diary-backdrop-picker-page .diary-poster-picker-header h2 {
+		font-size: 1.05rem;
+	}
+
+	.diary-backdrop-picker-page .diary-poster-picker-year,
+	.diary-backdrop-picker-page .diary-poster-picker-count {
+		font-size: 0.74rem;
+	}
+
+	.diary-backdrop-picker-page .diary-poster-picker-selected {
+		font-size: 0.62rem;
+	}
+}

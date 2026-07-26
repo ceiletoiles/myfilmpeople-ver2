@@ -39,7 +39,7 @@ DIARY_SYNC_JOB_TTL_SECONDS = 60 * 60
 DIARY_SYNC_STALE_SECONDS = 60 * 60
 LETTERBOXD_RSS_MAX_ITEMS = 50
 
-_DIARY_POSTER_LANGUAGE_CODES = {
+_DIARY_IMAGE_LANGUAGE_CODES = {
 	"en",
 	"",
 	"xx",
@@ -54,6 +54,7 @@ _DIARY_POSTER_LANGUAGE_CODES = {
 	"gu",
 	"or",
 }
+_DIARY_POSTER_LANGUAGE_CODES = _DIARY_IMAGE_LANGUAGE_CODES
 
 _STAR_RE = re.compile(r"[★☆]+")
 _RATING_STAR_RE = re.compile(r"[\u2605\u2606]+")
@@ -517,7 +518,13 @@ def _diary_safe_return_to(request: HttpRequest, fallback: str) -> str:
 	return fallback
 
 
-def _diary_movie_poster_candidates(movie_id: int) -> list[dict[str, object]]:
+def _diary_movie_image_candidates(
+	movie_id: int,
+	*,
+	image_key: str,
+	image_size: str,
+	sort_by_aspect_ratio: bool = False,
+) -> list[dict[str, object]]:
 	try:
 		client = TMDbClient.from_settings()
 		payload = client.get_movie_images(
@@ -528,41 +535,63 @@ def _diary_movie_poster_candidates(movie_id: int) -> list[dict[str, object]]:
 	except Exception:
 		return []
 
-	posters = payload.get("posters") or []
-	if not isinstance(posters, list):
+	images = payload.get(image_key) or []
+	if not isinstance(images, list):
 		return []
 
 	results: list[dict[str, object]] = []
-	for poster in posters:
-		if not isinstance(poster, dict):
+	for image in images:
+		if not isinstance(image, dict):
 			continue
-		lang = str(poster.get("iso_639_1") or "").strip().lower()
-		if lang not in _DIARY_POSTER_LANGUAGE_CODES:
+		lang = str(image.get("iso_639_1") or "").strip().lower()
+		if lang not in _DIARY_IMAGE_LANGUAGE_CODES:
 			continue
-		file_path = str(poster.get("file_path") or "").strip()
+		file_path = str(image.get("file_path") or "").strip()
 		if not file_path:
 			continue
 		results.append(
 			{
 				"file_path": file_path,
-				"aspect_ratio": poster.get("aspect_ratio"),
-				"height": poster.get("height"),
-				"width": poster.get("width"),
+				"aspect_ratio": image.get("aspect_ratio"),
+				"height": image.get("height"),
+				"width": image.get("width"),
 				"iso_639_1": lang,
-				"vote_average": poster.get("vote_average"),
-				"vote_count": poster.get("vote_count"),
-				"url": tmdb_image_url(file_path, size="w500"),
+				"vote_average": image.get("vote_average"),
+				"vote_count": image.get("vote_count"),
+				"url": tmdb_image_url(file_path, size=image_size),
 			}
 		)
 
-	results.sort(
-		key=lambda item: (
-			-(float(item.get("vote_average") or 0.0)),
-			-(int(item.get("vote_count") or 0)),
-			str(item.get("file_path") or "").casefold(),
+	if sort_by_aspect_ratio:
+		results.sort(
+			key=lambda item: (
+				-(float(item.get("aspect_ratio") or 0.0)),
+				-(int(item.get("vote_count") or 0)),
+				str(item.get("file_path") or "").casefold(),
+			)
 		)
-	)
+	else:
+		results.sort(
+			key=lambda item: (
+				-(float(item.get("vote_average") or 0.0)),
+				-(int(item.get("vote_count") or 0)),
+				str(item.get("file_path") or "").casefold(),
+			)
+		)
 	return results
+
+
+def _diary_movie_poster_candidates(movie_id: int) -> list[dict[str, object]]:
+	return _diary_movie_image_candidates(movie_id, image_key="posters", image_size="w500")
+
+
+def _diary_movie_backdrop_candidates(movie_id: int) -> list[dict[str, object]]:
+	return _diary_movie_image_candidates(
+		movie_id,
+		image_key="backdrops",
+		image_size="w780",
+		sort_by_aspect_ratio=True,
+	)
 
 
 def _diary_group_posters(posters: list[dict[str, object]]) -> dict[str, list[dict[str, object]]]:
@@ -576,6 +605,10 @@ def _diary_group_posters(posters: list[dict[str, object]]) -> dict[str, list[dic
 		elif lang in {"hi", "ta", "te", "kn", "ml", "bn", "mr", "pa", "gu", "or"}:
 			grouped["indian"].append(poster)
 	return grouped
+
+
+def _diary_group_backdrops(backdrops: list[dict[str, object]]) -> dict[str, list[dict[str, object]]]:
+	return _diary_group_posters(backdrops)
 
 
 def _upsert_diary_entry(
@@ -1566,6 +1599,62 @@ def diary_entry_posters(request: HttpRequest, entry_id: int) -> HttpResponse:
 
 
 @login_required
+def diary_entry_backdrops(request: HttpRequest, entry_id: int) -> HttpResponse:
+	entry = _find_diary_entry_for_user(request.user, entry_id)
+	if entry is None:
+		messages.error(request, "Diary entry not found.")
+		return redirect(_diary_redirect_target(request))
+
+	fallback_url = reverse("diary_entry_backdrops", kwargs={"entry_id": entry.id})
+	return_to = _diary_safe_return_to(request, _diary_redirect_target(request))
+
+	if request.method == "POST":
+		if entry.tmdb_id is None:
+			messages.error(request, "Pick a matched movie before choosing a backdrop.")
+			return redirect(return_to)
+
+		selected_backdrop_path = (request.POST.get("backdrop_path") or "").strip()
+		candidates = _diary_movie_backdrop_candidates(entry.tmdb_id)
+		allowed_paths = {str(candidate.get("file_path") or "").strip() for candidate in candidates}
+		if selected_backdrop_path not in allowed_paths:
+			messages.error(request, "Selected backdrop is no longer available.")
+			return redirect(fallback_url)
+
+		entry.backdrop_path = selected_backdrop_path
+		entry.save(update_fields=["backdrop_path", "updated_at"])
+
+		if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in (request.headers.get("accept") or ""):
+			return JsonResponse(
+				{
+					"ok": True,
+					"entry": {
+						"id": entry.id,
+						"backdrop_path": entry.backdrop_path,
+					},
+				}
+			)
+		return redirect(return_to)
+
+	if entry.tmdb_id is None:
+		messages.error(request, "Pick a matched movie before choosing a backdrop.")
+		return redirect(return_to)
+
+	backdrops = _diary_movie_backdrop_candidates(entry.tmdb_id)
+	grouped_backdrops = _diary_group_backdrops(backdrops)
+	context = {
+		"entry": entry,
+		"backdrops": backdrops,
+		"backdrop_count": len(backdrops),
+		"english_backdrops": grouped_backdrops["en"],
+		"no_language_backdrops": grouped_backdrops["none"],
+		"indian_language_backdrops": grouped_backdrops["indian"],
+		"return_to": return_to,
+		"page_title": f"Choose backdrop for {entry.original_title}",
+	}
+	return render(request, "catalog/diary_entry_backdrops.html", context)
+
+
+@login_required
 def diary_entry_update(request: HttpRequest, entry_id: int) -> HttpResponse:
 	if request.method != "POST":
 		return redirect("diary")
@@ -1592,6 +1681,7 @@ def diary_entry_update(request: HttpRequest, entry_id: int) -> HttpResponse:
 			entry.tmdb_id = movie.tmdb_id
 			entry.official_title = movie.title
 			entry.poster_path = movie.poster_path
+			entry.backdrop_path = ""
 			entry.release_date = movie.release_date
 			entry.match_source = DiaryEntry.MatchSource.MANUAL
 			entry.manual_lock = True
@@ -1627,6 +1717,7 @@ def diary_entry_update(request: HttpRequest, entry_id: int) -> HttpResponse:
 			"tmdb_id",
 			"official_title",
 			"poster_path",
+			"backdrop_path",
 			"release_date",
 			"match_source",
 			"manual_lock",
@@ -1643,6 +1734,7 @@ def diary_entry_update(request: HttpRequest, entry_id: int) -> HttpResponse:
 					"tmdb_id": entry.tmdb_id,
 					"official_title": entry.official_title,
 					"poster_path": entry.poster_path,
+					"backdrop_path": entry.backdrop_path,
 					"release_date": entry.release_date.isoformat() if entry.release_date else "",
 					"rating": str(entry.rating) if entry.rating is not None else "",
 					"liked": entry.liked,

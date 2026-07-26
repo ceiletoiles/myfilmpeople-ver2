@@ -17,7 +17,7 @@ from django.utils import timezone
 
 from .context_processors import new_arrivals_context
 from .models import Company, CompanyFollow, DiaryAccount, DiaryEntry, Movie, NewMovieArrival, NewsletterIssue, NewsletterItem, NewsletterItemSeen, Person, PersonFollow
-from .related_links import build_person_related_links
+from .related_links import build_movie_related_links, build_person_related_links
 from .newsletter import parse_issue, publish_issue, split_newsletter_items, upsert_issue_from_raw_text
 from .new_movie_helpers import (
 	build_person_comeback_event_meta,
@@ -1639,6 +1639,77 @@ class RelatedLinksTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertIn("related_links", response.context)
 		self.assertTrue(any(link["label"] == "TMDb" for link in response.context["related_links"]))
+
+	def test_build_movie_related_links_includes_letterboxd_premiere_search(self) -> None:
+		raw = {
+			"title": "Obsession",
+			"release_date": "2026-01-23",
+			"release_dates": {
+				"results": [
+					{
+						"iso_3166_1": "CA",
+						"release_dates": [
+							{
+								"release_date": "2025-09-06T00:00:00.000Z",
+								"type": 1,
+								"note": "TIFF premiere",
+							},
+							{
+								"release_date": "2026-01-23T00:00:00.000Z",
+								"type": 3,
+								"note": "Theatrical release",
+							},
+						],
+					}
+				]
+			},
+		}
+
+		links = build_movie_related_links(1339713, raw)
+		letterboxd = next(link for link in links if link["label"] == "Letterboxd")
+		self.assertEqual(
+			letterboxd["url"],
+			"https://letterboxd.com/search/films/Obsession%202025/",
+		)
+
+	def test_build_movie_related_links_falls_back_to_earliest_release_date(self) -> None:
+		raw = {
+			"title": "Obsession",
+			"release_date": "2026-01-23",
+			"release_dates": {
+				"results": [
+					{
+						"iso_3166_1": "US",
+						"release_dates": [
+							{
+								"release_date": "2026-01-23T00:00:00.000Z",
+								"type": 3,
+							}
+						],
+					}
+				]
+			},
+		}
+
+		links = build_movie_related_links(1339713, raw)
+		letterboxd = next(link for link in links if link["label"] == "Letterboxd")
+		self.assertEqual(
+			letterboxd["url"],
+			"https://letterboxd.com/search/films/Obsession%202026/",
+		)
+
+	def test_build_movie_related_links_falls_back_to_movie_release_year(self) -> None:
+		raw = {
+			"title": "Obsession",
+			"release_date": "2026-01-23",
+		}
+
+		links = build_movie_related_links(1339713, raw)
+		letterboxd = next(link for link in links if link["label"] == "Letterboxd")
+		self.assertEqual(
+			letterboxd["url"],
+			"https://letterboxd.com/search/films/Obsession%202026/",
+		)
 
 	@patch("catalog.views.person.get_person_status_label", return_value="Upcoming")
 	@patch("catalog.views.person.get_or_sync_person")

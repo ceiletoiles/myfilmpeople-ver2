@@ -509,8 +509,9 @@
     const metaEl = document.querySelector('[data-diary-editor-meta]');
     const kickerEl = document.querySelector('[data-diary-editor-kicker]');
     const posterEl = document.querySelector('[data-diary-editor-poster]');
-    const viewLink = document.querySelector('[data-diary-editor-view]');
+    const viewButton = document.querySelector('[data-diary-editor-view]');
     const postersButton = document.querySelector('[data-diary-editor-posters]');
+    const backdropsButton = document.querySelector('[data-diary-editor-backdrops]');
     const editButton = document.querySelector('[data-diary-editor-edit]');
     const cancelEditButton = document.querySelector('[data-diary-editor-cancel-edit]');
     const releaseDisplay = document.querySelector('[data-diary-editor-release]');
@@ -541,6 +542,7 @@
       !kickerEl ||
       !posterEl ||
       !postersButton ||
+      !backdropsButton ||
       !editButton ||
       !cancelEditButton ||
       !releaseDisplay ||
@@ -693,6 +695,7 @@
       activeCard.setAttribute('data-entry-rewatch', entry.rewatch ? '1' : '0');
       activeCard.setAttribute('data-entry-review', entry.review || '');
       activeCard.setAttribute('data-entry-poster-path', entry.poster_path || '');
+      activeCard.setAttribute('data-entry-backdrop-path', entry.backdrop_path || '');
       activeCard.setAttribute('data-entry-movie-url', entry.tmdb_id ? ('/movie/' + String(entry.tmdb_id) + '/') : '');
 
       const titleEl = activeCard.querySelector('.diary-entry-title');
@@ -767,6 +770,15 @@
       window.location.href = postersUrl + '?return_to=' + encodeURIComponent(returnTo);
     }
 
+    function openBackdropPicker(card) {
+      if (!(card instanceof HTMLElement)) return;
+      const backdropsUrl = card.getAttribute('data-entry-backdrops-url') || '';
+      if (!backdropsUrl) return;
+      saveScrollPosition();
+      const returnTo = window.location.pathname + window.location.search + window.location.hash;
+      window.location.href = backdropsUrl + '?return_to=' + encodeURIComponent(returnTo);
+    }
+
     function closeEditor() {
       activeCard = null;
       searchInput.value = '';
@@ -785,9 +797,12 @@
     function setSelectedMovie(movie) {
       if (!movie) return;
       tmdbIdInput.value = String(movie.tmdb_id || '');
-      if (viewLink && movie.url) {
-        viewLink.href = movie.url;
-        viewLink.hidden = false;
+      if (viewButton && movie.url) {
+        viewButton.setAttribute('data-entry-movie-url', movie.url);
+        viewButton.hidden = false;
+      } else if (viewButton) {
+        viewButton.hidden = true;
+        viewButton.removeAttribute('data-entry-movie-url');
       }
       if (movie.poster_path) {
         posterEl.src = 'https://image.tmdb.org/t/p/w342' + movie.poster_path;
@@ -918,14 +933,16 @@
       populateForm(card);
 
       const movieUrl = card.getAttribute('data-entry-movie-url') || '';
-      if (viewLink && movieUrl) {
-        viewLink.href = movieUrl;
-        viewLink.hidden = false;
-      } else if (viewLink) {
-        viewLink.hidden = true;
+      if (viewButton && movieUrl) {
+        viewButton.setAttribute('data-entry-movie-url', movieUrl);
+        viewButton.hidden = false;
+      } else if (viewButton) {
+        viewButton.hidden = true;
+        viewButton.removeAttribute('data-entry-movie-url');
       }
 
       const postersUrl = card.getAttribute('data-entry-posters-url') || '';
+      const backdropsUrl = card.getAttribute('data-entry-backdrops-url') || '';
       if (movieUrl && postersUrl) {
         postersButton.hidden = false;
         postersButton.disabled = false;
@@ -934,6 +951,16 @@
         postersButton.hidden = true;
         postersButton.disabled = true;
         postersButton.removeAttribute('data-entry-posters-url');
+      }
+
+      if (backdropsUrl) {
+        backdropsButton.hidden = false;
+        backdropsButton.disabled = false;
+        backdropsButton.setAttribute('data-entry-backdrops-url', backdropsUrl);
+      } else {
+        backdropsButton.hidden = true;
+        backdropsButton.disabled = true;
+        backdropsButton.removeAttribute('data-entry-backdrops-url');
       }
 
       setEditorMode('view');
@@ -1010,9 +1037,21 @@
       setEditorMode('edit');
     });
 
+    if (viewButton) {
+      viewButton.addEventListener('click', function () {
+        if (!activeCard) return;
+        navigateToMovie(activeCard);
+      });
+    }
+
     postersButton.addEventListener('click', function () {
       if (!activeCard) return;
       openPosterPicker(activeCard);
+    });
+
+    backdropsButton.addEventListener('click', function () {
+      if (!activeCard) return;
+      openBackdropPicker(activeCard);
     });
 
     cancelEditButton.addEventListener('click', function () {

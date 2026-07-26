@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Choose Backdrop{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260723a" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary_backdrop_images.css?v=20260726a" />
+{% endblock %}
+
+{% block page_header %}
+  <div class="page-header diary-page-header">
+    <button type="button" class="nav-icon-btn" data-menu-toggle aria-controls="site-drawer" aria-expanded="false">
+      <img class="nav-icon" src="{% static 'img/menu.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
+      <span class="sr-only">Open menu</span>
+    </button>
+    <div class="page-header-content">
+      <h1>Choose backdrop</h1>
+    </div>
+    <span class="page-header-spacer" aria-hidden="true"></span>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <section class="diary-poster-picker diary-backdrop-picker-page">
+    <div class="diary-poster-picker-header">
+      <h2>{{ entry.original_title }}</h2>
+      {% if entry.original_release_year %}<span class="diary-poster-picker-year">{{ entry.original_release_year }}</span>{% endif %}
+      <span class="diary-poster-picker-count">{{ backdrop_count }} backdrops</span>
+    </div>
+
+    {% if load_error %}
+      <section class="diary-card">
+        <p class="muted">{{ load_error }}</p>
+      </section>
+    {% endif %}
+
+    {% if backdrops %}
+      {% if english_backdrops %}
+        <section class="diary-poster-picker-group" aria-label="English backdrops">
+          <div class="diary-poster-picker-group-head">
+            <h3>English</h3>
+            <span>{{ english_backdrops|length }}</span>
+          </div>
+          <div class="diary-poster-picker-grid">
+            {% for backdrop in english_backdrops %}
+              <article class="diary-poster-picker-card{% if backdrop.file_path == entry.backdrop_path %} is-selected{% endif %}">
+                <form method="post" action="{% url 'diary_entry_backdrops' entry.id %}" class="diary-poster-picker-form">
+                  {% csrf_token %}
+                  <input type="hidden" name="backdrop_path" value="{{ backdrop.file_path|escape }}" />
+                  <input type="hidden" name="return_to" value="{{ return_to|escape }}" />
+                  <button
+                    type="submit"
+                    class="diary-poster-picker-button"
+                    aria-label="Select English backdrop {{ forloop.counter }} for {{ entry.original_title }}"
+                  >
+                    <img class="diary-poster-picker-image diary-backdrop-picker-image" src="{{ backdrop.url }}" alt="" loading="lazy" />
+                  </button>
+                </form>
+                <div class="diary-poster-picker-details">
+                  <span class="diary-poster-picker-meta">
+                    {{ backdrop.width }}&times;{{ backdrop.height }} · Rating {{ backdrop.vote_average|default:"0" }} · Votes {{ backdrop.vote_count|default:"0" }}
+                  </span>
+                  {% if backdrop.file_path == entry.backdrop_path %}
+                    <span class="diary-poster-picker-selected">Current backdrop</span>
+                  {% endif %}
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
+
+      {% if no_language_backdrops %}
+        <section class="diary-poster-picker-group" aria-label="No language backdrops">
+          <div class="diary-poster-picker-group-head">
+            <h3>No language</h3>
+            <span>{{ no_language_backdrops|length }}</span>
+          </div>
+          <div class="diary-poster-picker-grid">
+            {% for backdrop in no_language_backdrops %}
+              <article class="diary-poster-picker-card{% if backdrop.file_path == entry.backdrop_path %} is-selected{% endif %}">
+                <form method="post" action="{% url 'diary_entry_backdrops' entry.id %}" class="diary-poster-picker-form">
+                  {% csrf_token %}
+                  <input type="hidden" name="backdrop_path" value="{{ backdrop.file_path|escape }}" />
+                  <input type="hidden" name="return_to" value="{{ return_to|escape }}" />
+                  <button
+                    type="submit"
+                    class="diary-poster-picker-button"
+                    aria-label="Select no language backdrop {{ forloop.counter }} for {{ entry.original_title }}"
+                  >
+                    <img class="diary-poster-picker-image diary-backdrop-picker-image" src="{{ backdrop.url }}" alt="" loading="lazy" />
+                  </button>
+                </form>
+                <div class="diary-poster-picker-details">
+                  <span class="diary-poster-picker-meta">
+                    {{ backdrop.width }}&times;{{ backdrop.height }} · Rating {{ backdrop.vote_average|default:"0" }} · Votes {{ backdrop.vote_count|default:"0" }}
+                  </span>
+                  {% if backdrop.file_path == entry.backdrop_path %}
+                    <span class="diary-poster-picker-selected">Current backdrop</span>
+                  {% endif %}
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
+
+      {% if indian_language_backdrops %}
+        <section class="diary-poster-picker-group" aria-label="Indian language backdrops">
+          <div class="diary-poster-picker-group-head">
+            <h3>Indian languages</h3>
+            <span>{{ indian_language_backdrops|length }}</span>
+          </div>
+          <div class="diary-poster-picker-grid">
+            {% for backdrop in indian_language_backdrops %}
+              <article class="diary-poster-picker-card{% if backdrop.file_path == entry.backdrop_path %} is-selected{% endif %}">
+                <form method="post" action="{% url 'diary_entry_backdrops' entry.id %}" class="diary-poster-picker-form">
+                  {% csrf_token %}
+                  <input type="hidden" name="backdrop_path" value="{{ backdrop.file_path|escape }}" />
+                  <input type="hidden" name="return_to" value="{{ return_to|escape }}" />
+                  <button
+                    type="submit"
+                    class="diary-poster-picker-button"
+                    aria-label="Select Indian language backdrop {{ forloop.counter }} for {{ entry.original_title }}"
+                  >
+                    <img class="diary-poster-picker-image diary-backdrop-picker-image" src="{{ backdrop.url }}" alt="" loading="lazy" />
+                  </button>
+                </form>
+                <div class="diary-poster-picker-details">
+                  <span class="diary-poster-picker-meta">
+                    {{ backdrop.width }}&times;{{ backdrop.height }} · Rating {{ backdrop.vote_average|default:"0" }} · Votes {{ backdrop.vote_count|default:"0" }}
+                  </span>
+                  {% if backdrop.file_path == entry.backdrop_path %}
+                    <span class="diary-poster-picker-selected">Current backdrop</span>
+                  {% endif %}
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
+    {% else %}
+      <section class="diary-card">
+        <p class="muted">TMDb did not return any supported backdrops for this movie.</p>
+      </section>
+    {% endif %}
+  </section>
+{% endblock %}

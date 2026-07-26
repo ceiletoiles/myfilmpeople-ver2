@@ -7,17 +7,17 @@
 {% block extra_css %}
   <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260723a" />
   <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/movie_detail.css" />
-  {% if movie.tmdb_raw.backdrop_path %}
+  {% if movie_display_backdrop_path %}
     <style>
       .movie-backdrop.has-image {
-        background-image: url('https://image.tmdb.org/t/p/original{{ movie.tmdb_raw.backdrop_path }}');
+        background-image: url('https://image.tmdb.org/t/p/original{{ movie_display_backdrop_path }}');
       }
     </style>
   {% endif %}
 {% endblock %}
 
 {% block content %}
-  {% if movie.tmdb_raw.backdrop_path %}
+  {% if movie_display_backdrop_path %}
     <div class="movie-backdrop movie-backdrop-visible has-image fade-in"></div>
   {% endif %}
 
@@ -165,8 +165,10 @@
                     data-entry-rewatch="{{ entry.rewatch|yesno:'1,0' }}"
                     data-entry-review="{{ entry.review|escape }}"
                     data-entry-poster-path="{{ entry.poster_path|escape }}"
+                    data-entry-backdrop-path="{{ entry.backdrop_path|escape }}"
                     data-entry-movie-url="{% if entry.tmdb_id %}{% url 'movie_detail' entry.tmdb_id %}{% endif %}"
                     data-entry-posters-url="{% url 'diary_entry_posters' entry.id %}"
+                    data-entry-backdrops-url="{% url 'diary_entry_backdrops' entry.id %}"
                     data-entry-update-url="{% url 'diary_entry_update' entry.id %}"
                     aria-label="Open {{ entry.official_title|default:entry.original_title }}"
                     tabindex="0"

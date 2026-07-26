@@ -395,6 +395,7 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		.only(
 			"tmdb_id",
 			"poster_path",
+			"backdrop_path",
 			"watched_date",
 			"rating",
 			"liked",
@@ -410,6 +411,7 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	)
 	watched_entry = watched_entries[0] if watched_entries else None
 	movie_display_poster_path = str((watched_entry.poster_path if watched_entry else "") or movie.poster_path or "").strip()
+	movie_display_backdrop_path = str((watched_entry.backdrop_path if watched_entry else "") or movie.backdrop_path or "").strip()
 	if tab == "watched" and not watched_entries:
 		tab = "cast"
 
@@ -479,6 +481,7 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"movie_box_office_text": movie_box_office_text,
 			"related_links": related_links,
 			"movie_display_poster_path": movie_display_poster_path,
+			"movie_display_backdrop_path": movie_display_backdrop_path,
 			"watched_entries": watched_entries,
 			"hide_diary_editor_view_link": True,
 		},

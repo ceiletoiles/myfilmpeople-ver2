@@ -1590,11 +1590,16 @@
 }
 
 .diary-editor-actions {
-	display: flex;
-	flex-wrap: wrap;
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
 	gap: 0.6rem;
 	align-items: center;
-	justify-content: flex-end;
+	justify-content: stretch;
+}
+
+.diary-editor-actions .diary-action {
+	min-width: 0;
+	width: 100%;
 }
 
 .diary-editor-view-link {
@@ -1880,6 +1885,10 @@ body.modal-open {
 		flex: 1 1 240px;
 	}
 
+	.diary-editor-actions {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
 	.diary-calendar-month-head {
 		align-items: baseline;
 		flex-direction: row;
@@ -1941,6 +1950,10 @@ body.modal-open {
 	.diary-action {
 		width: 100%;
 		min-width: 0;
+	}
+
+	.diary-editor-actions {
+		grid-template-columns: 1fr;
 	}
 
 	.diary-input-row {
