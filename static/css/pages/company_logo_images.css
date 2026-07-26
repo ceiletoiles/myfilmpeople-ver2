@@ -1,0 +1,136 @@
+.company-logo-picker {
+	display: grid;
+	gap: 1rem;
+}
+
+.company-logo-picker-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 1rem;
+	flex-wrap: wrap;
+}
+
+.company-logo-picker-name {
+	font-size: 1.4rem;
+	font-weight: 800;
+	letter-spacing: -0.02em;
+}
+
+.company-logo-picker-meta {
+	color: #64748b;
+	font-size: 0.95rem;
+	font-weight: 600;
+}
+
+.company-logo-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+	gap: 0.9rem;
+	align-items: start;
+}
+
+.company-logo-card {
+	display: grid;
+	gap: 0.5rem;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.company-logo-frame,
+.company-logo-empty-frame {
+	position: relative;
+	display: block;
+	width: 100%;
+	min-height: 112px;
+	overflow: hidden;
+	border-radius: 14px;
+}
+
+.company-logo-checkerboard {
+	position: absolute;
+	inset: 0;
+	background-color: #e2e8f0;
+	background-image:
+		linear-gradient(45deg, rgba(255, 255, 255, 0.55) 25%, transparent 25%),
+		linear-gradient(-45deg, rgba(255, 255, 255, 0.55) 25%, transparent 25%),
+		linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.55) 75%),
+		linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.55) 75%);
+	background-size: 22px 22px;
+	background-position: 0 0, 0 11px, 11px -11px, -11px 0;
+}
+
+.company-logo-thumb,
+.company-logo-empty-img {
+	position: relative;
+	z-index: 1;
+	display: block;
+	width: 100%;
+	height: 100%;
+	min-height: 112px;
+	object-fit: contain;
+	padding: 0.7rem;
+	box-sizing: border-box;
+}
+
+.company-logo-card.is-selected .company-logo-frame {
+	outline: 2px solid rgba(59, 130, 246, 0.35);
+	outline-offset: 2px;
+}
+
+.company-logo-selected {
+	width: fit-content;
+	padding: 0;
+	background: transparent;
+	color: #2563eb;
+	font-size: 0.72rem;
+	font-weight: 700;
+	line-height: 1.1;
+}
+
+.company-logo-empty,
+.company-logo-error {
+	display: grid;
+	gap: 0.75rem;
+	padding: 1rem;
+}
+
+.company-logo-empty-img {
+	padding: 0.35rem;
+}
+
+@media (max-width: 640px) {
+	.company-logo-picker-head {
+		gap: 0.4rem;
+	}
+
+	.company-logo-picker-name {
+		font-size: 1.15rem;
+	}
+
+	.company-logo-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.55rem;
+	}
+
+	.company-logo-frame,
+	.company-logo-empty-frame,
+	.company-logo-thumb,
+	.company-logo-empty-img {
+		min-height: 84px;
+		border-radius: 10px;
+	}
+
+	.company-logo-thumb,
+	.company-logo-empty-img {
+		padding: 0.45rem;
+	}
+
+	.company-logo-selected {
+		font-size: 0.64rem;
+	}
+}

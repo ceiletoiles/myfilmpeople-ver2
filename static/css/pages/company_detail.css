@@ -158,6 +158,26 @@
   width: 100%;
 }
 
+.kebab-pop a {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #0f172a;
+  border-radius: 8px;
+  background: #0f172a;
+  color: white;
+  text-decoration: none;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.kebab-pop a:hover,
+.kebab-pop a:focus-visible {
+  background: #111827;
+}
+
 .company-dialog {
   border: 1px solid #e2e8f0;
   border-radius: 10px;

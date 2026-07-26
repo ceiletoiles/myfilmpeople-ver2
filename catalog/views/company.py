@@ -5,12 +5,15 @@ from types import SimpleNamespace
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.conf import settings
 
-from ..models import CompanyFollow
+from ..models import Company, CompanyFollow
 from ..related_links import build_company_related_links
 from ..new_movie_helpers import (
 	extract_movie_ids_from_filmography,
@@ -20,14 +23,64 @@ from ..new_movie_helpers import (
 from ..services import (
 	COMPANY_FILMOGRAPHY_RELEASE_DATE_GTE,
 	COMPANY_FILMOGRAPHY_SORT_BY,
+	get_or_sync_company_images,
 	get_or_sync_company,
 	get_or_sync_company_filmography_page,
 	get_or_sync_company_tba_movies_page,
 	hydrate_company_movie_results,
 )
 from ..rate_limit import rate_limit
-from ..tmdb import TMDbClient, TMDbError
+from ..tmdb import TMDbClient, TMDbError, tmdb_image_url
 from ._shared import _add_years_safe, _countdown_text, _parse_iso_date
+
+
+def _safe_get_or_sync_company_filmography_page(company, page: int) -> dict:
+	try:
+		return get_or_sync_company_filmography_page(company, page=page)
+	except TMDbError:
+		return {}
+
+
+def _company_logo_images_return_to(request: HttpRequest, tmdb_id: int) -> str:
+	return_to = (request.GET.get("return_to") or request.POST.get("return_to") or "").strip()
+	fallback = reverse("company_detail", args=[tmdb_id])
+	if return_to and url_has_allowed_host_and_scheme(return_to, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+		return return_to
+	return fallback
+
+
+def _company_logo_candidates(company: Company) -> list[dict[str, object]]:
+	raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+	images = raw.get("images") if isinstance(raw.get("images"), dict) else {}
+	logos = images.get("logos") if isinstance(images, dict) else []
+	if not isinstance(logos, list):
+		return []
+
+	results: list[dict[str, object]] = []
+	priority = {".svg": 0, ".png": 1}
+	seen_paths: set[str] = set()
+	for logo in logos:
+		if not isinstance(logo, dict):
+			continue
+		file_path = str(logo.get("file_path") or "").strip()
+		lower_path = file_path.lower()
+		extension = ".svg" if lower_path.endswith(".svg") else ".png" if lower_path.endswith(".png") else ""
+		if not file_path or file_path in seen_paths or not extension:
+			continue
+		seen_paths.add(file_path)
+		results.append(
+			{
+				"file_path": file_path,
+				"format": extension.lstrip("."),
+				"sort_order": priority.get(extension, 99),
+				"width": logo.get("width"),
+				"height": logo.get("height"),
+				"vote_average": logo.get("vote_average"),
+				"vote_count": logo.get("vote_count"),
+				"url": tmdb_image_url(file_path, size="original"),
+			}
+		)
+	return sorted(results, key=lambda item: (int(item.get("sort_order") or 99), -int(item.get("vote_count") or 0)))
 
 
 @rate_limit(limit=25, window_seconds=60, bucket_name="company_detail")
@@ -72,12 +125,6 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		if latest_past_release is not None and latest_past_release < ten_years_ago:
 			return "Inactive"
 		return "Idle"
-
-	def _safe_get_or_sync_company_filmography_page(company, page: int) -> dict:
-		try:
-			return get_or_sync_company_filmography_page(company, page=page)
-		except TMDbError:
-			return {}
 
 	mode = (request.GET.get("mode") or "").strip().lower()
 	filmography_mode = "upcoming" if mode in {"upcoming", "tba"} else "filmography"
@@ -481,5 +528,77 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"note_text": note_text,
 			"related_links": related_links,
 			"alternative_names": alternative_names,
+		},
+	)
+
+
+@login_required
+def company_logo_images(request: HttpRequest, tmdb_id: int) -> HttpResponse:
+	return_to = _company_logo_images_return_to(request, tmdb_id)
+	is_followed = CompanyFollow.objects.filter(user=request.user, company__tmdb_id=tmdb_id).exists()
+	if not is_followed:
+		messages.error(request, "Logos are available only for followed companies.")
+		return redirect(return_to)
+
+	load_error = ""
+
+	if request.method == "POST":
+		try:
+			company = get_or_sync_company_images(tmdb_id)
+		except Exception:
+			messages.error(request, "TMDb company logos are temporarily unavailable. Please try again soon.")
+			return redirect(return_to)
+
+		selected_logo_path = (request.POST.get("logo_path") or "").strip()
+		candidates = _company_logo_candidates(company)
+		allowed_paths = {str(candidate.get("file_path") or "").strip() for candidate in candidates}
+		if selected_logo_path not in allowed_paths:
+			messages.error(request, "Selected logo is no longer available.")
+			return redirect(reverse("company_logo_images", args=[tmdb_id]))
+
+		company.logo_path = selected_logo_path
+		company.save(update_fields=["logo_path", "updated_at"])
+		try:
+			cache.delete(f"db:company:v1:{int(tmdb_id)}")
+		except Exception:
+			pass
+		return redirect(return_to)
+
+	try:
+		company = get_or_sync_company_images(tmdb_id)
+		logos = _company_logo_candidates(company)
+	except Exception:
+		load_error = "TMDb company logos are temporarily unavailable right now."
+		logos = []
+		stored_company = Company.objects.filter(tmdb_id=tmdb_id).first()
+		if stored_company is not None:
+			company = stored_company
+		else:
+			try:
+				company = get_or_sync_company(tmdb_id)
+			except Exception:
+				company = SimpleNamespace(
+					tmdb_id=tmdb_id,
+					name=str(tmdb_id),
+					logo_path="",
+					tmdb_raw={},
+				)
+
+	selected_logo_path = str(getattr(company, "logo_path", "") or "").strip()
+	current_logo = next((item for item in logos if item.get("file_path") == selected_logo_path), None)
+	current_logo_url = tmdb_image_url(selected_logo_path, size="original") if selected_logo_path else ""
+
+	return render(
+		request,
+		"catalog/company_logo_images.html",
+		{
+			"company": company,
+			"logos": logos,
+			"logo_count": len(logos),
+			"current_logo": current_logo,
+			"selected_logo_path": selected_logo_path,
+			"current_logo_url": current_logo_url,
+			"return_to": return_to,
+			"load_error": load_error,
 		},
 	)

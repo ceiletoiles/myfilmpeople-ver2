@@ -1369,8 +1369,16 @@ def get_or_sync_company(tmdb_id: int, *, force: bool = False) -> Company:
         merged.pop("company_movies_pages", None)
         merged.pop("company_movies_meta", None)
 
+        existing_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+        existing_logo_path = str(getattr(company, "logo_path", "") or "").strip()
+        previous_tmdb_logo_path = str(existing_raw.get("logo_path") or "").strip()
+        current_tmdb_logo_path = str(merged.get("logo_path") or "").strip()
+
         company.name = merged.get("name") or company.name
-        company.logo_path = merged.get("logo_path") or ""
+        if existing_logo_path and existing_logo_path != previous_tmdb_logo_path:
+            company.logo_path = existing_logo_path
+        else:
+            company.logo_path = current_tmdb_logo_path
         company.tmdb_raw = merged
         company.tmdb_last_sync_at = timezone.now()
         company.tmdb_last_sync_source = "sync" if force else "ttl"
@@ -1388,6 +1396,34 @@ def get_or_sync_company(tmdb_id: int, *, force: bool = False) -> Company:
     except Exception:
         pass
     return company
+
+
+def get_or_sync_company_images(tmdb_id: int, *, force: bool = False) -> Company:
+    """Fetch and cache company images for followed/saved companies."""
+    company = get_or_sync_company(tmdb_id, force=force)
+    tmdb_raw = company.tmdb_raw if isinstance(company.tmdb_raw, dict) else {}
+    has_images = isinstance(tmdb_raw.get("images"), dict)
+    if force or _is_stale(company.tmdb_last_sync_at) or not has_images:
+        if force:
+            try:
+                client = TMDbClient.from_settings()
+                try:
+                    cache.delete(client.cache_key_for(f"/company/{tmdb_id}/images"))
+                except Exception:
+                    pass
+            except Exception:
+                client = TMDbClient.from_settings()
+        else:
+            client = TMDbClient.from_settings()
+        images = client.get_company_images(tmdb_id)
+        company.tmdb_raw = {**tmdb_raw, "images": images}
+        company.tmdb_last_sync_at = timezone.now()
+        company.tmdb_last_sync_source = "sync" if force else "ttl"
+        company.save(update_fields=["tmdb_raw", "tmdb_last_sync_at", "tmdb_last_sync_source", "updated_at"])
+        _seed_company_summary_cache(company)
+    return company
+
+
 def get_or_sync_movie(
     tmdb_id: int,
     *,

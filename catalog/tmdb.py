@@ -250,6 +250,9 @@ class TMDbClient:
     def get_company_alternative_names(self, company_id: int) -> dict[str, Any]:
         return self._get(f"/company/{company_id}/alternative_names")
 
+    def get_company_images(self, company_id: int) -> dict[str, Any]:
+        return self._get(f"/company/{company_id}/images", include_language=False)
+
     def get_company_movies(self, company_id: int, *, page: int = 1) -> dict[str, Any]:
         return self._get(f"/company/{company_id}/movies", params={"page": page})
 

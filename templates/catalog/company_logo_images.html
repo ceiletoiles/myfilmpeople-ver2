@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Logos · {{ company.name }}{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/company_detail.css?v=20260510c" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/company_logo_images.css?v=20260726a" />
+{% endblock %}
+
+{% block page_header %}
+  <div class="page-header company-logo-page-header">
+    <button type="button" class="nav-icon-btn" data-menu-toggle aria-controls="site-drawer" aria-expanded="false">
+      <img class="nav-icon" src="{% static 'img/menu.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
+      <span class="sr-only">Open menu</span>
+    </button>
+    <div class="page-header-content">
+      <h1>Choose logo</h1>
+    </div>
+    <span class="page-header-spacer" aria-hidden="true"></span>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <section class="company-logo-picker">
+    <header class="company-logo-picker-head">
+      <div>
+        <div class="company-logo-picker-name">{{ company.name }}</div>
+        <div class="company-logo-picker-meta">
+          {% if logo_count %}
+            {{ logo_count }} available logo{{ logo_count|pluralize }}
+          {% else %}
+            No selectable logos available
+          {% endif %}
+        </div>
+      </div>
+    </header>
+
+    {% if load_error %}
+      <section class="company-logo-error card">
+        <p class="muted">{{ load_error }}</p>
+      </section>
+    {% endif %}
+
+    {% if logos %}
+      <form method="post" class="company-logo-grid" action="{% url 'company_logo_images' company.tmdb_id %}">
+        {% csrf_token %}
+        <input type="hidden" name="return_to" value="{{ return_to|escape }}" />
+        {% for logo in logos %}
+          <button
+            type="submit"
+            class="company-logo-card{% if logo.file_path == selected_logo_path %} is-selected{% endif %}"
+            name="logo_path"
+            value="{{ logo.file_path|escape }}"
+            aria-label="Select logo {{ forloop.counter }} for {{ company.name }}"
+          >
+            <span class="company-logo-frame">
+              <span class="company-logo-checkerboard" aria-hidden="true"></span>
+              <img class="company-logo-thumb" src="{{ logo.url }}" alt="" loading="lazy" />
+            </span>
+            {% if logo.file_path == selected_logo_path %}
+              <span class="company-logo-selected">Current logo</span>
+            {% endif %}
+          </button>
+        {% endfor %}
+      </form>
+    {% else %}
+      <section class="company-logo-empty card">
+        {% if current_logo_url %}
+          <div class="company-logo-empty-frame">
+            <span class="company-logo-checkerboard" aria-hidden="true"></span>
+            <img class="company-logo-empty-img" src="{{ current_logo_url }}" alt="" />
+          </div>
+        {% else %}
+          <img class="company-logo-empty-img" src="{% static 'img/placeholder-company.svg' %}" alt="" />
+        {% endif %}
+        <p class="muted">TMDb did not return any selectable SVG logos for this company.</p>
+      </section>
+    {% endif %}
+  </section>
+{% endblock %}
