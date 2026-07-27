@@ -1144,8 +1144,6 @@ body.followed-people-sheet-open {
   line-height: 1.2;
 }
 
-/* Date and country notes share the same wrapping style. */
-.release-note.date-note,
 .release-note.country-note {
   word-wrap: break-word;
   white-space: normal;
