@@ -1,9 +1,80 @@
 (function () {
+  const STAR_PATH = 'M12 2.25 14.92 8.17 21.45 9.12 16.73 13.72 17.84 20.22 12 17.16 6.16 20.22 7.27 13.72 2.55 9.12 9.08 8.17 12 2.25Z';
+
   function getCookie(name) {
     const cookieValue = '; ' + document.cookie;
     const parts = cookieValue.split('; ' + name + '=');
     if (parts.length !== 2) return '';
     return decodeURIComponent(parts.pop().split(';').shift() || '');
+  }
+
+  function normalizeRatingValue(value) {
+    const raw = Number(value);
+    if (!Number.isFinite(raw)) return null;
+    const rounded = Math.round(raw * 2) / 2;
+    return Math.max(0, Math.min(5, rounded));
+  }
+
+  function formatRatingValue(value) {
+    const rating = normalizeRatingValue(value);
+    if (rating === null) return '';
+    return rating % 1 === 0 ? String(Math.trunc(rating)) : String(rating.toFixed(1));
+  }
+
+  function createStarSvg(state) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('diary-star', 'is-' + state);
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+
+    const base = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    base.classList.add('diary-star-base');
+    base.setAttribute('d', STAR_PATH);
+    svg.appendChild(base);
+
+    const fill = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    fill.classList.add('diary-star-fill');
+    fill.setAttribute('d', STAR_PATH);
+    svg.appendChild(fill);
+
+    return svg;
+  }
+
+  function buildRatingStars(rating, options) {
+    const config = options || {};
+    const compact = !!config.compact;
+    const ratingValue = normalizeRatingValue(rating);
+    const result = document.createElement('span');
+    result.className = 'diary-rating-stars';
+
+    if (ratingValue === null) {
+      return result;
+    }
+
+    const displayRating = formatRatingValue(ratingValue);
+    result.setAttribute('aria-label', displayRating ? (displayRating + ' out of 5 stars') : 'Not rated');
+
+    if (compact) {
+      if (!ratingValue) {
+        return result;
+      }
+      const fullStars = Math.floor(ratingValue);
+      const hasHalf = ratingValue - fullStars >= 0.5;
+      for (let idx = 0; idx < fullStars; idx += 1) {
+        result.appendChild(createStarSvg('filled'));
+      }
+      if (hasHalf) {
+        result.appendChild(createStarSvg('half'));
+      }
+      return result;
+    }
+
+    for (let idx = 0; idx < 5; idx += 1) {
+      const state = ratingValue >= idx + 1 ? 'filled' : (ratingValue >= idx + 0.5 ? 'half' : 'empty');
+      result.appendChild(createStarSvg(state));
+    }
+    return result;
   }
 
   function initDiaryImportProgress() {
@@ -516,6 +587,8 @@
     const cancelEditButton = document.querySelector('[data-diary-editor-cancel-edit]');
     const releaseDisplay = document.querySelector('[data-diary-editor-release]');
     const ratingDisplay = document.querySelector('[data-diary-editor-rating-display]');
+    const ratingPicker = modal.querySelector('[data-diary-rating-picker]');
+    const ratingPickerValue = modal.querySelector('[data-diary-rating-picker-value]');
     const likedDisplay = document.querySelector('[data-diary-editor-liked-display]');
     const rewatchDisplay = document.querySelector('[data-diary-editor-rewatch-display]');
     const reviewDisplay = document.querySelector('[data-diary-editor-review-display]');
@@ -547,6 +620,8 @@
       !cancelEditButton ||
       !releaseDisplay ||
       !ratingDisplay ||
+      !ratingPicker ||
+      !ratingPickerValue ||
       !likedDisplay ||
       !rewatchDisplay ||
       !reviewDisplay ||
@@ -565,14 +640,91 @@
     let cardClickTimer = null;
     let searchToken = 0;
     let searchDebounceTimer = null;
+    let committedRating = 0;
+    let hoverRating = null;
+    let ratingPointerActive = false;
     const scrollStorageKey = 'diary-scroll:' + window.location.pathname;
 
-    function formatRatingStarsText(value) {
-      const raw = Number(value || 0);
-      if (!raw) return 'Not rated';
-      const fullStars = Math.max(0, Math.min(5, Math.floor(raw)));
-      const hasHalf = raw - fullStars >= 0.5;
-      return '\u2605'.repeat(fullStars) + (hasHalf ? '\u00bd' : '');
+    function getRatingValue() {
+      return normalizeRatingValue(ratingInput ? ratingInput.value : null);
+    }
+
+    function ratingLabel(value) {
+      const ratingValue = normalizeRatingValue(value);
+      if (ratingValue === null || !ratingValue) {
+        return 'Not rated';
+      }
+      return 'Rate ' + formatRatingValue(ratingValue) + ' out of 5 stars';
+    }
+
+    function createPickerStar(state, index) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'diary-rating-picker-star';
+      button.setAttribute('data-diary-rating-star', String(index));
+      button.setAttribute('aria-hidden', 'true');
+      button.setAttribute('tabindex', '-1');
+      button.appendChild(createStarSvg(state));
+      return button;
+    }
+
+    function renderRatingPicker(value, previewValue, previewMode) {
+      const committed = normalizeRatingValue(value);
+      const preview = normalizeRatingValue(previewValue);
+      const hasPreview = previewMode === 'mouse' && preview !== null && preview > 0;
+      const display = hasPreview ? preview : committed;
+
+      if (ratingInput) {
+        ratingInput.value = committed === null ? '' : String(committed);
+      }
+
+      ratingPicker.dataset.rating = committed === null ? '0' : String(committed);
+      ratingPicker.classList.toggle('is-previewing', hasPreview);
+      ratingPicker.setAttribute('aria-valuenow', display === null ? '0' : String(display));
+      ratingPicker.setAttribute('aria-valuetext', ratingLabel(display));
+      if (ratingPickerValue) {
+        ratingPickerValue.textContent = display === null || !display
+          ? 'Not rated'
+          : (formatRatingValue(display) + ' / 5');
+      }
+
+      if (!ratingPicker.children.length) {
+        for (let idx = 1; idx <= 5; idx += 1) {
+          ratingPicker.appendChild(createPickerStar('empty', idx));
+        }
+      }
+
+      Array.from(ratingPicker.children).forEach(function (button, zeroIndex) {
+        if (!(button instanceof HTMLElement)) return;
+        const starIndex = zeroIndex + 1;
+        const state = display === null
+          ? 'empty'
+          : (display >= starIndex ? 'filled' : (display >= starIndex - 0.5 ? 'half' : 'empty'));
+        button.classList.remove('is-filled', 'is-half', 'is-empty');
+        button.classList.add('is-' + state);
+        button.replaceChildren(createStarSvg(state));
+      });
+    }
+
+    function commitRating(value) {
+      const normalized = normalizeRatingValue(value);
+      if (normalized === null) return;
+      committedRating = normalized;
+      hoverRating = null;
+      renderRatingPicker(committedRating, null, null);
+    }
+
+    function previewRatingFromPointer(event) {
+      const elementAtPoint = document.elementFromPoint(event.clientX, event.clientY);
+      const target = elementAtPoint instanceof Element
+        ? elementAtPoint.closest('[data-diary-rating-star]')
+        : (event.target instanceof Element ? event.target.closest('[data-diary-rating-star]') : null);
+      if (!target) return null;
+      const starIndex = Number(target.getAttribute('data-diary-rating-star') || '0');
+      if (!starIndex) return null;
+      const rect = target.getBoundingClientRect();
+      const isLeftHalf = (event.clientX - rect.left) <= (rect.width / 2);
+      return normalizeRatingValue(starIndex - (isLeftHalf ? 0.5 : 0));
     }
 
     function setEditorMode(mode) {
@@ -591,7 +743,13 @@
       const reviewValue = (card.getAttribute('data-entry-review') || '').trim();
 
       releaseDisplay.textContent = releaseYear || 'Unknown';
-      ratingDisplay.textContent = formatRatingStarsText(ratingValue);
+      const ratingStars = buildRatingStars(ratingValue, { compact: true });
+      ratingDisplay.replaceChildren();
+      if (ratingStars.childNodes.length) {
+        ratingDisplay.appendChild(ratingStars);
+      } else {
+        ratingDisplay.textContent = 'Not rated';
+      }
       likedDisplay.textContent = likedValue ? 'Yes' : 'No';
       rewatchDisplay.textContent = rewatchValue ? 'Yes' : 'No';
       reviewDisplay.textContent = reviewValue || 'No review yet.';
@@ -607,6 +765,9 @@
       if (ratingInput) {
         ratingInput.value = card.getAttribute('data-entry-rating') || '';
       }
+      committedRating = normalizeRatingValue(ratingInput ? ratingInput.value : null) || 0;
+      hoverRating = null;
+      renderRatingPicker(committedRating, null, null);
       if (likedInput) {
         likedInput.checked = (card.getAttribute('data-entry-liked') || '') === '1';
       }
@@ -724,7 +885,7 @@
         if (entry.rating) {
           const badge = document.createElement('span');
           badge.className = 'diary-badge diary-rating-badge';
-          badge.appendChild(buildStars(entry.rating));
+          badge.appendChild(buildRatingStars(entry.rating, { compact: true }));
           badgesEl.appendChild(badge);
         }
         if (entry.liked) {
@@ -1080,6 +1241,91 @@
         return;
       }
       queueSearch();
+    });
+
+    ratingPicker.addEventListener('pointerdown', function (event) {
+      const value = previewRatingFromPointer(event);
+      if (value === null) return;
+      ratingPointerActive = true;
+      committedRating = value;
+      hoverRating = null;
+      commitRating(value);
+      if (typeof ratingPicker.setPointerCapture === 'function') {
+        try {
+          ratingPicker.setPointerCapture(event.pointerId);
+        } catch (_) {}
+      }
+      event.preventDefault();
+    });
+
+    ratingPicker.addEventListener('pointermove', function (event) {
+      if (event.pointerType === 'mouse' && !ratingPointerActive) {
+        const value = previewRatingFromPointer(event);
+        if (value === null) return;
+        hoverRating = value;
+        renderRatingPicker(committedRating, hoverRating, 'mouse');
+        return;
+      }
+      if (!ratingPointerActive) return;
+      const value = previewRatingFromPointer(event);
+      if (value === null) return;
+      committedRating = value;
+      hoverRating = null;
+      renderRatingPicker(committedRating, null, null);
+    });
+
+    ratingPicker.addEventListener('pointerup', function (event) {
+      if (!ratingPointerActive) return;
+      ratingPointerActive = false;
+      if (typeof ratingPicker.releasePointerCapture === 'function') {
+        try {
+          ratingPicker.releasePointerCapture(event.pointerId);
+        } catch (_) {}
+      }
+      hoverRating = null;
+      renderRatingPicker(committedRating, null, null);
+    });
+
+    ratingPicker.addEventListener('click', function (event) {
+      const target = event.target instanceof Element
+        ? event.target.closest('[data-diary-rating-star]')
+        : null;
+      if (!target) return;
+      const starIndex = Number(target.getAttribute('data-diary-rating-star') || '0');
+      if (!starIndex) return;
+      const rect = target.getBoundingClientRect();
+      const isLeftHalf = (event.clientX - rect.left) <= (rect.width / 2);
+      commitRating(normalizeRatingValue(starIndex - (isLeftHalf ? 0.5 : 0)));
+    });
+
+    ratingPicker.addEventListener('pointercancel', function () {
+      ratingPointerActive = false;
+      hoverRating = null;
+      renderRatingPicker(committedRating, null, null);
+    });
+
+    ratingPicker.addEventListener('pointerleave', function () {
+      if (ratingPointerActive) return;
+      hoverRating = null;
+      renderRatingPicker(committedRating, null, null);
+    });
+
+    ratingPicker.addEventListener('keydown', function (event) {
+      const current = normalizeRatingValue(ratingInput ? ratingInput.value : committedRating) || 0;
+      let next = current;
+      if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+        next = Math.min(5, current + 0.5);
+      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+        next = Math.max(0, current - 0.5);
+      } else if (event.key === 'Home') {
+        next = 0;
+      } else if (event.key === 'End') {
+        next = 5;
+      } else if (event.key !== 'Enter' && event.key !== ' ') {
+        return;
+      }
+      event.preventDefault();
+      commitRating(next);
     });
 
     modal.addEventListener('click', function (event) {
