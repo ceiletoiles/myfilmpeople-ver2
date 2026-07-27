@@ -2644,6 +2644,133 @@ class RelatedLinksTests(TestCase):
 		self.assertContains(response, "diary-icon-rewatch")
 		mock_purge_stale_movies.assert_called_once_with()
 
+	@patch("catalog.views.movie.purge_stale_movies")
+	@patch("catalog.views.movie.TMDbClient.from_settings")
+	@patch("catalog.views.movie.get_or_sync_movie")
+	def test_movie_detail_hides_followed_people_surface_without_matches(self, mock_get_or_sync_movie, mock_from_settings, mock_purge_stale_movies) -> None:
+		user = get_user_model().objects.create_user(username="movie-follow-none-user", password="pw")
+		self.client.force_login(user)
+
+		movie = Movie.objects.create(
+			tmdb_id=4,
+			title="No Match Movie",
+			tmdb_credits_raw={
+				"cast": [
+					{"id": 9001, "name": "Unfollowed Person", "character": "Lead", "profile_path": "/unfollowed.jpg"},
+				],
+				"crew": [],
+			},
+		)
+		mock_get_or_sync_movie.return_value = movie
+		mock_from_settings.return_value.get_configuration_countries.return_value = []
+		mock_from_settings.return_value.get_movie_alternative_titles.return_value = {}
+		mock_from_settings.return_value.get_movie_videos.return_value = {}
+		mock_from_settings.return_value.get_movie_credits.return_value = movie.tmdb_credits_raw
+		mock_from_settings.return_value.get_movie.return_value = {"id": 4, "title": "No Match Movie", "release_date": "2026-01-01"}
+
+		response = self.client.get(reverse("movie_detail", args=[4]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertIsNone(response.context["followed_people_single"])
+		self.assertEqual(response.context["followed_people_sheet_people"], [])
+		self.assertNotContains(response, "followed-people-card")
+		self.assertNotContains(response, "People You Follow")
+		mock_purge_stale_movies.assert_called_once_with()
+
+	@patch("catalog.views.movie.purge_stale_movies")
+	@patch("catalog.views.movie.TMDbClient.from_settings")
+	@patch("catalog.views.movie.get_or_sync_movie")
+	def test_movie_detail_renders_single_followed_person_card(self, mock_get_or_sync_movie, mock_from_settings, mock_purge_stale_movies) -> None:
+		user = get_user_model().objects.create_user(username="movie-follow-single-user", password="pw")
+		self.client.force_login(user)
+
+		person = Person.objects.create(
+			tmdb_id=5,
+			name="Christopher Nolan",
+			profile_path="/nolan.jpg",
+		)
+		PersonFollow.objects.create(user=user, person=person, name=person.name, role="Director")
+		movie = Movie.objects.create(
+			tmdb_id=5,
+			title="Single Match Movie",
+			tmdb_credits_raw={
+				"cast": [],
+				"crew": [
+					{"id": 5, "name": "Christopher Nolan", "job": "Director", "profile_path": "/nolan.jpg"},
+				],
+			},
+		)
+		mock_get_or_sync_movie.return_value = movie
+		mock_from_settings.return_value.get_configuration_countries.return_value = []
+		mock_from_settings.return_value.get_movie_alternative_titles.return_value = {}
+		mock_from_settings.return_value.get_movie_videos.return_value = {}
+		mock_from_settings.return_value.get_movie_credits.return_value = movie.tmdb_credits_raw
+		mock_from_settings.return_value.get_movie.return_value = {"id": 5, "title": "Single Match Movie", "release_date": "2026-01-01"}
+
+		response = self.client.get(reverse("movie_detail", args=[5]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.context["followed_people_single"]["tmdb_id"], 5)
+		self.assertEqual(response.context["followed_people_sheet_people"], [])
+		self.assertContains(response, "followed-people-card-single")
+		self.assertContains(response, "Christopher Nolan worked on this film")
+		self.assertContains(response, "Director • Tap to view profile")
+		self.assertNotContains(response, "Tap to see who they are")
+		self.assertNotContains(response, "followed-people-sheet")
+		mock_purge_stale_movies.assert_called_once_with()
+
+	@patch("catalog.views.movie.purge_stale_movies")
+	@patch("catalog.views.movie.TMDbClient.from_settings")
+	@patch("catalog.views.movie.get_or_sync_movie")
+	def test_movie_detail_renders_followed_people_banner_and_sheet(self, mock_get_or_sync_movie, mock_from_settings, mock_purge_stale_movies) -> None:
+		user = get_user_model().objects.create_user(username="movie-follow-multi-user", password="pw")
+		self.client.force_login(user)
+
+		director_writer = Person.objects.create(tmdb_id=6, name="Alex Director", profile_path="/alex.jpg")
+		writer = Person.objects.create(tmdb_id=7, name="Beth Writer", profile_path="/beth.jpg")
+		cast = Person.objects.create(tmdb_id=8, name="Cara Cast", profile_path="/cara.jpg")
+		crew = Person.objects.create(tmdb_id=9, name="Dana Crew", profile_path="/dana.jpg")
+
+		for person in (director_writer, writer, cast, crew):
+			PersonFollow.objects.create(user=user, person=person, name=person.name, role="Actor")
+
+		movie = Movie.objects.create(
+			tmdb_id=6,
+			title="Multi Match Movie",
+			tmdb_credits_raw={
+				"cast": [
+					{"id": 6, "name": "Alex Director", "character": "Captain", "profile_path": "/alex.jpg"},
+					{"id": 8, "name": "Cara Cast", "character": "Penelope", "profile_path": "/cara.jpg"},
+				],
+				"crew": [
+					{"id": 6, "name": "Alex Director", "job": "Director", "profile_path": "/alex.jpg"},
+					{"id": 6, "name": "Alex Director", "job": "Producer", "profile_path": "/alex.jpg"},
+					{"id": 7, "name": "Beth Writer", "job": "Writer", "profile_path": "/beth.jpg"},
+					{"id": 9, "name": "Dana Crew", "job": "Original Music Composer", "profile_path": "/dana.jpg"},
+				],
+			},
+		)
+		mock_get_or_sync_movie.return_value = movie
+		mock_from_settings.return_value.get_configuration_countries.return_value = []
+		mock_from_settings.return_value.get_movie_alternative_titles.return_value = {}
+		mock_from_settings.return_value.get_movie_videos.return_value = {}
+		mock_from_settings.return_value.get_movie_credits.return_value = movie.tmdb_credits_raw
+		mock_from_settings.return_value.get_movie.return_value = {"id": 6, "title": "Multi Match Movie", "release_date": "2026-01-01"}
+
+		response = self.client.get(reverse("movie_detail", args=[6]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.context["followed_people_sheet_count"], 4)
+		self.assertEqual([p["tmdb_id"] for p in response.context["followed_people_sheet_people"]], [6, 7, 8, 9])
+		self.assertEqual(response.context["followed_people_sheet_people"][0]["roles_display"], "Director • Producer • Captain")
+		self.assertEqual(response.context["followed_people_sheet_people"][1]["roles_display"], "Writer")
+		self.assertContains(response, "followed-people-card-banner")
+		self.assertContains(response, "4 people you follow worked on this film")
+		self.assertContains(response, "Tap to see who they are")
+		self.assertContains(response, "People You Follow")
+		self.assertContains(response, "followed-people-sheet")
+		mock_purge_stale_movies.assert_called_once_with()
+
 	def test_compact_company_filmography_command_compacts_existing_rows(self) -> None:
 		company = Company.objects.create(
 			tmdb_id=41077,

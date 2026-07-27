@@ -62,6 +62,89 @@
         {% endif %}
       </div>
 
+      {% if followed_people_single %}
+        <a
+          class="followed-people-card followed-people-card-single fade-in"
+          href="{% url 'person_detail' followed_people_single.tmdb_id %}"
+          aria-label="View {{ followed_people_single.name }} profile"
+        >
+          <span class="followed-people-card-icon followed-people-card-avatar" aria-hidden="true">
+            {% if followed_people_single.profile_path %}
+              <img src="https://image.tmdb.org/t/p/w185{{ followed_people_single.profile_path }}" alt="" />
+            {% else %}
+              <img src="{% static 'img/placeholder-person.svg' %}" alt="" />
+            {% endif %}
+          </span>
+          <span class="followed-people-card-copy">
+            <span class="followed-people-card-title">{{ followed_people_single.name }} worked on this film</span>
+            <span class="followed-people-card-subtitle">{{ followed_people_single.roles_display }} • Tap to view profile</span>
+          </span>
+          <span class="followed-people-card-chevron" aria-hidden="true">›</span>
+        </a>
+      {% elif followed_people_sheet_people %}
+        <button
+          type="button"
+          class="followed-people-card followed-people-card-banner fade-in"
+          data-followed-people-open
+          aria-controls="followedPeopleSheet"
+          aria-expanded="false"
+        >
+          <span class="followed-people-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="presentation" focusable="false" aria-hidden="true">
+              <path d="M16 11a3 3 0 1 0-2.999-3A3 3 0 0 0 16 11Zm-8-1.5A2.5 2.5 0 1 0 5.5 7 2.5 2.5 0 0 0 8 9.5Zm8 2.25c-2.21 0-4 1.12-4 2.5V17h8v-2.75c0-1.38-1.79-2.5-4-2.5Zm-8 .5c-1.94 0-3.5.99-3.5 2.21V17h5v-2.54c0-1.22-1.56-2.21-3.5-2.21Zm0 0" />
+            </svg>
+          </span>
+          <span class="followed-people-card-copy">
+            <span class="followed-people-card-title">{{ followed_people_sheet_count }} people you follow worked on this film</span>
+            <span class="followed-people-card-subtitle">Tap to see who they are</span>
+          </span>
+          <span class="followed-people-card-chevron" aria-hidden="true">›</span>
+        </button>
+
+        <div class="followed-people-sheet" id="followedPeopleSheet" data-followed-people-sheet hidden>
+          <div class="followed-people-sheet-backdrop" data-followed-people-close></div>
+          <section
+            class="followed-people-sheet-panel card"
+            data-followed-people-panel
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="followedPeopleSheetTitle"
+            aria-describedby="followedPeopleSheetSubtitle"
+          >
+            <div class="followed-people-sheet-drag-zone" data-followed-people-drag>
+              <span class="followed-people-sheet-handle" aria-hidden="true"></span>
+            </div>
+
+            <header class="followed-people-sheet-header">
+              <div class="followed-people-sheet-heading">
+                <h2 id="followedPeopleSheetTitle">People You Follow</h2>
+                <p class="muted" id="followedPeopleSheetSubtitle">{{ followed_people_sheet_count }} people worked on this film</p>
+              </div>
+              <button type="button" class="followed-people-sheet-close" data-followed-people-close aria-label="Close people sheet">Close</button>
+            </header>
+
+            <div class="followed-people-sheet-list" role="list">
+              {% for person in followed_people_sheet_people %}
+                <a class="followed-people-sheet-row" role="listitem" href="{% url 'person_detail' person.tmdb_id %}">
+                  <span class="followed-people-sheet-avatar">
+                    {% if person.profile_path %}
+                      <img src="https://image.tmdb.org/t/p/w185{{ person.profile_path }}" alt="" loading="lazy" />
+                    {% else %}
+                      <img src="{% static 'img/placeholder-person.svg' %}" alt="" loading="lazy" />
+                    {% endif %}
+                  </span>
+                  <span class="followed-people-sheet-copy">
+                    <span class="followed-people-sheet-name">{{ person.name }}</span>
+                    <span class="followed-people-sheet-role">{{ person.roles_display }}</span>
+                  </span>
+                  <span class="followed-people-sheet-chevron" aria-hidden="true">›</span>
+                </a>
+              {% endfor %}
+            </div>
+          </section>
+        </div>
+      {% endif %}
+
       <div class="credits-section">
         <div class="movie-tabs credits-tabs">
           <button type="button" class="movie-tab-btn credits-tab{% if tab == 'cast' %} active{% endif %}" data-tab="cast">Cast</button>

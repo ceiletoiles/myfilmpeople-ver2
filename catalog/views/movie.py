@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from ..services import get_or_sync_movie, purge_stale_movies
 from ..rate_limit import rate_limit
-from ..models import DiaryEntry
+from ..models import DiaryEntry, PersonFollow
 from ..tmdb import TMDbClient, TMDbError
 from ..related_links import build_movie_related_links
 
@@ -233,6 +233,192 @@ def _build_crew_groups(credits: dict[str, Any]) -> list[dict[str, Any]]:
 	return groups
 
 
+_FOLLOWED_DIRECTOR_JOBS = {"Director"}
+_FOLLOWED_WRITER_JOBS = {
+	"Writer",
+	"Screenplay",
+	"Story",
+	"Original Story",
+	"Original Writer",
+	"Characters",
+	"Novel",
+	"Book",
+}
+
+
+def _normalize_movie_credit_text(value: Any) -> str:
+	return str(value or "").strip()
+
+
+def _add_unique_text(target: list[str], value: str) -> None:
+	text = _normalize_movie_credit_text(value)
+	if not text or text in target:
+		return
+	target.append(text)
+
+
+def _first_defined_int(*values: Any) -> int:
+	for value in values:
+		if value is None:
+			continue
+		try:
+			return int(value)
+		except (TypeError, ValueError):
+			continue
+	return 0
+
+
+def _build_followed_people_feature(credits: dict[str, Any], followed_follows: list[Any]) -> dict[str, Any] | None:
+	followed_people_lookup: dict[int, dict[str, Any]] = {}
+	followed_ids: set[int] = set()
+
+	for follow in followed_follows:
+		person = getattr(follow, "person", None)
+		person_id = int(getattr(person, "tmdb_id", 0) or 0)
+		if person is None or person_id <= 0:
+			continue
+		if person_id in followed_people_lookup:
+			continue
+		followed_ids.add(person_id)
+		followed_people_lookup[person_id] = {
+			"tmdb_id": person_id,
+			"name": _normalize_movie_credit_text(getattr(person, "name", "")) or str(person_id),
+			"profile_path": _normalize_movie_credit_text(getattr(person, "profile_path", "")),
+		}
+
+	if not followed_people_lookup:
+		return None
+
+	matched_people: dict[int, dict[str, Any]] = {}
+
+	def _entry_for(person_id: int) -> dict[str, Any]:
+		entry = matched_people.get(person_id)
+		if entry is None:
+			base = followed_people_lookup[person_id]
+			entry = {
+				"tmdb_id": base["tmdb_id"],
+				"name": base["name"],
+				"profile_path": base["profile_path"],
+				"director_roles": [],
+				"writer_roles": [],
+				"cast_roles": [],
+				"other_roles": [],
+				"director_order": None,
+				"writer_order": None,
+				"cast_order": None,
+				"crew_order": None,
+			}
+			matched_people[person_id] = entry
+		return entry
+
+	cast = credits.get("cast") or []
+	if isinstance(cast, list):
+		for index, item in enumerate(cast):
+			if not isinstance(item, dict):
+				continue
+			person_id = int(item.get("id") or 0)
+			if person_id not in followed_ids:
+				continue
+			entry = _entry_for(person_id)
+			entry["cast_order"] = index if entry["cast_order"] is None else min(int(entry["cast_order"]), index)
+			name = _normalize_movie_credit_text(item.get("name"))
+			if name and not entry["name"]:
+				entry["name"] = name
+			profile_path = _normalize_movie_credit_text(item.get("profile_path"))
+			if profile_path and not entry["profile_path"]:
+				entry["profile_path"] = profile_path
+			_add_unique_text(entry["cast_roles"], item.get("character") or "Cast")
+
+	crew = credits.get("crew") or []
+	if isinstance(crew, list):
+		for index, item in enumerate(crew):
+			if not isinstance(item, dict):
+				continue
+			person_id = int(item.get("id") or 0)
+			if person_id not in followed_ids:
+				continue
+			entry = _entry_for(person_id)
+			entry["crew_order"] = index if entry["crew_order"] is None else min(int(entry["crew_order"]), index)
+			name = _normalize_movie_credit_text(item.get("name"))
+			if name and not entry["name"]:
+				entry["name"] = name
+			profile_path = _normalize_movie_credit_text(item.get("profile_path"))
+			if profile_path and not entry["profile_path"]:
+				entry["profile_path"] = profile_path
+
+			job = _normalize_movie_credit_text(item.get("job"))
+			department = _normalize_movie_credit_text(item.get("department"))
+			role_label = job or department or "Crew"
+			if job in _FOLLOWED_DIRECTOR_JOBS:
+				_add_unique_text(entry["director_roles"], "Director")
+				entry["director_order"] = index if entry["director_order"] is None else min(int(entry["director_order"]), index)
+			elif job in _FOLLOWED_WRITER_JOBS:
+				_add_unique_text(entry["writer_roles"], job)
+				entry["writer_order"] = index if entry["writer_order"] is None else min(int(entry["writer_order"]), index)
+			else:
+				_add_unique_text(entry["other_roles"], role_label)
+
+	results: list[dict[str, Any]] = []
+	for entry in matched_people.values():
+		roles = (
+			list(entry["director_roles"])
+			+ list(entry["writer_roles"])
+			+ list(entry["other_roles"])
+			+ list(entry["cast_roles"])
+		)
+		roles = [role for role in roles if _normalize_movie_credit_text(role)]
+		if not roles:
+			if entry["cast_order"] is not None:
+				roles = ["Cast"]
+			else:
+				roles = ["Crew"]
+		if entry["director_roles"]:
+			sort_group = 0
+			sort_order = _first_defined_int(entry["director_order"], entry["crew_order"], entry["cast_order"])
+		elif entry["writer_roles"]:
+			sort_group = 1
+			sort_order = _first_defined_int(entry["writer_order"], entry["crew_order"], entry["cast_order"])
+		elif entry["cast_roles"]:
+			sort_group = 2
+			sort_order = _first_defined_int(entry["cast_order"], entry["crew_order"])
+		else:
+			sort_group = 3
+			sort_order = _first_defined_int(entry["crew_order"])
+
+		results.append(
+			{
+				"tmdb_id": entry["tmdb_id"],
+				"name": entry["name"],
+				"profile_path": entry["profile_path"],
+				"roles": roles,
+				"roles_display": " \u2022 ".join(roles),
+				"primary_role": roles[0],
+				"sort_group": sort_group,
+				"sort_order": sort_order,
+			}
+		)
+
+	results.sort(
+		key=lambda item: (
+			int(item["sort_group"]),
+			int(item["sort_order"]),
+			str(item["name"]).lower(),
+			int(item["tmdb_id"]),
+		)
+	)
+
+	if not results:
+		return None
+
+	return {
+		"count": len(results),
+		"people": results,
+		"single": results[0] if len(results) == 1 else None,
+		"sheet_people": results if len(results) >= 2 else [],
+		"sheet_count": len(results) if len(results) >= 2 else 0,
+	}
+
+
 def _release_type_description(release_type: int) -> str:
 	types = {
 		1: "Premiere",
@@ -431,6 +617,16 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		country_name_lookup = _build_country_name_lookup(client.get_configuration_countries())
 	except TMDbError:
 		country_name_lookup = {}
+
+	followed_people_feature = None
+	if request.user.is_authenticated:
+		followed_follows = list(
+			PersonFollow.objects.select_related("person")
+			.filter(user=request.user)
+			.order_by("person__tmdb_id", "person__name", "role")
+		)
+		followed_people_feature = _build_followed_people_feature(credits, followed_follows)
+
 	if include_credits:
 		cast = credits.get("cast", []) or []
 		crew_groups = _build_crew_groups(credits)
@@ -483,6 +679,10 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"movie_display_poster_path": movie_display_poster_path,
 			"movie_display_backdrop_path": movie_display_backdrop_path,
 			"watched_entries": watched_entries,
+			"followed_people_feature": followed_people_feature,
+			"followed_people_single": (followed_people_feature or {}).get("single"),
+			"followed_people_sheet_people": (followed_people_feature or {}).get("sheet_people", []),
+			"followed_people_sheet_count": (followed_people_feature or {}).get("sheet_count", 0),
 			"hide_diary_editor_view_link": True,
 		},
 	)

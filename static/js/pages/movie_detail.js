@@ -292,3 +292,134 @@
   // Fonts/layout can shift shortly after first paint.
   window.setTimeout(fitTitleToPoster, 60);
 })();
+
+(function () {
+  var opener = document.querySelector('[data-followed-people-open]');
+  var sheet = document.querySelector('[data-followed-people-sheet]');
+  var panel = sheet ? sheet.querySelector('[data-followed-people-panel]') : null;
+  var dragZone = sheet ? sheet.querySelector('[data-followed-people-drag]') : null;
+  var closeButtons = sheet ? sheet.querySelectorAll('[data-followed-people-close]') : [];
+
+  if (!opener || !sheet || !panel || !dragZone) {
+    return;
+  }
+
+  var lastFocus = null;
+  var dragState = null;
+  var releaseTimer = null;
+
+  function resetPanelTransform() {
+    panel.style.transform = '';
+    panel.style.transition = '';
+  }
+
+  function openSheet() {
+    lastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    sheet.hidden = false;
+    document.body.classList.add('followed-people-sheet-open');
+    opener.setAttribute('aria-expanded', 'true');
+    resetPanelTransform();
+
+    window.requestAnimationFrame(function () {
+      if (closeButtons[0] && typeof closeButtons[0].focus === 'function') {
+        closeButtons[0].focus();
+      }
+    });
+  }
+
+  function closeSheet() {
+    resetPanelTransform();
+    sheet.hidden = true;
+    document.body.classList.remove('followed-people-sheet-open');
+    opener.setAttribute('aria-expanded', 'false');
+    dragState = null;
+
+    if (lastFocus && typeof lastFocus.focus === 'function') {
+      window.requestAnimationFrame(function () {
+        lastFocus.focus();
+      });
+    }
+  }
+
+  function startDrag(event) {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return;
+    }
+    dragState = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      lastY: event.clientY,
+    };
+    panel.style.transition = 'none';
+    try {
+      dragZone.setPointerCapture(event.pointerId);
+    } catch (_) {
+      // Ignore pointer-capture failures on older browsers.
+    }
+  }
+
+  function moveDrag(event) {
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    var deltaY = Math.max(0, event.clientY - dragState.startY);
+    dragState.lastY = event.clientY;
+    if (deltaY > 0) {
+      event.preventDefault();
+      panel.style.transform = 'translateY(' + deltaY + 'px)';
+    }
+  }
+
+  function endDrag(event) {
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    var deltaY = Math.max(0, event.clientY - dragState.startY);
+    dragState = null;
+    panel.style.transition = 'transform 0.2s ease';
+
+    if (deltaY > 110) {
+      closeSheet();
+      return;
+    }
+
+    panel.style.transform = '';
+    if (releaseTimer) {
+      window.clearTimeout(releaseTimer);
+    }
+    releaseTimer = window.setTimeout(function () {
+      panel.style.transition = '';
+    }, 220);
+  }
+
+  opener.addEventListener('click', function () {
+    openSheet();
+  });
+
+  closeButtons.forEach(function (button) {
+    button.addEventListener('click', function () {
+      closeSheet();
+    });
+  });
+
+  sheet.addEventListener('click', function (event) {
+    var target = event.target;
+    if (target && target instanceof HTMLElement && target.hasAttribute('data-followed-people-close')) {
+      closeSheet();
+    }
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && !sheet.hidden) {
+      closeSheet();
+    }
+  });
+
+  dragZone.addEventListener('pointerdown', startDrag);
+  dragZone.addEventListener('pointermove', moveDrag);
+  dragZone.addEventListener('pointerup', endDrag);
+  dragZone.addEventListener('pointercancel', endDrag);
+  dragZone.addEventListener('lostpointercapture', endDrag);
+})();
