@@ -832,10 +832,24 @@ body.followed-people-sheet-open {
   transition: all 0.2s ease;
 }
 
+.cast-credit-copy,
+.crew-credit-copy {
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+}
+
 .cast-person:hover,
 .crew-person:hover {
   background-color: #e2e8f0;
   transform: translateY(-4px);
+}
+
+.cast-view-more {
+  display: none;
 }
 
 .cast-profile-pic,
@@ -1490,33 +1504,96 @@ body.followed-people-sheet-open {
 
   .cast-list,
   .crew-members {
-    gap: 0.65rem;
-    padding: 0.5rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.35rem 0 0;
+    overflow-x: visible;
+    overflow-y: visible;
   }
 
   .cast-person,
   .crew-person {
-    width: 76px;
-    gap: 0.22rem;
-    padding: 0.18rem 0.1rem;
+    width: 100%;
+    min-width: 0;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.45rem 0.2rem;
+    border-radius: 12px;
+    text-align: left;
+    background: transparent;
   }
 
   .cast-profile-pic,
   .crew-profile-pic {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+  }
+
+  .cast-credit-copy,
+  .crew-credit-copy {
+    flex: 1;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.06rem;
+    min-height: 44px;
+    text-align: left;
   }
 
   .cast-name,
   .crew-name {
-    min-height: 2em;
-    font-size: 0.62rem;
+    min-height: 0;
+    margin: 0;
+    font-size: 0.92rem;
     line-height: 1.15;
+    font-weight: 700;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    text-align: left;
   }
 
   .cast-character,
   .crew-job {
-    font-size: 0.56rem;
+    display: block;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.74rem;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+  }
+
+  .cast-view-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 2.4rem;
+    margin: 0.15rem 0 0.35rem;
+    padding: 0.55rem 0.8rem;
+    border: 0;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #334155;
+    font: inherit;
+    font-size: 0.74rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .cast-view-more:hover {
+    background: #cbd5e1;
   }
 
   .release-content {

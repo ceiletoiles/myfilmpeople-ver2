@@ -158,20 +158,33 @@
 
         <div class="credits-content">
           <section class="tab-panel cast-section{% if tab == 'cast' %} active{% endif %}" data-panel="cast" id="castSection">
-            <div class="cast-list" id="castList">
+            <div class="cast-list" id="castList" data-cast-list data-cast-limit="8">
               {% for c in cast %}
-                <a href="{% url 'person_detail' c.id %}" class="cast-person">
+                <a href="{% url 'person_detail' c.id %}" class="cast-person" data-cast-item>
                   {% if c.profile_path %}
                     <img class="cast-profile-pic" src="https://image.tmdb.org/t/p/w185{{ c.profile_path }}" alt="" />
                   {% else %}
                     <img class="cast-profile-pic" src="{% static 'img/placeholder-person.svg' %}" alt="" />
                   {% endif %}
-                  <p class="cast-name">{{ c.name }}</p>
-                  {% if c.character %}<p class="cast-character">{{ c.character }}</p>{% endif %}
+                  <div class="cast-credit-copy">
+                    <p class="cast-name">{{ c.name }}</p>
+                    {% if c.character %}<p class="cast-character">{{ c.character }}</p>{% endif %}
+                  </div>
                 </a>
               {% empty %}
                 <p class="muted">No cast available.</p>
               {% endfor %}
+              {% if cast_more_count > 0 %}
+                <button
+                  type="button"
+                  class="cast-view-more"
+                  data-cast-view-more
+                  aria-expanded="false"
+                  aria-controls="castList"
+                >
+                  View {{ cast_more_count }} more
+                </button>
+              {% endif %}
             </div>
           </section>
 
@@ -188,8 +201,10 @@
                         {% else %}
                           <img class="crew-profile-pic" src="{% static 'img/placeholder-person.svg' %}" alt="" />
                         {% endif %}
-                        <p class="crew-name">{{ c.name }}</p>
-                        {% if c.job %}<p class="crew-job">{{ c.job }}</p>{% endif %}
+                        <div class="crew-credit-copy">
+                          <p class="crew-name">{{ c.name }}</p>
+                          {% if c.job %}<p class="crew-job">{{ c.job }}</p>{% endif %}
+                        </div>
                       </a>
                     {% endfor %}
                   </div>

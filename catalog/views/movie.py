@@ -630,6 +630,7 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	if include_credits:
 		cast = credits.get("cast", []) or []
 		crew_groups = _build_crew_groups(credits)
+	cast_more_count = max(0, len(cast) - 8) if include_credits else 0
 
 	release_groups = _build_release_groups(movie_raw, country_name_lookup)
 	try:
@@ -666,6 +667,7 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"movie": movie,
 			"tab": tab,
 			"cast": cast,
+			"cast_more_count": cast_more_count,
 			"crew_groups": crew_groups,
 			"release_groups": release_groups,
 			"alternative_titles": alternative_titles,

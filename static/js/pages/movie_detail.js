@@ -423,3 +423,68 @@
   dragZone.addEventListener('pointercancel', endDrag);
   dragZone.addEventListener('lostpointercapture', endDrag);
 })();
+
+(function () {
+  var castList = document.querySelector('[data-cast-list]');
+  var moreButton = document.querySelector('[data-cast-view-more]');
+
+  if (!castList || !moreButton) {
+    return;
+  }
+
+  var castItems = Array.prototype.slice.call(castList.querySelectorAll('[data-cast-item]'));
+  var previewLimit = parseInt(castList.getAttribute('data-cast-limit') || '8', 10);
+  var expanded = false;
+  var mobileQuery = window.matchMedia ? window.matchMedia('(max-width: 700px)') : null;
+
+  function applyState() {
+    var isMobile = mobileQuery ? mobileQuery.matches : false;
+    if (!isMobile) {
+      expanded = false;
+      castItems.forEach(function (item) {
+        item.hidden = false;
+      });
+      moreButton.hidden = true;
+      moreButton.setAttribute('aria-expanded', 'false');
+      moreButton.textContent = '';
+      return;
+    }
+
+    if (castItems.length <= previewLimit) {
+      moreButton.hidden = true;
+      castItems.forEach(function (item) {
+        item.hidden = false;
+      });
+      return;
+    }
+
+    moreButton.hidden = false;
+    moreButton.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    moreButton.textContent = expanded
+      ? 'Show less'
+      : 'View ' + String(Math.max(castItems.length - previewLimit, 0)) + ' more';
+
+    castItems.forEach(function (item, index) {
+      item.hidden = !expanded && index >= previewLimit;
+    });
+  }
+
+  moreButton.addEventListener('click', function () {
+    expanded = !expanded;
+    applyState();
+    if (expanded) {
+      var firstHidden = castItems[previewLimit];
+      if (firstHidden && typeof firstHidden.scrollIntoView === 'function') {
+        firstHidden.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  });
+
+  if (mobileQuery && typeof mobileQuery.addEventListener === 'function') {
+    mobileQuery.addEventListener('change', applyState);
+  } else if (mobileQuery && typeof mobileQuery.addListener === 'function') {
+    mobileQuery.addListener(applyState);
+  }
+
+  applyState();
+})();
