@@ -7,34 +7,23 @@
     <div class="diary-editor-head">
       <img class="diary-editor-poster" data-diary-editor-poster src="{% static 'img/placeholder-movie.svg' %}" alt="" />
       <div class="diary-editor-copy">
-        <span class="diary-card-kicker" data-diary-editor-kicker>Entry details</span>
-        <h3 data-diary-editor-title>Diary entry</h3>
-        <p class="muted" data-diary-editor-meta></p>
+        <h3 class="diary-editor-title-row">
+          <span data-diary-editor-title>Diary entry</span>
+          <span class="diary-editor-title-year" data-diary-editor-release>Unknown</span>
+        </h3>
+        <p class="muted diary-editor-meta-row" data-diary-editor-meta></p>
+        <div class="diary-badges diary-entry-rating-row diary-editor-rating-line">
+          <span class="diary-badge diary-rating-badge" data-diary-editor-rating-display>Not rated</span>
+          <span class="diary-badge diary-icon-badge diary-icon-like" data-diary-editor-liked-display title="Liked" aria-label="Liked" hidden>
+            <span class="diary-icon-mark" aria-hidden="true"></span>
+          </span>
+          <span class="diary-badge diary-icon-badge diary-icon-rewatch" data-diary-editor-rewatch-display title="Rewatch" aria-label="Rewatch" hidden></span>
+        </div>
       </div>
     </div>
 
     <section class="diary-editor-overview" data-diary-editor-overview>
-      <div class="diary-editor-summary">
-        <div class="diary-editor-summary-item">
-          <span class="diary-editor-summary-label">Release year</span>
-          <span class="diary-editor-summary-value" data-diary-editor-release>Unknown</span>
-        </div>
-        <div class="diary-editor-summary-item">
-          <span class="diary-editor-summary-label">Rating</span>
-          <span class="diary-editor-summary-value" data-diary-editor-rating-display>Not rated</span>
-        </div>
-        <div class="diary-editor-summary-item">
-          <span class="diary-editor-summary-label">Liked</span>
-          <span class="diary-editor-summary-value" data-diary-editor-liked-display>No</span>
-        </div>
-        <div class="diary-editor-summary-item">
-          <span class="diary-editor-summary-label">Rewatch</span>
-          <span class="diary-editor-summary-value" data-diary-editor-rewatch-display>No</span>
-        </div>
-      </div>
-
       <div class="diary-editor-field">
-        <span class="diary-editor-summary-label">Review</span>
         <p class="diary-editor-review-display" data-diary-editor-review-display>No review yet.</p>
       </div>
 
@@ -65,7 +54,7 @@
           />
           <button type="button" class="diary-action diary-action-secondary diary-editor-search-button" data-diary-editor-search-button>Search</button>
         </div>
-        <p class="diary-field-help">Search by title, year, or use <code>m:1368337</code> to jump straight to a TMDb movie ID.</p>
+        <p class="diary-field-help">Search by title, year, or use <code>"m:{tmdbId}"</code> to jump straight to a TMDb movie ID.</p>
         <div class="diary-editor-search-results" data-diary-editor-search-results hidden></div>
         <div class="diary-field-errors" data-diary-editor-search-error hidden></div>
       </div>
@@ -75,16 +64,21 @@
         <input type="hidden" id="diary-editor-rating" name="rating" value="" />
         <div class="diary-rating-picker" data-diary-rating-picker role="slider" tabindex="0" aria-label="Rate entry" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0" aria-valuetext="Not rated"></div>
         <div class="diary-rating-picker-value" data-diary-rating-picker-value aria-live="polite">Not rated</div>
-        <p class="diary-field-help">Use the stars or arrow keys to set a rating in half-star steps.</p>
       </div>
       <div class="diary-editor-toggles">
-        <label class="diary-editor-toggle">
-          <input type="checkbox" name="liked" />
-          <span>Liked</span>
+        <label class="diary-editor-toggle diary-editor-toggle-like">
+          <input type="checkbox" name="liked" class="diary-editor-toggle-input" />
+          <span class="diary-editor-toggle-visual">
+            <span class="diary-badge diary-icon-badge diary-icon-like" aria-hidden="true"></span>
+            <span class="diary-editor-toggle-text">Liked</span>
+          </span>
         </label>
-        <label class="diary-editor-toggle">
-          <input type="checkbox" name="rewatch" />
-          <span>Rewatch</span>
+        <label class="diary-editor-toggle diary-editor-toggle-rewatch">
+          <input type="checkbox" name="rewatch" class="diary-editor-toggle-input" />
+          <span class="diary-editor-toggle-visual">
+            <span class="diary-badge diary-icon-badge diary-icon-rewatch" aria-hidden="true"></span>
+            <span class="diary-editor-toggle-text">Rewatch</span>
+          </span>
         </label>
       </div>
       <div class="diary-editor-field">

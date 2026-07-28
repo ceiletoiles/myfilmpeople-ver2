@@ -578,7 +578,6 @@
     const overview = document.querySelector('[data-diary-editor-overview]');
     const titleEl = document.querySelector('[data-diary-editor-title]');
     const metaEl = document.querySelector('[data-diary-editor-meta]');
-    const kickerEl = document.querySelector('[data-diary-editor-kicker]');
     const posterEl = document.querySelector('[data-diary-editor-poster]');
     const viewButton = document.querySelector('[data-diary-editor-view]');
     const postersButton = document.querySelector('[data-diary-editor-posters]');
@@ -612,7 +611,6 @@
       !overview ||
       !titleEl ||
       !metaEl ||
-      !kickerEl ||
       !posterEl ||
       !postersButton ||
       !backdropsButton ||
@@ -655,6 +653,13 @@
         return 'Not rated';
       }
       return 'Rate ' + formatRatingValue(ratingValue) + ' out of 5 stars';
+    }
+
+    function sanitizeReviewText(value) {
+      const text = (value || '').trim();
+      if (!text) return '';
+      if (/^watched on\b/i.test(text)) return '';
+      return text;
     }
 
     function createPickerStar(state, index) {
@@ -731,7 +736,6 @@
       const isEdit = mode === 'edit';
       overview.hidden = isEdit;
       form.hidden = !isEdit;
-      kickerEl.textContent = isEdit ? 'Edit entry' : 'Entry details';
     }
 
     function populateOverview(card) {
@@ -740,7 +744,7 @@
       const ratingValue = card.getAttribute('data-entry-rating') || '';
       const likedValue = (card.getAttribute('data-entry-liked') || '') === '1';
       const rewatchValue = (card.getAttribute('data-entry-rewatch') || '') === '1';
-      const reviewValue = (card.getAttribute('data-entry-review') || '').trim();
+      const reviewValue = sanitizeReviewText(card.getAttribute('data-entry-review') || '');
 
       releaseDisplay.textContent = releaseYear || 'Unknown';
       const ratingStars = buildRatingStars(ratingValue, { compact: true });
@@ -750,9 +754,18 @@
       } else {
         ratingDisplay.textContent = 'Not rated';
       }
-      likedDisplay.textContent = likedValue ? 'Yes' : 'No';
-      rewatchDisplay.textContent = rewatchValue ? 'Yes' : 'No';
-      reviewDisplay.textContent = reviewValue || 'No review yet.';
+      if (likedDisplay) {
+        likedDisplay.hidden = !likedValue;
+        likedDisplay.setAttribute('aria-hidden', likedValue ? 'false' : 'true');
+      }
+      if (rewatchDisplay) {
+        rewatchDisplay.hidden = !rewatchValue;
+        rewatchDisplay.setAttribute('aria-hidden', rewatchValue ? 'false' : 'true');
+      }
+      if (reviewDisplay) {
+        reviewDisplay.textContent = reviewValue;
+        reviewDisplay.hidden = !reviewValue;
+      }
     }
 
     function populateForm(card) {
@@ -775,7 +788,7 @@
         rewatchInput.checked = (card.getAttribute('data-entry-rewatch') || '') === '1';
       }
       if (reviewInput) {
-        reviewInput.value = card.getAttribute('data-entry-review') || '';
+        reviewInput.value = sanitizeReviewText(card.getAttribute('data-entry-review') || '');
       }
 
       const title = card.getAttribute('data-entry-title') || '';
