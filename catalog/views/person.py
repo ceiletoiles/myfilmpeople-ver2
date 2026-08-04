@@ -166,7 +166,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	is_followed = follows_qs.exists()
 	follow_roles = sorted(set(follows_qs.values_list("role", flat=True))) if is_followed else []
 	follow_roles_set = set(follow_roles)
-	follow_role_statuses: list[dict[str, str]] = []
+	follow_role_statuses: list[dict[str, object]] = []
 	note_text = (
 		(follows_qs.order_by("-updated_at").values_list("notes", flat=True).first() or "")
 		if is_followed
@@ -302,14 +302,6 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				credits = live_credits
 		except Exception:
 			pass
-	if is_followed:
-		follow_role_statuses = [
-			{
-				"role": role,
-				"status": get_person_status_label(person, followed_role=role),
-			}
-			for role in follow_roles
-		]
 	comeback_info = None
 	active_info = None
 	if is_followed:
@@ -798,6 +790,53 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		if not accent_color:
 			accent_color = fallback_movie_accent_color(display_poster_path or str(mid))
 		it["accent_color"] = accent_color
+
+	if is_followed:
+		filter_lookup = {str(key).strip().lower(): str(key) for key in filter_counts.keys()}
+		role_aliases = {
+			"actor": "Acting",
+			"actress": "Acting",
+			"director": "Directing",
+			"writer": "Writing",
+			"screenwriter": "Writing",
+			"producer": "Production",
+			"executive producer": "Production",
+			"cinematography": "Camera",
+			"cinematographer": "Camera",
+			"director of photography": "Camera",
+			"editor": "Editing",
+		}
+
+		def _follow_role_filter_key(role: str) -> str | None:
+			role_n = (role or "").strip().lower()
+			if not role_n:
+				return None
+			if role_n in role_aliases:
+				return role_aliases[role_n]
+			if role_n in filter_lookup:
+				return filter_lookup[role_n]
+			return None
+
+		follow_role_statuses = []
+		for role in follow_roles:
+			filter_key = _follow_role_filter_key(role)
+			total_count = 0
+			watched_count = 0
+			if filter_key:
+				for item in filmography_items:
+					item_filters = {str(key).strip() for key in (item.get("filters") or [])}
+					if filter_key in item_filters:
+						total_count += 1
+						if item.get("is_watched"):
+							watched_count += 1
+			follow_role_statuses.append(
+				{
+					"role": role,
+					"status": get_person_status_label(person, followed_role=role),
+					"watched_count": watched_count,
+					"total_count": total_count,
+				}
+			)
 
 	shared_followed_people: list[dict[str, object]] = []
 	try:
@@ -1346,6 +1385,53 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		if not accent_color:
 			accent_color = fallback_movie_accent_color(display_poster_path or str(mid))
 		it["accent_color"] = accent_color
+
+	if is_followed:
+		filter_lookup = {str(key).strip().lower(): str(key) for key in filter_counts.keys()}
+		role_aliases = {
+			"actor": "Acting",
+			"actress": "Acting",
+			"director": "Directing",
+			"writer": "Writing",
+			"screenwriter": "Writing",
+			"producer": "Production",
+			"executive producer": "Production",
+			"cinematography": "Camera",
+			"cinematographer": "Camera",
+			"director of photography": "Camera",
+			"editor": "Editing",
+		}
+
+		def _follow_role_filter_key(role: str) -> str | None:
+			role_n = (role or "").strip().lower()
+			if not role_n:
+				return None
+			if role_n in role_aliases:
+				return role_aliases[role_n]
+			if role_n in filter_lookup:
+				return filter_lookup[role_n]
+			return None
+
+		follow_role_statuses = []
+		for role in follow_roles:
+			filter_key = _follow_role_filter_key(role)
+			total_count = 0
+			watched_count = 0
+			if filter_key:
+				for item in filmography_items:
+					item_filters = {str(key).strip() for key in (item.get("filters") or [])}
+					if filter_key in item_filters:
+						total_count += 1
+						if item.get("is_watched"):
+							watched_count += 1
+			follow_role_statuses.append(
+				{
+					"role": role,
+					"status": get_person_status_label(person, followed_role=role),
+					"watched_count": watched_count,
+					"total_count": total_count,
+				}
+			)
 
 	def _follow_role_default_filter() -> str:
 		if not follow_roles:

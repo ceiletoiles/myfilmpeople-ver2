@@ -1917,6 +1917,7 @@ class RelatedLinksTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		entry.refresh_from_db()
 		self.assertEqual(entry.accent_color, "#123456")
+		self.assertContains(response, "Watched: 1/1")
 
 	@patch("catalog.models.build_movie_accent_color", return_value="#123456")
 	@patch("catalog.views.person.TMDbClient.from_settings")
