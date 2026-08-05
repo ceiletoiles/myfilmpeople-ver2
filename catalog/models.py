@@ -194,6 +194,8 @@ class PersonFollow(models.Model):
 	status_key = models.CharField(max_length=20, blank=True, default="")
 	# Free-text role (e.g. "Director", "Actor", "Producer", "Writer").
 	role = models.CharField(max_length=100)
+	# Marks this followed person as a user favorite across all of their roles.
+	favorite = models.BooleanField(default=False)
 	notes = models.TextField(blank=True)
 
 	created_at = models.DateTimeField(auto_now_add=True)
@@ -220,6 +222,8 @@ class CompanyFollow(models.Model):
 	status = models.CharField(max_length=20, blank=True, default="")
 	# Cached status key for filtering / state tracking when annotated.
 	status_key = models.CharField(max_length=20, blank=True, default="")
+	# Marks this followed company as a user favorite.
+	favorite = models.BooleanField(default=False)
 	notes = models.TextField(blank=True)
 
 	created_at = models.DateTimeField(auto_now_add=True)

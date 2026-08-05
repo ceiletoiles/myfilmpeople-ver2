@@ -156,6 +156,31 @@ class ProfileActivityTests(TestCase):
 		self.assertEqual(activities[0].summary, "Followed Logged Person as Actor")
 		self.assertEqual(activities[2].summary, "Followed Logged Studio")
 
+	def test_favorite_toggles_apply_to_people_and_studios(self) -> None:
+		person = Person.objects.create(tmdb_id=3003, name="Favourite Person", profile_path="/fav-person.jpg")
+		Company.objects.create(tmdb_id=3004, name="Favourite Studio", logo_path="/fav-studio.png")
+		PersonFollow.objects.create(user=self.user, person=person, name=person.name, role="Director")
+		PersonFollow.objects.create(user=self.user, person=person, name=person.name, role="Actor")
+		company = Company.objects.get(tmdb_id=3004)
+		CompanyFollow.objects.create(user=self.user, company=company, name=company.name)
+
+		response = self.client.post(reverse("person_toggle_favorite", args=[person.tmdb_id]))
+		self.assertEqual(response.status_code, 302)
+		self.assertTrue(PersonFollow.objects.filter(user=self.user, person=person, favorite=True).exists())
+		self.assertEqual(PersonFollow.objects.filter(user=self.user, person=person, favorite=True).count(), 2)
+
+		response = self.client.post(reverse("person_toggle_favorite", args=[person.tmdb_id]))
+		self.assertEqual(response.status_code, 302)
+		self.assertFalse(PersonFollow.objects.filter(user=self.user, person=person, favorite=True).exists())
+
+		response = self.client.post(reverse("company_toggle_favorite", args=[company.tmdb_id]))
+		self.assertEqual(response.status_code, 302)
+		self.assertTrue(CompanyFollow.objects.filter(user=self.user, company=company, favorite=True).exists())
+
+		response = self.client.post(reverse("company_toggle_favorite", args=[company.tmdb_id]))
+		self.assertEqual(response.status_code, 302)
+		self.assertFalse(CompanyFollow.objects.filter(user=self.user, company=company, favorite=True).exists())
+
 
 class SignupVerificationTests(TestCase):
 	@patch("accounts.email_services.requests.post")

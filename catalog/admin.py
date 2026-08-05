@@ -61,8 +61,8 @@ class DiaryEntryAdmin(admin.ModelAdmin):
 
 @admin.register(PersonFollow)
 class PersonFollowAdmin(admin.ModelAdmin):
-	list_display = ("user", "person_link", "name", "role", "created_at")
-	list_filter = ("role",)
+	list_display = ("user", "person_link", "name", "role", "favorite", "created_at")
+	list_filter = ("role", "favorite")
 	search_fields = ("user__username", "name", "person__name")
 
 	def person_link(self, obj):
@@ -76,7 +76,8 @@ class PersonFollowAdmin(admin.ModelAdmin):
 
 @admin.register(CompanyFollow)
 class CompanyFollowAdmin(admin.ModelAdmin):
-	list_display = ("user", "company_link", "name", "created_at")
+	list_display = ("user", "company_link", "name", "favorite", "created_at")
+	list_filter = ("favorite",)
 	search_fields = ("user__username", "name", "company__name")
 
 	def company_link(self, obj):

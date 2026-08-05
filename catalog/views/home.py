@@ -34,16 +34,25 @@ def home(request: HttpRequest) -> HttpResponse:
 		directors = [f for f in person_follows if _role_category(f.role) == "director"]
 		actors = [f for f in person_follows if _role_category(f.role) == "actor"]
 		crew = [f for f in person_follows if _role_category(f.role) == "crew"]
+		favorite_people = [f for f in person_follows if getattr(f, "favorite", False)]
+		favorite_directors = [f for f in favorite_people if _role_category(f.role) == "director"]
+		favorite_actors = [f for f in favorite_people if _role_category(f.role) == "actor"]
+		favorite_crew = [f for f in favorite_people if _role_category(f.role) == "crew"]
 		# Compute studio status for each followed company
 		companies = []
 		for f in company_follows:
 			_, f.studio_status = get_company_status_snapshot(f.company)
 			companies.append(f)
+		favorite_companies = [f for f in companies if getattr(f, "favorite", False)]
 	else:
 		directors = []
 		actors = []
 		crew = []
 		companies = []
+		favorite_directors = []
+		favorite_actors = []
+		favorite_crew = []
+		favorite_companies = []
 
 	next_url = (request.GET.get("next") or "").strip() or None
 
@@ -55,6 +64,10 @@ def home(request: HttpRequest) -> HttpResponse:
 			"actors": actors,
 			"crew": crew,
 			"companies": companies,
+			"favorite_directors": favorite_directors,
+			"favorite_actors": favorite_actors,
+			"favorite_crew": favorite_crew,
+			"favorite_companies": favorite_companies,
 			"next_url": next_url,
 		},
 	)

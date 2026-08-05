@@ -10,10 +10,12 @@ from .diary import diary, diary_calendar, diary_entry_backdrops, diary_entry_pos
 from .company import company_detail, company_filmography_page, company_logo_images
 from .follow import (
 	company_note,
+	company_toggle_favorite,
 	company_sync,
 	company_unfollow,
 	follow,
 	person_note,
+	person_toggle_favorite,
 	person_sync,
 	person_unfollow,
 	sync_all_followed,
@@ -58,6 +60,7 @@ __all__ = [
 	"company_filmography_page",
 	"company_logo_images",
 	"company_note",
+	"company_toggle_favorite",
 	"company_sync_progress",
 	"company_sync_start",
 	"company_sync",
@@ -73,6 +76,7 @@ __all__ = [
 	"person_profile_images",
 	"person_toggle_self_appearances",
 	"person_note",
+	"person_toggle_favorite",
 	"person_sync_progress",
 	"person_sync_start",
 	"person_sync",

@@ -272,6 +272,7 @@ def _role_category(role: str) -> str:
 def _build_status_filters(base_path: str, selected_status: str) -> list[dict[str, object]]:
 	options = [
 		("all", "Status"),
+		("favorite", "Favourite"),
 		("inactive", "Inactive"),
 		("deceased", "Deceased"),
 		("announced", "Announced"),
@@ -297,7 +298,9 @@ def _normalize_status_key(value: str | None) -> str:
 	status = (value or "").strip().lower()
 	if status == "tba":
 		return "announced"
-	return status if status in {"inactive", "deceased", "announced", "upcoming", "idle"} else "all"
+	if status in {"favorite", "favourite"}:
+		return "favorite"
+	return status if status in {"inactive", "deceased", "announced", "upcoming", "idle", "favorite"} else "all"
 
 
 FOLLOW_BADGE_LEVELS: tuple[dict[str, object], ...] = (
@@ -464,10 +467,16 @@ def profile(request: HttpRequest) -> HttpResponse:
 		follow_activities = list(activities_qs)
 
 	if selected_status != "all":
-		directors = [f for f in directors if f.status_key == selected_status]
-		actors = [f for f in actors if f.status_key == selected_status]
-		crew = [f for f in crew if f.status_key == selected_status]
-		company_follows = [c for c in company_follows if getattr(c, "status_key", "") == selected_status]
+		if selected_status == "favorite":
+			directors = [f for f in directors if getattr(f, "favorite", False)]
+			actors = [f for f in actors if getattr(f, "favorite", False)]
+			crew = [f for f in crew if getattr(f, "favorite", False)]
+			company_follows = [c for c in company_follows if getattr(c, "favorite", False)]
+		else:
+			directors = [f for f in directors if f.status_key == selected_status]
+			actors = [f for f in actors if f.status_key == selected_status]
+			crew = [f for f in crew if f.status_key == selected_status]
+			company_follows = [c for c in company_follows if getattr(c, "status_key", "") == selected_status]
 
 	tab_counts = {
 		"director": len(directors),
@@ -569,10 +578,16 @@ def user_following(request: HttpRequest, username: str) -> HttpResponse:
 		_annotate_company_status(c)
 
 	if selected_status != "all":
-		directors = [f for f in directors if f.status_key == selected_status]
-		actors = [f for f in actors if f.status_key == selected_status]
-		crew = [f for f in crew if f.status_key == selected_status]
-		company_follows = [c for c in company_follows if getattr(c, "status_key", "") == selected_status]
+		if selected_status == "favorite":
+			directors = [f for f in directors if getattr(f, "favorite", False)]
+			actors = [f for f in actors if getattr(f, "favorite", False)]
+			crew = [f for f in crew if getattr(f, "favorite", False)]
+			company_follows = [c for c in company_follows if getattr(c, "favorite", False)]
+		else:
+			directors = [f for f in directors if f.status_key == selected_status]
+			actors = [f for f in actors if f.status_key == selected_status]
+			crew = [f for f in crew if f.status_key == selected_status]
+			company_follows = [c for c in company_follows if getattr(c, "status_key", "") == selected_status]
 
 	tab_counts = {
 		"director": len(directors),

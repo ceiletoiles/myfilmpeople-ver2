@@ -12,6 +12,14 @@
       <img class="kebab-icon" src="{% static 'img/menu.svg' %}" width="18" height="18" alt="" aria-hidden="true" />
     </summary>
     <div class="kebab-pop" role="menu">
+      <form method="post" action="{% url 'person_toggle_favorite' person.tmdb_id %}" data-ajax="1" role="none">
+        {% csrf_token %}
+        <input type="hidden" name="ajax_context" value="person_detail" />
+        <button type="submit" role="menuitem">
+          {% if is_favorite %}Remove favourite{% else %}Mark as favourite{% endif %}
+        </button>
+      </form>
+
       <form method="post" action="{% url 'person_toggle_self_appearances' person.tmdb_id %}" role="none">
         {% csrf_token %}
         <button type="submit" role="menuitem">

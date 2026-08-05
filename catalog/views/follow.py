@@ -41,7 +41,6 @@ def _wants_json(request: HttpRequest) -> bool:
 
 
 def _render_person_follow_controls(request: HttpRequest, *, tmdb_id: int) -> str:
- 
 	hide_self_appearances = _get_session_bool(
 		request.session,
 		SESSION_KEY_HIDE_SELF_APPEARANCES,
@@ -54,6 +53,7 @@ def _render_person_follow_controls(request: HttpRequest, *, tmdb_id: int) -> str
 	follows_qs = follows_qs.defer("person__tmdb_raw")
 	follow_roles = sorted(set(follows_qs.values_list("role", flat=True))) if follows_qs.exists() else []
 	follow_roles_set = set(follow_roles)
+	is_favorite = bool(follows_qs.filter(favorite=True).exists())
 	note_text = (
 		(follows_qs.order_by("-updated_at").values_list("notes", flat=True).first() or "")
 		if follows_qs.exists()
@@ -71,6 +71,7 @@ def _render_person_follow_controls(request: HttpRequest, *, tmdb_id: int) -> str
 			"follow_roles": follow_roles,
 			"role_options": role_options,
 			"role_options_remaining": role_options_remaining,
+			"is_favorite": is_favorite,
 			"note_text": note_text,
 			"hide_self_appearances": hide_self_appearances,
 		},
@@ -82,16 +83,38 @@ def _render_company_follow_controls(request: HttpRequest, *, tmdb_id: int) -> st
 	company = get_or_sync_company(tmdb_id)
 	follow = CompanyFollow.objects.filter(user=request.user, company__tmdb_id=tmdb_id).defer("company__tmdb_raw").first()
 	is_followed = bool(follow)
+	is_favorite = bool(getattr(follow, "favorite", False))
 	note_text = follow.notes if follow else ""
 	return render_to_string(
 		"catalog/_company_follow_controls.html",
 		{
 			"company": company,
 			"is_followed": is_followed,
+			"is_favorite": is_favorite,
 			"note_text": note_text,
 		},
 		request=request,
 	)
+
+
+def _toggle_person_favorite_state(*, request: HttpRequest, tmdb_id: int) -> tuple[bool, int]:
+	qs = PersonFollow.objects.filter(user=request.user, person__tmdb_id=tmdb_id)
+	if not qs.exists():
+		return False, 0
+	current = bool(qs.filter(favorite=True).exists())
+	new_value = not current
+	updated = qs.update(favorite=new_value, updated_at=timezone.now())
+	return new_value, updated
+
+
+def _toggle_company_favorite_state(*, request: HttpRequest, tmdb_id: int) -> tuple[bool, int]:
+	qs = CompanyFollow.objects.filter(user=request.user, company__tmdb_id=tmdb_id)
+	follow = qs.first()
+	if follow is None:
+		return False, 0
+	new_value = not bool(follow.favorite)
+	updated = qs.update(favorite=new_value, updated_at=timezone.now())
+	return new_value, updated
 
 
 def _record_follow_activity(*, user, action: str, person=None, company=None, role: str = "", created_at=None) -> None:
@@ -183,6 +206,68 @@ def company_note(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			payload["controls_html"] = _render_company_follow_controls(request, tmdb_id=tmdb_id)
 		return JsonResponse(payload)
 
+	return redirect("company_detail", tmdb_id=tmdb_id)
+
+
+@login_required
+def person_toggle_favorite(request: HttpRequest, tmdb_id: int) -> HttpResponse:
+	if request.method != "POST":
+		return redirect("person_detail", tmdb_id=tmdb_id)
+
+	wants_json = _wants_json(request)
+	ajax_context = (request.POST.get("ajax_context") or "").strip().lower()
+	is_favorite, updated = _toggle_person_favorite_state(request=request, tmdb_id=tmdb_id)
+	if not updated:
+		msg = "Follow this person before marking them as favourite."
+		messages.error(request, msg)
+		if wants_json:
+			return JsonResponse({"ok": False, "error": msg}, status=400)
+		return redirect("person_detail", tmdb_id=tmdb_id)
+
+	message = "Added to favourites." if is_favorite else "Removed from favourites."
+	messages.success(request, message)
+	if wants_json:
+		payload: dict[str, object] = {
+			"ok": True,
+			"tmdb_id": tmdb_id,
+			"is_favorite": is_favorite,
+			"message": message,
+		}
+		if ajax_context == "person_detail":
+			payload["controls_target"] = "#person-follow-controls"
+			payload["controls_html"] = _render_person_follow_controls(request, tmdb_id=tmdb_id)
+		return JsonResponse(payload)
+	return redirect("person_detail", tmdb_id=tmdb_id)
+
+
+@login_required
+def company_toggle_favorite(request: HttpRequest, tmdb_id: int) -> HttpResponse:
+	if request.method != "POST":
+		return redirect("company_detail", tmdb_id=tmdb_id)
+
+	wants_json = _wants_json(request)
+	ajax_context = (request.POST.get("ajax_context") or "").strip().lower()
+	is_favorite, updated = _toggle_company_favorite_state(request=request, tmdb_id=tmdb_id)
+	if not updated:
+		msg = "Follow this company before marking it as favourite."
+		messages.error(request, msg)
+		if wants_json:
+			return JsonResponse({"ok": False, "error": msg}, status=400)
+		return redirect("company_detail", tmdb_id=tmdb_id)
+
+	message = "Added to favourites." if is_favorite else "Removed from favourites."
+	messages.success(request, message)
+	if wants_json:
+		payload: dict[str, object] = {
+			"ok": True,
+			"tmdb_id": tmdb_id,
+			"is_favorite": is_favorite,
+			"message": message,
+		}
+		if ajax_context == "company_detail":
+			payload["controls_target"] = "#company-follow-controls"
+			payload["controls_html"] = _render_company_follow_controls(request, tmdb_id=tmdb_id)
+		return JsonResponse(payload)
 	return redirect("company_detail", tmdb_id=tmdb_id)
 
 

@@ -65,110 +65,221 @@
       <input type="radio" name="home-tab" id="home-tab-actor" />
       <input type="radio" name="home-tab" id="home-tab-crew" />
       <input type="radio" name="home-tab" id="home-tab-studio" />
+      <input type="checkbox" id="home-favorites-toggle" class="home-favorites-toggle-input" />
 
-      <div class="tab-list" role="tablist" aria-label="Home tabs">
-        <label for="home-tab-director" class="tab-label" role="tab">Director</label>
-        <label for="home-tab-actor" class="tab-label" role="tab">Actor</label>
-        <label for="home-tab-crew" class="tab-label" role="tab">Crew</label>
-        <label for="home-tab-studio" class="tab-label" role="tab">Studios</label>
+      <div class="tab-row">
+        <div class="tab-list" role="tablist" aria-label="Home tabs">
+          <label for="home-tab-director" class="tab-label" role="tab">Director</label>
+          <label for="home-tab-actor" class="tab-label" role="tab">Actor</label>
+          <label for="home-tab-crew" class="tab-label" role="tab">Crew</label>
+          <label for="home-tab-studio" class="tab-label" role="tab">Studios</label>
+        </div>
+
+        <label class="home-favorites-toggle" for="home-favorites-toggle">
+          <span class="home-favorites-toggle-text">Favourites</span>
+          <span class="home-favorites-toggle-track" aria-hidden="true">
+            <span class="home-favorites-toggle-thumb"></span>
+          </span>
+        </label>
       </div>
 
       <div class="tab-panels">
         <section class="tab-panel panel-director" aria-label="Directors">
-          {% if directors %}
-            <div class="home-people-grid">
-              {% for f in directors %}
-                <a class="home-person" href="{% url 'person_detail' f.person.tmdb_id %}">
-                  <span class="home-person-media">
-                    {% if f.person.profile_path %}
-                      <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
-                    {% else %}
-                      <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
-                    {% endif %}
-                    {% if f.comeback_info %}
-                      <span class="home-person-badge">Inactive {{ f.comeback_info.gap_label }}</span>
-                    {% endif %}
-                  </span>
-                  <div class="home-person-name">{{ f.person.name }}</div>
-                </a>
-              {% endfor %}
-            </div>
-          {% else %}
-            <p class="muted">No followed directors yet. <br>Search for directors and follow them to see them here.</p>
-          {% endif %}
+          <div class="home-view-all">
+            {% if directors %}
+              <div class="home-people-grid">
+                {% for f in directors %}
+                  <a class="home-person" href="{% url 'person_detail' f.person.tmdb_id %}">
+                    <span class="home-person-media">
+                      {% if f.person.profile_path %}
+                        <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      {% else %}
+                        <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      {% endif %}
+                      {% if f.comeback_info %}
+                        <span class="home-person-badge">Inactive {{ f.comeback_info.gap_label }}</span>
+                      {% endif %}
+                    </span>
+                    <div class="home-person-name">{{ f.person.name }}</div>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="muted">No followed directors yet. <br>Search for directors and follow them to see them here.</p>
+            {% endif %}
+          </div>
+          <div class="home-view-favorites">
+            {% if favorite_directors %}
+              <div class="home-people-grid">
+                {% for f in favorite_directors %}
+                  <a class="home-person" href="{% url 'person_detail' f.person.tmdb_id %}">
+                    <span class="home-person-media">
+                      {% if f.person.profile_path %}
+                        <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      {% else %}
+                        <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      {% endif %}
+                      {% if f.comeback_info %}
+                        <span class="home-person-badge">Inactive {{ f.comeback_info.gap_label }}</span>
+                      {% endif %}
+                    </span>
+                    <div class="home-person-name">{{ f.person.name }}</div>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="muted">No favourite directors yet.</p>
+            {% endif %}
+          </div>
         </section>
 
         <section class="tab-panel panel-actor" aria-label="Actors">
-          {% if actors %}
-            <div class="home-people-grid">
-              {% for f in actors %}
-                <a class="home-person" href="{% url 'person_detail' f.person.tmdb_id %}">
-                  <span class="home-person-media">
-                    {% if f.person.profile_path %}
-                      <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
-                    {% else %}
-                      <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
-                    {% endif %}
-                    {% if f.comeback_info %}
-                      <span class="home-person-badge">Inactive {{ f.comeback_info.gap_label }}</span>
-                    {% endif %}
-                  </span>
-                  <div class="home-person-name">{{ f.person.name }}</div>
-                </a>
-              {% endfor %}
-            </div>
-          {% else %}
-            <p class="muted">No followed actors yet. <br>Search for actors and follow them to see them here.</p>
-          {% endif %}
+          <div class="home-view-all">
+            {% if actors %}
+              <div class="home-people-grid">
+                {% for f in actors %}
+                  <a class="home-person" href="{% url 'person_detail' f.person.tmdb_id %}">
+                    <span class="home-person-media">
+                      {% if f.person.profile_path %}
+                        <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      {% else %}
+                        <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      {% endif %}
+                      {% if f.comeback_info %}
+                        <span class="home-person-badge">Inactive {{ f.comeback_info.gap_label }}</span>
+                      {% endif %}
+                    </span>
+                    <div class="home-person-name">{{ f.person.name }}</div>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="muted">No followed actors yet. <br>Search for actors and follow them to see them here.</p>
+            {% endif %}
+          </div>
+          <div class="home-view-favorites">
+            {% if favorite_actors %}
+              <div class="home-people-grid">
+                {% for f in favorite_actors %}
+                  <a class="home-person" href="{% url 'person_detail' f.person.tmdb_id %}">
+                    <span class="home-person-media">
+                      {% if f.person.profile_path %}
+                        <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      {% else %}
+                        <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      {% endif %}
+                      {% if f.comeback_info %}
+                        <span class="home-person-badge">Inactive {{ f.comeback_info.gap_label }}</span>
+                      {% endif %}
+                    </span>
+                    <div class="home-person-name">{{ f.person.name }}</div>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="muted">No favourite actors yet.</p>
+            {% endif %}
+          </div>
         </section>
 
         <section class="tab-panel panel-crew" aria-label="Crew">
-          {% if crew %}
-            <div class="home-people-grid">
-              {% for f in crew %}
-                <a class="home-person" href="{% url 'person_detail' f.person.tmdb_id %}">
-                  <span class="home-person-media">
-                    {% if f.person.profile_path %}
-                      <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
-                    {% else %}
-                      <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
-                    {% endif %}
-                    {% if f.comeback_info %}
-                      <span class="home-person-badge">Inactive {{ f.comeback_info.gap_label }}</span>
-                    {% endif %}
-                  </span>
-                  <div class="home-person-name">{{ f.person.name }}</div>
-                  <div class="home-person-meta muted">{{ f.role }}</div>
-                </a>
-              {% endfor %}
-            </div>
-          {% else %}
-            <p class="muted">No followed crew yet. <br>Search for crew and follow them to see them here.</p>
-          {% endif %}
+          <div class="home-view-all">
+            {% if crew %}
+              <div class="home-people-grid">
+                {% for f in crew %}
+                  <a class="home-person" href="{% url 'person_detail' f.person.tmdb_id %}">
+                    <span class="home-person-media">
+                      {% if f.person.profile_path %}
+                        <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      {% else %}
+                        <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      {% endif %}
+                      {% if f.comeback_info %}
+                        <span class="home-person-badge">Inactive {{ f.comeback_info.gap_label }}</span>
+                      {% endif %}
+                    </span>
+                    <div class="home-person-name">{{ f.person.name }}</div>
+                    <div class="home-person-meta muted">{{ f.role }}</div>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="muted">No followed crew yet. <br>Search for crew and follow them to see them here.</p>
+            {% endif %}
+          </div>
+          <div class="home-view-favorites">
+            {% if favorite_crew %}
+              <div class="home-people-grid">
+                {% for f in favorite_crew %}
+                  <a class="home-person" href="{% url 'person_detail' f.person.tmdb_id %}">
+                    <span class="home-person-media">
+                      {% if f.person.profile_path %}
+                        <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="https://image.tmdb.org/t/p/w300{{ f.person.profile_path }}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      {% else %}
+                        <img class="home-person-img{% if f.person_deathday %} is-deceased{% endif %}" src="{% static 'img/placeholder-person.svg' %}" alt="{{ f.person.name }}" loading="lazy" width="300" height="450" />
+                      {% endif %}
+                      {% if f.comeback_info %}
+                        <span class="home-person-badge">Inactive {{ f.comeback_info.gap_label }}</span>
+                      {% endif %}
+                    </span>
+                    <div class="home-person-name">{{ f.person.name }}</div>
+                    <div class="home-person-meta muted">{{ f.role }}</div>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="muted">No favourite crew yet.</p>
+            {% endif %}
+          </div>
         </section>
 
         <section class="tab-panel panel-studio" aria-label="Studios">
-          {% if companies %}
-            <div class="home-studio-grid">
-              {% for f in companies %}
-                <a class="home-studio" href="{% url 'company_detail' f.company.tmdb_id %}">
-                  <span class="home-studio-media">
-                    {% if f.company.logo_path %}
-                      <img class="home-studio-logo" src="https://image.tmdb.org/t/p/w300{{ f.company.logo_path }}" alt="{{ f.company.name }}" loading="lazy" width="300" height="120" />
-                    {% else %}
-                      <img class="home-studio-logo" src="{% static 'img/placeholder-company.svg' %}" alt="{{ f.company.name }}" loading="lazy" width="300" height="120" />
-                    {% endif %}
-                    {% if f.studio_status == 'inactive' %}
-                      <span class="home-studio-badge">Inactive</span>
-                    {% endif %}
-                  </span>
-                  <span class="home-studio-name">{{ f.company.name }}</span>
-                </a>
-              {% endfor %}
-            </div>
-          {% else %}
-            <p class="muted">No followed studios yet. <br>Search for studios and follow them to see them here.</p>
-          {% endif %}
+          <div class="home-view-all">
+            {% if companies %}
+              <div class="home-studio-grid">
+                {% for f in companies %}
+                  <a class="home-studio" href="{% url 'company_detail' f.company.tmdb_id %}">
+                    <span class="home-studio-media">
+                      {% if f.company.logo_path %}
+                        <img class="home-studio-logo" src="https://image.tmdb.org/t/p/w300{{ f.company.logo_path }}" alt="{{ f.company.name }}" loading="lazy" width="300" height="120" />
+                      {% else %}
+                        <img class="home-studio-logo" src="{% static 'img/placeholder-company.svg' %}" alt="{{ f.company.name }}" loading="lazy" width="300" height="120" />
+                      {% endif %}
+                      {% if f.studio_status == 'inactive' %}
+                        <span class="home-studio-badge">Inactive</span>
+                      {% endif %}
+                    </span>
+                    <span class="home-studio-name">{{ f.company.name }}</span>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="muted">No followed studios yet. <br>Search for studios and follow them to see them here.</p>
+            {% endif %}
+          </div>
+          <div class="home-view-favorites">
+            {% if favorite_companies %}
+              <div class="home-studio-grid">
+                {% for f in favorite_companies %}
+                  <a class="home-studio" href="{% url 'company_detail' f.company.tmdb_id %}">
+                    <span class="home-studio-media">
+                      {% if f.company.logo_path %}
+                        <img class="home-studio-logo" src="https://image.tmdb.org/t/p/w300{{ f.company.logo_path }}" alt="{{ f.company.name }}" loading="lazy" width="300" height="120" />
+                      {% else %}
+                        <img class="home-studio-logo" src="{% static 'img/placeholder-company.svg' %}" alt="{{ f.company.name }}" loading="lazy" width="300" height="120" />
+                      {% endif %}
+                      {% if f.studio_status == 'inactive' %}
+                        <span class="home-studio-badge">Inactive</span>
+                      {% endif %}
+                    </span>
+                    <span class="home-studio-name">{{ f.company.name }}</span>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="muted">No favourite studios yet.</p>
+            {% endif %}
+          </div>
         </section>
       </div>
     </div>
