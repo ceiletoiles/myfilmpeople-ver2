@@ -1845,9 +1845,15 @@ class RelatedLinksTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(
 			response,
-			'<strong>Actor</strong> <span class="person-role-status muted">| upcoming</span>',
+			'<span class="person-role-name">Actor</span>',
 			html=True,
 		)
+		self.assertContains(
+			response,
+			'<span class="person-role-status muted">| Upcoming</span>',
+			html=True,
+		)
+		self.assertContains(response, "Watched: 0/38")
 
 	@patch("catalog.models.build_movie_accent_color", return_value="#123456")
 	@patch("catalog.views.person.TMDbClient.from_settings")
