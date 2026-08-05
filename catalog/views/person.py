@@ -817,6 +817,10 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				return filter_lookup[role_n]
 			return None
 
+		def _is_released_item(item: dict[str, object]) -> bool:
+			rd = item.get("release_dt")
+			return isinstance(rd, date) and rd <= today
+
 		follow_role_statuses = []
 		for role in follow_roles:
 			filter_key = _follow_role_filter_key(role)
@@ -824,6 +828,8 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			watched_count = 0
 			if filter_key:
 				for item in filmography_items:
+					if not _is_released_item(item):
+						continue
 					item_filters = {str(key).strip() for key in (item.get("filters") or [])}
 					if filter_key in item_filters:
 						total_count += 1

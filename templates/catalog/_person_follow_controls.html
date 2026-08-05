@@ -68,7 +68,11 @@
 
   <div class="person-follow-summary">
     {% for item in follow_role_statuses %}
-      <strong>{{ item.role }}</strong>{% if item.status %} <span class="person-role-status muted">| {{ item.status|lower }}</span>{% endif %} <span class="person-role-watch muted">| Watched: {{ item.watched_count|default:0 }}/{{ item.total_count|default:0 }}</span>{% if not forloop.last %}, {% endif %}
+      <span class="person-role-name">{{ item.role }}</span>
+      {% if item.status %}
+        <span class="person-role-status muted">| {{ item.status|lower|capfirst }}</span>
+      {% endif %}
+      <span class="person-role-watch muted">| Watched: {{ item.watched_count|default:0 }}/{{ item.total_count|default:0 }}</span>{% if not forloop.last %}, {% endif %}
     {% endfor %}
   </div>
 

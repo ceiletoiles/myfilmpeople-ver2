@@ -54,6 +54,23 @@ main {
 
 .person-follow-summary {
   margin-top: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  line-height: 1.35;
+  color: #334155;
+}
+
+.person-role-name {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.person-role-status,
+.person-role-watch {
+  font-size: 0.92em;
+  white-space: nowrap;
 }
 
 .person-actions {
