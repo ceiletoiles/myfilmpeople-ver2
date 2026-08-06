@@ -43,10 +43,11 @@
           <button type="submit">Sign up</button>
         </form>
 
-        <p class="auth-switch muted">
-          Already have an account?
-          <a class="auth-link" href="{% url 'login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Login</a>
-        </p>
+        <div class="auth-switch auth-switch-single" aria-label="Account actions">
+          <a class="auth-link auth-link-action auth-link-action-full" href="{% url 'login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">
+            Login
+          </a>
+        </div>
       </div>
     </div>
   </section>
