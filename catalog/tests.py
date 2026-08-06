@@ -1823,8 +1823,14 @@ class RelatedLinksTests(TestCase):
 		)
 
 	@patch("catalog.views.person.get_person_status_label", return_value="Upcoming")
+	@patch("catalog.views.person.TMDbClient.from_settings")
 	@patch("catalog.views.person.get_or_sync_person")
-	def test_person_detail_shows_status_beside_followed_role(self, mock_get_person, _mock_status_label) -> None:
+	def test_person_detail_shows_status_beside_followed_role(
+		self,
+		mock_get_person,
+		mock_tmdb_from_settings,
+		_mock_status_label,
+	) -> None:
 		User = get_user_model()
 		user = User.objects.create_user(username="status-user", password="pw")
 		person = Person.objects.create(
@@ -1837,6 +1843,23 @@ class RelatedLinksTests(TestCase):
 		)
 		PersonFollow.objects.create(user=user, person=person, name=person.name, role="Actor")
 		mock_get_person.return_value = person
+		mock_client = Mock()
+		mock_client.get_person_credits.return_value = {
+			"cast": [
+				{
+					"id": 401,
+					"title": "Status Film",
+					"character": "Lead",
+					"media_type": "movie",
+					"poster_path": "/status-film.jpg",
+					"release_date": "2024-01-01",
+					"popularity": 1.0,
+				}
+			],
+			"crew": [],
+		}
+		mock_client.get_person_external_ids.return_value = {}
+		mock_tmdb_from_settings.return_value = mock_client
 
 		client = self.client
 		client.force_login(user)
@@ -1853,7 +1876,7 @@ class RelatedLinksTests(TestCase):
 			'<span class="person-role-status muted">| Upcoming</span>',
 			html=True,
 		)
-		self.assertContains(response, "Watched: 0/38")
+		self.assertContains(response, "Watched: 0/1")
 
 	@patch("catalog.models.build_movie_accent_color", return_value="#123456")
 	@patch("catalog.views.person.TMDbClient.from_settings")
