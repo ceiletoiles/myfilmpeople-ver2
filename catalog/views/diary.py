@@ -559,6 +559,7 @@ def _diary_movie_image_candidates(
 				"vote_average": image.get("vote_average"),
 				"vote_count": image.get("vote_count"),
 				"url": tmdb_image_url(file_path, size=image_size),
+				"full_url": tmdb_image_url(file_path, size="original"),
 			}
 		)
 

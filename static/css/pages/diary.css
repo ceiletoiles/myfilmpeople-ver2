@@ -2036,6 +2036,10 @@ body.modal-open {
 	cursor: pointer;
 }
 
+.diary-poster-picker-lightbox-button {
+	cursor: zoom-in;
+}
+
 .diary-poster-picker-image {
 	width: 100%;
 	aspect-ratio: 2 / 3;

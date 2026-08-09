@@ -6,6 +6,7 @@
 {% block extra_css %}
   <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260723a" />
   <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary_backdrop_images.css?v=20260726a" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/components/image_lightbox.css" />
 {% endblock %}
 
 {% block page_header %}
@@ -22,7 +23,7 @@
 {% endblock %}
 
 {% block content %}
-  <section class="diary-poster-picker diary-backdrop-picker-page">
+  <section class="diary-poster-picker diary-backdrop-picker-page" data-image-lightbox-gallery>
     <div class="diary-poster-picker-header">
       <h2>{{ entry.original_title }}</h2>
       {% if entry.original_release_year %}<span class="diary-poster-picker-year">{{ entry.original_release_year }}</span>{% endif %}
@@ -40,9 +41,17 @@
             {% for backdrop in english_backdrops %}
               <article class="diary-poster-picker-card{% if not view_only and backdrop.file_path == entry.backdrop_path %} is-selected{% endif %}">
                 {% if view_only %}
-                  <div class="diary-poster-picker-form">
+                  <button
+                    type="button"
+                    class="diary-poster-picker-button diary-poster-picker-lightbox-button"
+                    data-image-lightbox-open
+                    data-image-lightbox-src="{{ backdrop.full_url|default:backdrop.url }}"
+                    data-image-lightbox-alt="{{ entry.original_title }} backdrop {{ forloop.counter }}"
+                    data-image-lightbox-caption="{{ backdrop.width }}&times;{{ backdrop.height }} &middot; Rating {{ backdrop.vote_average|default:'0' }} &middot; Votes {{ backdrop.vote_count|default:'0' }}"
+                    aria-label="Open backdrop {{ forloop.counter }} for {{ entry.original_title }}"
+                  >
                     <img class="diary-poster-picker-image diary-backdrop-picker-image" src="{{ backdrop.url }}" alt="" loading="lazy" />
-                  </div>
+                  </button>
                 {% else %}
                   <form method="post" action="{% url 'diary_entry_backdrops' entry.id %}" class="diary-poster-picker-form">
                     {% csrf_token %}
@@ -59,7 +68,7 @@
                 {% endif %}
                 <div class="diary-poster-picker-details">
                   <span class="diary-poster-picker-meta">
-                    {{ backdrop.width }}&times;{{ backdrop.height }} · Rating {{ backdrop.vote_average|default:"0" }} · Votes {{ backdrop.vote_count|default:"0" }}
+                    {{ backdrop.width }}&times;{{ backdrop.height }} &middot; Rating {{ backdrop.vote_average|default:"0" }} &middot; Votes {{ backdrop.vote_count|default:"0" }}
                   </span>
                   {% if not view_only and backdrop.file_path == entry.backdrop_path %}
                     <span class="diary-poster-picker-selected">Current backdrop</span>
@@ -81,9 +90,17 @@
             {% for backdrop in no_language_backdrops %}
               <article class="diary-poster-picker-card{% if not view_only and backdrop.file_path == entry.backdrop_path %} is-selected{% endif %}">
                 {% if view_only %}
-                  <div class="diary-poster-picker-form">
+                  <button
+                    type="button"
+                    class="diary-poster-picker-button diary-poster-picker-lightbox-button"
+                    data-image-lightbox-open
+                    data-image-lightbox-src="{{ backdrop.full_url|default:backdrop.url }}"
+                    data-image-lightbox-alt="{{ entry.original_title }} backdrop {{ forloop.counter }}"
+                    data-image-lightbox-caption="{{ backdrop.width }}&times;{{ backdrop.height }} &middot; Rating {{ backdrop.vote_average|default:'0' }} &middot; Votes {{ backdrop.vote_count|default:'0' }}"
+                    aria-label="Open backdrop {{ forloop.counter }} for {{ entry.original_title }}"
+                  >
                     <img class="diary-poster-picker-image diary-backdrop-picker-image" src="{{ backdrop.url }}" alt="" loading="lazy" />
-                  </div>
+                  </button>
                 {% else %}
                   <form method="post" action="{% url 'diary_entry_backdrops' entry.id %}" class="diary-poster-picker-form">
                     {% csrf_token %}
@@ -100,7 +117,7 @@
                 {% endif %}
                 <div class="diary-poster-picker-details">
                   <span class="diary-poster-picker-meta">
-                    {{ backdrop.width }}&times;{{ backdrop.height }} · Rating {{ backdrop.vote_average|default:"0" }} · Votes {{ backdrop.vote_count|default:"0" }}
+                    {{ backdrop.width }}&times;{{ backdrop.height }} &middot; Rating {{ backdrop.vote_average|default:"0" }} &middot; Votes {{ backdrop.vote_count|default:"0" }}
                   </span>
                   {% if not view_only and backdrop.file_path == entry.backdrop_path %}
                     <span class="diary-poster-picker-selected">Current backdrop</span>
@@ -122,9 +139,17 @@
             {% for backdrop in indian_language_backdrops %}
               <article class="diary-poster-picker-card{% if not view_only and backdrop.file_path == entry.backdrop_path %} is-selected{% endif %}">
                 {% if view_only %}
-                  <div class="diary-poster-picker-form">
+                  <button
+                    type="button"
+                    class="diary-poster-picker-button diary-poster-picker-lightbox-button"
+                    data-image-lightbox-open
+                    data-image-lightbox-src="{{ backdrop.full_url|default:backdrop.url }}"
+                    data-image-lightbox-alt="{{ entry.original_title }} backdrop {{ forloop.counter }}"
+                    data-image-lightbox-caption="{{ backdrop.width }}&times;{{ backdrop.height }} &middot; Rating {{ backdrop.vote_average|default:'0' }} &middot; Votes {{ backdrop.vote_count|default:'0' }}"
+                    aria-label="Open backdrop {{ forloop.counter }} for {{ entry.original_title }}"
+                  >
                     <img class="diary-poster-picker-image diary-backdrop-picker-image" src="{{ backdrop.url }}" alt="" loading="lazy" />
-                  </div>
+                  </button>
                 {% else %}
                   <form method="post" action="{% url 'diary_entry_backdrops' entry.id %}" class="diary-poster-picker-form">
                     {% csrf_token %}
@@ -141,7 +166,7 @@
                 {% endif %}
                 <div class="diary-poster-picker-details">
                   <span class="diary-poster-picker-meta">
-                    {{ backdrop.width }}&times;{{ backdrop.height }} · Rating {{ backdrop.vote_average|default:"0" }} · Votes {{ backdrop.vote_count|default:"0" }}
+                    {{ backdrop.width }}&times;{{ backdrop.height }} &middot; Rating {{ backdrop.vote_average|default:"0" }} &middot; Votes {{ backdrop.vote_count|default:"0" }}
                   </span>
                   {% if not view_only and backdrop.file_path == entry.backdrop_path %}
                     <span class="diary-poster-picker-selected">Current backdrop</span>
@@ -158,4 +183,10 @@
       </section>
     {% endif %}
   </section>
+
+  {% include 'catalog/_image_lightbox.html' %}
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{{ STATIC_PREFIX }}js/image_lightbox.js"></script>
 {% endblock %}
