@@ -9,6 +9,7 @@
   var captionEl = viewer.querySelector('[data-image-lightbox-caption]');
   var stageEl = viewer.querySelector('[data-image-lightbox-stage]');
   var closeBtns = viewer.querySelectorAll('[data-image-lightbox-close]');
+  var fullscreenBtn = viewer.querySelector('[data-image-lightbox-fullscreen]');
   var galleries = Array.prototype.slice.call(document.querySelectorAll('[data-image-lightbox-gallery]'));
 
   if (!imageEl || !stageEl || !galleries.length) {
@@ -25,7 +26,98 @@
     pointerStartX: 0,
     pointerStartY: 0,
     pointerTracking: false,
+    pendingCloseAfterFullscreenExit: false,
   };
+
+  function isFullscreenActive() {
+    return document.fullscreenElement === viewer;
+  }
+
+  function getFullscreenLabel() {
+    return isFullscreenActive() ? 'Exit full screen' : 'View in full screen';
+  }
+
+  function updateFullscreenButton() {
+    if (!fullscreenBtn) {
+      return;
+    }
+
+    var label = getFullscreenLabel();
+    fullscreenBtn.setAttribute('aria-label', label);
+    fullscreenBtn.setAttribute('title', label);
+    fullscreenBtn.setAttribute('aria-pressed', isFullscreenActive() ? 'true' : 'false');
+  }
+
+  function finishClose() {
+    if (!state.open) {
+      return;
+    }
+
+    state.open = false;
+    state.pendingCloseAfterFullscreenExit = false;
+    viewer.hidden = true;
+    viewer.setAttribute('aria-hidden', 'true');
+    imageEl.removeAttribute('src');
+    statusEl.hidden = false;
+    statusEl.textContent = 'Loading image…';
+    unlockScroll();
+
+    if (state.lastFocused && typeof state.lastFocused.focus === 'function') {
+      state.lastFocused.focus({ preventScroll: true });
+    }
+  }
+
+  function syncFullscreenState() {
+    viewer.classList.toggle('is-fullscreen', isFullscreenActive());
+    updateFullscreenButton();
+
+    if (!isFullscreenActive() && state.pendingCloseAfterFullscreenExit) {
+      finishClose();
+    }
+  }
+
+  function enterFullscreen() {
+    if (!viewer.requestFullscreen || isFullscreenActive()) {
+      return;
+    }
+
+    try {
+      var request = viewer.requestFullscreen({ navigationUI: 'hide' });
+      if (request && typeof request.catch === 'function') {
+        request.catch(function () {
+          // Ignore fullscreen failures and keep the lightbox working normally.
+        });
+      }
+    } catch (error) {
+      // Ignore fullscreen failures and keep the lightbox working normally.
+    }
+  }
+
+  function exitFullscreen() {
+    if (!document.exitFullscreen || !isFullscreenActive()) {
+      return;
+    }
+
+    try {
+      var request = document.exitFullscreen();
+      if (request && typeof request.catch === 'function') {
+        request.catch(function () {
+          // Ignore fullscreen failures and keep the lightbox working normally.
+        });
+      }
+    } catch (error) {
+      // Ignore fullscreen failures and keep the lightbox working normally.
+    }
+  }
+
+  function toggleFullscreen() {
+    if (isFullscreenActive()) {
+      exitFullscreen();
+      return;
+    }
+
+    enterFullscreen();
+  }
 
   function lockScroll() {
     state.scrollY = window.scrollY || document.documentElement.scrollTop || 0;
@@ -117,6 +209,7 @@
 
     state.index = Math.max(0, buttons.indexOf(button));
     state.lastFocused = document.activeElement;
+    state.pendingCloseAfterFullscreenExit = false;
     lockScroll();
     state.open = true;
     render(state.index);
@@ -126,16 +219,14 @@
     if (!state.open) {
       return;
     }
-    state.open = false;
-    viewer.hidden = true;
-    viewer.setAttribute('aria-hidden', 'true');
-    imageEl.removeAttribute('src');
-    statusEl.hidden = false;
-    statusEl.textContent = 'Loading image…';
-    unlockScroll();
-    if (state.lastFocused && typeof state.lastFocused.focus === 'function') {
-      state.lastFocused.focus({ preventScroll: true });
+
+    if (isFullscreenActive()) {
+      state.pendingCloseAfterFullscreenExit = true;
+      exitFullscreen();
+      return;
     }
+
+    finishClose();
   }
 
   function step(delta) {
@@ -160,6 +251,16 @@
     button.addEventListener('click', closeViewer);
   });
 
+  if (fullscreenBtn) {
+    fullscreenBtn.addEventListener('click', function (event) {
+      event.preventDefault();
+      toggleFullscreen();
+    });
+  }
+
+  document.addEventListener('fullscreenchange', syncFullscreenState);
+  updateFullscreenButton();
+
   viewer.addEventListener('click', function (event) {
     var target = event.target;
     if (target && typeof target.closest === 'function') {
@@ -176,6 +277,10 @@
     }
     if (event.key === 'Escape') {
       event.preventDefault();
+      if (isFullscreenActive()) {
+        exitFullscreen();
+        return;
+      }
       closeViewer();
       return;
     }
