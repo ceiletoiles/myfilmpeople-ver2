@@ -20,7 +20,7 @@
           {% csrf_token %}
           <input type="hidden" name="ajax_context" value="company_detail" />
           <button type="submit" role="menuitem">
-            {% if is_favorite %}Remove favourite{% else %}Mark as favourite{% endif %}
+            {% if is_favorite %}Unmark as favourite{% else %}Mark as favourite{% endif %}
           </button>
         </form>
 

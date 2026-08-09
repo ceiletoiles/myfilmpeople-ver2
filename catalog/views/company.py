@@ -477,6 +477,7 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		user=request.user, company__tmdb_id=tmdb_id
 	).first()
 	is_followed = bool(follow)
+	is_favorite = bool(getattr(follow, "favorite", False))
 	note_text = follow.notes if follow else ""
 
 	if follow:
@@ -618,6 +619,7 @@ def company_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"filmography_page_url": filmography_page_url,
 			"company_status_label": company_status_label,
 			"is_followed": is_followed,
+			"is_favorite": is_favorite,
 			"note_text": note_text,
 			"related_links": related_links,
 			"alternative_names": alternative_names,

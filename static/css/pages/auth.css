@@ -203,7 +203,9 @@
 	border: 1px solid #0f172a;
 	background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
 	color: white;
-	font-weight: 800;
+	font-size: 14px;
+	line-height: 1.1;
+	font-weight: 600;
 	letter-spacing: 0.01em;
 	box-shadow: 0 14px 28px rgba(15, 23, 42, 0.18);
 	transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease;
@@ -267,7 +269,9 @@
 	background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 	box-shadow: 0 1px 1px rgba(15, 23, 42, 0.04);
 	color: #0f172a;
-	font-size: 13px;
+	font-size: 14px;
+	line-height: 1.1;
+	font-weight: 600;
 	text-decoration: none;
 	white-space: nowrap;
 }
@@ -280,7 +284,8 @@
 	box-shadow: 0 14px 28px rgba(15, 23, 42, 0.18);
 	color: white;
 	font-size: 14px;
-	font-weight: 800;
+	line-height: 1.1;
+	font-weight: 600;
 }
 
 .auth-link:hover {
@@ -332,13 +337,11 @@
 	.auth-link-action {
 		min-height: 36px;
 		padding: 0 12px;
-		font-size: 12px;
 	}
 
 	.auth-link-action-full {
 		min-height: 44px;
 		padding: 0 18px;
-		font-size: 13px;
 	}
 }
 

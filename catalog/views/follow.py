@@ -51,6 +51,7 @@ def _render_person_follow_controls(request: HttpRequest, *, tmdb_id: int) -> str
 		user=request.user, person__tmdb_id=tmdb_id
 	)
 	follows_qs = follows_qs.defer("person__tmdb_raw")
+	is_followed = follows_qs.exists()
 	follow_roles = sorted(set(follows_qs.values_list("role", flat=True))) if follows_qs.exists() else []
 	follow_roles_set = set(follow_roles)
 	is_favorite = bool(follows_qs.filter(favorite=True).exists())
@@ -68,6 +69,7 @@ def _render_person_follow_controls(request: HttpRequest, *, tmdb_id: int) -> str
 		"catalog/_person_follow_controls.html",
 		{
 			"person": person,
+			"is_followed": is_followed,
 			"follow_roles": follow_roles,
 			"role_options": role_options,
 			"role_options_remaining": role_options_remaining,

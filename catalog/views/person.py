@@ -166,6 +166,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	is_followed = follows_qs.exists()
 	follow_roles = sorted(set(follows_qs.values_list("role", flat=True))) if is_followed else []
 	follow_roles_set = set(follow_roles)
+	is_favorite = bool(follows_qs.filter(favorite=True).exists())
 	follow_role_statuses: list[dict[str, object]] = []
 	note_text = (
 		(follows_qs.order_by("-updated_at").values_list("notes", flat=True).first() or "")
@@ -974,6 +975,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"person": person,
 			"is_followed": is_followed,
 			"follow_roles": follow_roles,
+			"is_favorite": is_favorite,
 			"follow_role_statuses": follow_role_statuses,
 			"role_options": role_options,
 			"role_options_remaining": role_options_remaining,
