@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Choose Poster{% endblock %}
+{% block title %}{{ page_title|default:"Choose Poster" }}{% endblock %}
 
 {% block extra_css %}
   <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260723a" />
@@ -14,7 +14,7 @@
       <span class="sr-only">Open menu</span>
     </button>
     <div class="page-header-content">
-      <h1>Choose poster</h1>
+      <h1>{{ page_title|default:"Choose poster" }}</h1>
     </div>
     <span class="page-header-spacer" aria-hidden="true"></span>
   </div>
@@ -37,24 +37,30 @@
           </div>
           <div class="diary-poster-picker-grid">
             {% for poster in english_posters %}
-              <article class="diary-poster-picker-card{% if poster.file_path == entry.poster_path %} is-selected{% endif %}">
-                <form method="post" action="{% url 'diary_entry_posters' entry.id %}" class="diary-poster-picker-form">
-                  {% csrf_token %}
-                  <input type="hidden" name="poster_path" value="{{ poster.file_path|escape }}" />
-                  <input type="hidden" name="return_to" value="{{ return_to|escape }}" />
-                  <button
-                    type="submit"
-                    class="diary-poster-picker-button"
-                    aria-label="Select English poster {{ forloop.counter }} for {{ entry.original_title }}"
-                  >
+              <article class="diary-poster-picker-card{% if not view_only and poster.file_path == entry.poster_path %} is-selected{% endif %}">
+                {% if view_only %}
+                  <div class="diary-poster-picker-form">
                     <img class="diary-poster-picker-image" src="{{ poster.url }}" alt="" loading="lazy" />
-                  </button>
-                </form>
+                  </div>
+                {% else %}
+                  <form method="post" action="{% url 'diary_entry_posters' entry.id %}" class="diary-poster-picker-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="poster_path" value="{{ poster.file_path|escape }}" />
+                    <input type="hidden" name="return_to" value="{{ return_to|escape }}" />
+                    <button
+                      type="submit"
+                      class="diary-poster-picker-button"
+                      aria-label="Select English poster {{ forloop.counter }} for {{ entry.original_title }}"
+                    >
+                      <img class="diary-poster-picker-image" src="{{ poster.url }}" alt="" loading="lazy" />
+                    </button>
+                  </form>
+                {% endif %}
                 <div class="diary-poster-picker-details">
                   <span class="diary-poster-picker-meta">
-                    {{ poster.width }}&times;{{ poster.height }} · {{ poster.vote_average|default:"0" }} · {{ poster.vote_count|default:"0" }}
+                    {{ poster.width }}&times;{{ poster.height }} Â· {{ poster.vote_average|default:"0" }} Â· {{ poster.vote_count|default:"0" }}
                   </span>
-                  {% if poster.file_path == entry.poster_path %}
+                  {% if not view_only and poster.file_path == entry.poster_path %}
                     <span class="diary-poster-picker-selected">Current poster</span>
                   {% endif %}
                 </div>
@@ -72,24 +78,30 @@
           </div>
           <div class="diary-poster-picker-grid">
             {% for poster in no_language_posters %}
-              <article class="diary-poster-picker-card{% if poster.file_path == entry.poster_path %} is-selected{% endif %}">
-                <form method="post" action="{% url 'diary_entry_posters' entry.id %}" class="diary-poster-picker-form">
-                  {% csrf_token %}
-                  <input type="hidden" name="poster_path" value="{{ poster.file_path|escape }}" />
-                  <input type="hidden" name="return_to" value="{{ return_to|escape }}" />
-                  <button
-                    type="submit"
-                    class="diary-poster-picker-button"
-                    aria-label="Select no language poster {{ forloop.counter }} for {{ entry.original_title }}"
-                  >
+              <article class="diary-poster-picker-card{% if not view_only and poster.file_path == entry.poster_path %} is-selected{% endif %}">
+                {% if view_only %}
+                  <div class="diary-poster-picker-form">
                     <img class="diary-poster-picker-image" src="{{ poster.url }}" alt="" loading="lazy" />
-                  </button>
-                </form>
+                  </div>
+                {% else %}
+                  <form method="post" action="{% url 'diary_entry_posters' entry.id %}" class="diary-poster-picker-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="poster_path" value="{{ poster.file_path|escape }}" />
+                    <input type="hidden" name="return_to" value="{{ return_to|escape }}" />
+                    <button
+                      type="submit"
+                      class="diary-poster-picker-button"
+                      aria-label="Select no language poster {{ forloop.counter }} for {{ entry.original_title }}"
+                    >
+                      <img class="diary-poster-picker-image" src="{{ poster.url }}" alt="" loading="lazy" />
+                    </button>
+                  </form>
+                {% endif %}
                 <div class="diary-poster-picker-details">
                   <span class="diary-poster-picker-meta">
-                    {{ poster.width }}&times;{{ poster.height }} · {{ poster.vote_average|default:"0" }} · {{ poster.vote_count|default:"0" }}
+                    {{ poster.width }}&times;{{ poster.height }} Â· {{ poster.vote_average|default:"0" }} Â· {{ poster.vote_count|default:"0" }}
                   </span>
-                  {% if poster.file_path == entry.poster_path %}
+                  {% if not view_only and poster.file_path == entry.poster_path %}
                     <span class="diary-poster-picker-selected">Current poster</span>
                   {% endif %}
                 </div>
@@ -107,24 +119,30 @@
           </div>
           <div class="diary-poster-picker-grid">
             {% for poster in indian_language_posters %}
-              <article class="diary-poster-picker-card{% if poster.file_path == entry.poster_path %} is-selected{% endif %}">
-                <form method="post" action="{% url 'diary_entry_posters' entry.id %}" class="diary-poster-picker-form">
-                  {% csrf_token %}
-                  <input type="hidden" name="poster_path" value="{{ poster.file_path|escape }}" />
-                  <input type="hidden" name="return_to" value="{{ return_to|escape }}" />
-                  <button
-                    type="submit"
-                    class="diary-poster-picker-button"
-                    aria-label="Select Indian language poster {{ forloop.counter }} for {{ entry.original_title }}"
-                  >
+              <article class="diary-poster-picker-card{% if not view_only and poster.file_path == entry.poster_path %} is-selected{% endif %}">
+                {% if view_only %}
+                  <div class="diary-poster-picker-form">
                     <img class="diary-poster-picker-image" src="{{ poster.url }}" alt="" loading="lazy" />
-                  </button>
-                </form>
+                  </div>
+                {% else %}
+                  <form method="post" action="{% url 'diary_entry_posters' entry.id %}" class="diary-poster-picker-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="poster_path" value="{{ poster.file_path|escape }}" />
+                    <input type="hidden" name="return_to" value="{{ return_to|escape }}" />
+                    <button
+                      type="submit"
+                      class="diary-poster-picker-button"
+                      aria-label="Select Indian language poster {{ forloop.counter }} for {{ entry.original_title }}"
+                    >
+                      <img class="diary-poster-picker-image" src="{{ poster.url }}" alt="" loading="lazy" />
+                    </button>
+                  </form>
+                {% endif %}
                 <div class="diary-poster-picker-details">
                   <span class="diary-poster-picker-meta">
-                    {{ poster.width }}&times;{{ poster.height }} · {{ poster.vote_average|default:"0" }} · {{ poster.vote_count|default:"0" }}
+                    {{ poster.width }}&times;{{ poster.height }} Â· {{ poster.vote_average|default:"0" }} Â· {{ poster.vote_count|default:"0" }}
                   </span>
-                  {% if poster.file_path == entry.poster_path %}
+                  {% if not view_only and poster.file_path == entry.poster_path %}
                     <span class="diary-poster-picker-selected">Current poster</span>
                   {% endif %}
                 </div>

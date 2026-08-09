@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Any
 
 from django.contrib import messages
@@ -15,6 +16,7 @@ from ..rate_limit import rate_limit
 from ..models import DiaryEntry, PersonFollow
 from ..tmdb import TMDbClient, TMDbError
 from ..related_links import build_movie_related_links
+from .diary import _diary_group_backdrops, _diary_group_posters, _diary_movie_backdrop_candidates, _diary_movie_poster_candidates
 
 
 def _format_year_runtime(tmdb_raw: dict) -> str:
@@ -550,7 +552,7 @@ def _build_release_groups(tmdb_raw: dict[str, Any], country_name_lookup: dict[st
 @login_required
 def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	tab = (request.GET.get("tab") or "cast").strip().lower()
-	if tab not in {"cast", "crew", "details", "release", "watched"}:
+	if tab not in {"cast", "crew", "details", "images", "release", "watched"}:
 		tab = "cast"
 
 	include_credits = True
@@ -683,6 +685,68 @@ def movie_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"hide_diary_editor_view_link": True,
 		},
 	)
+
+
+def _movie_image_gallery_context(tmdb_id: int, *, image_type: str) -> dict[str, Any]:
+	movie = get_or_sync_movie(tmdb_id, force=False)
+	movie_year = ""
+	if movie.release_date:
+		movie_year = str(movie.release_date.year)
+	movie_entry = SimpleNamespace(
+		original_title=movie.title,
+		original_release_year=movie_year,
+		poster_path="",
+		backdrop_path="",
+	)
+	if image_type == "poster":
+		images = _diary_movie_poster_candidates(tmdb_id)
+		grouped = _diary_group_posters(images)
+		return {
+			"entry": movie_entry,
+			"posters": images,
+			"poster_count": len(images),
+			"english_posters": grouped["en"],
+			"no_language_posters": grouped["none"],
+			"indian_language_posters": grouped["indian"],
+			"view_only": True,
+			"page_title": f"Posters for {movie.title}",
+		}
+	if image_type == "backdrop":
+		images = _diary_movie_backdrop_candidates(tmdb_id)
+		grouped = _diary_group_backdrops(images)
+		return {
+			"entry": movie_entry,
+			"backdrops": images,
+			"backdrop_count": len(images),
+			"english_backdrops": grouped["en"],
+			"no_language_backdrops": grouped["none"],
+			"indian_language_backdrops": grouped["indian"],
+			"view_only": True,
+			"page_title": f"Backdrops for {movie.title}",
+		}
+	raise ValueError("Unsupported image type")
+
+
+@rate_limit(limit=20, window_seconds=60, bucket_name="movie_detail")
+@login_required
+def movie_posters(request: HttpRequest, tmdb_id: int) -> HttpResponse:
+	try:
+		context = _movie_image_gallery_context(tmdb_id, image_type="poster")
+	except TMDbError:
+		messages.error(request, "TMDb movie posters are temporarily unavailable. Please try again soon.")
+		return redirect("movie_detail", tmdb_id=tmdb_id)
+	return render(request, "catalog/diary_entry_posters.html", context)
+
+
+@rate_limit(limit=20, window_seconds=60, bucket_name="movie_detail")
+@login_required
+def movie_backdrops(request: HttpRequest, tmdb_id: int) -> HttpResponse:
+	try:
+		context = _movie_image_gallery_context(tmdb_id, image_type="backdrop")
+	except TMDbError:
+		messages.error(request, "TMDb movie backdrops are temporarily unavailable. Please try again soon.")
+		return redirect("movie_detail", tmdb_id=tmdb_id)
+	return render(request, "catalog/diary_entry_backdrops.html", context)
 
 
 def _year_from_release_date(release_date: Any) -> str:

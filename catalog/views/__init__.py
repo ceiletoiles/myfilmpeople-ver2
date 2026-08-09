@@ -22,7 +22,7 @@ from .follow import (
 )
 from .home import home
 from . import misc as misc
-from .movie import movie_detail, movie_related, movie_similar
+from .movie import movie_backdrops, movie_detail, movie_posters, movie_related, movie_similar
 from .new_arrivals import new_arrivals
 from .person import person_detail, person_profile_images, person_toggle_self_appearances
 from .recent import recent
@@ -69,6 +69,8 @@ __all__ = [
 	"home",
 	"misc",
 	"movie_detail",
+	"movie_posters",
+	"movie_backdrops",
 	"movie_related",
 	"movie_similar",
 	"new_arrivals",

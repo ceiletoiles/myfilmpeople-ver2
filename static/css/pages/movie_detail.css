@@ -715,6 +715,50 @@ body.followed-people-sheet-open {
   border-radius: 0;
 }
 
+.movie-image-menu {
+  position: relative;
+}
+
+.movie-image-menu-summary {
+  list-style: none;
+}
+
+.movie-image-menu-summary::-webkit-details-marker {
+  display: none;
+}
+
+.movie-image-menu-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  min-width: 220px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.1);
+}
+
+.movie-image-menu-pop .detail-category-title {
+  margin-bottom: 0.45rem;
+}
+
+.movie-image-menu-items {
+  grid-template-columns: 1fr;
+  gap: 0.35rem;
+}
+
+.movie-image-menu-link {
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+}
+
+.movie-image-menu-link .detail-name {
+  font-size: 0.88rem;
+  color: #0f172a;
+}
+
 .credits-tabs {
   margin-bottom: 0.55rem;
 }
@@ -1385,8 +1429,7 @@ body.followed-people-sheet-open {
 
   .movie-tabs.credits-tabs {
     gap: 6px;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: visible;
     padding-bottom: 4px;
   }
 
@@ -1449,6 +1492,11 @@ body.followed-people-sheet-open {
     padding: 0.5rem 0.8rem;
     font-size: 0.82rem;
     white-space: nowrap;
+  }
+
+  .movie-image-menu-pop {
+    right: 0;
+    left: auto;
   }
 
   .followed-people-card {
