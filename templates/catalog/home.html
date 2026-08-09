@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/home.css?v=20260526a" />
 {% endblock %}
 
+{% block body_class %}{% if not user.is_authenticated %}home-landing-page{% endif %}{% endblock %}
+
 {% block page_header %}
   {% if user.is_authenticated %}
     <div class="page-header">

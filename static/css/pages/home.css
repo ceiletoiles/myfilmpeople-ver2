@@ -13,6 +13,53 @@
 	box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
 }
 
+body.home-landing-page main {
+	max-width: 1074px;
+	margin: 0 auto;
+	padding: 0 16px 16px;
+	height: 100svh;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	box-sizing: border-box;
+}
+
+body.home-landing-page .page-header {
+	margin-bottom: 12px;
+}
+
+body.home-landing-page .page-header-content h1,
+body.home-landing-page .page-header h1 {
+	font-size: clamp(24px, 4vw, 36px);
+}
+
+body.home-landing-page .page-header-content p,
+body.home-landing-page .page-tagline {
+	font-size: 14px;
+	margin-top: 4px;
+}
+
+body.home-landing-page .home-landing {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	padding: clamp(18px, 4vw, 40px);
+}
+
+body.home-landing-page .home-landing-copy {
+	max-width: 100%;
+}
+
+body.home-landing-page .home-feature-grid {
+	margin-top: 18px;
+}
+
+body.home-landing-page .home-cta-row {
+	margin-top: 18px;
+}
+
 .home-landing-copy {
 	max-width: 760px;
 }
@@ -436,8 +483,34 @@ justify-content: center;
 
 @media (max-width: 700px) {
 	.home-landing {
-		padding: 20px;
+		padding: 18px;
 		border-radius: 22px;
+	}
+
+	body.home-landing-page main {
+		padding: 0 12px 12px;
+		height: 100svh;
+		overflow: hidden;
+	}
+
+	body.home-landing-page .page-header {
+		margin-bottom: 10px;
+	}
+
+	body.home-landing-page .page-header-content h1,
+	body.home-landing-page .page-header h1 {
+		font-size: 24px;
+	}
+
+	body.home-landing-page .page-header-content p,
+	body.home-landing-page .page-tagline {
+		font-size: 12px;
+		margin-top: 3px;
+	}
+
+	body.home-landing-page .home-landing {
+		padding: 12px;
+		justify-content: center;
 	}
 
 	.home-people-grid {
@@ -485,12 +558,53 @@ justify-content: center;
 
 	.home-feature-grid {
 		grid-template-columns: 1fr;
-		gap: 10px;
-		margin-top: 22px;
+		gap: 8px;
+		margin-top: 12px;
 	}
 
 	.home-cta {
 		width: 100%;
+	}
+
+	.home-eyebrow {
+		font-size: 11px;
+		padding: 5px 10px;
+		margin-bottom: 10px;
+	}
+
+	.home-landing h1 {
+		font-size: 1.65rem;
+	}
+
+	.home-intro {
+		margin-top: 10px;
+		font-size: 0.92rem;
+		line-height: 1.45;
+	}
+
+	.home-feature {
+		padding: 12px 10px;
+		border-radius: 14px;
+	}
+
+	.home-feature-kicker {
+		margin-bottom: 6px;
+		font-size: 10px;
+	}
+
+	.home-feature p {
+		font-size: 11px;
+		line-height: 1.35;
+	}
+
+	.home-login-note {
+		margin-top: 14px;
+		padding: 10px 12px;
+		font-size: 12px;
+	}
+
+	.home-cta-row {
+		margin-top: 12px;
 	}
 
 	.home-tabs .tab-label {
