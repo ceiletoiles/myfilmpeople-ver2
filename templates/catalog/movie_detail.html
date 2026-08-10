@@ -7,6 +7,7 @@
 {% block extra_css %}
   <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/diary.css?v=20260723a" />
   <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/movie_detail.css" />
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/components/image_lightbox.css" />
   {% if movie_display_backdrop_path %}
     <style>
       .movie-backdrop.has-image {
@@ -18,13 +19,23 @@
 
 {% block content %}
   {% if movie_display_backdrop_path %}
-    <div class="movie-backdrop movie-backdrop-visible has-image fade-in"></div>
+    <div
+      class="movie-backdrop movie-backdrop-visible has-image fade-in"
+      data-movie-image-lightbox-trigger="backdrop"
+      data-image-lightbox-src="https://image.tmdb.org/t/p/original{{ movie_display_backdrop_path }}"
+      data-image-lightbox-alt="{{ movie.title }} backdrop"
+    ></div>
   {% endif %}
 
   <div class="movie-page-container">
     <div class="movie-content">
       <div class="movie-info fade-in">
-        <div class="movie-poster-container">
+        <div
+          class="movie-poster-container"
+          data-movie-image-lightbox-trigger="poster"
+          data-image-lightbox-src="{% if movie_display_poster_path %}https://image.tmdb.org/t/p/original{{ movie_display_poster_path }}{% endif %}"
+          data-image-lightbox-alt="{{ movie.title }} poster"
+        >
           {% if movie_display_poster_path %}
             <img class="movie-poster-image" src="https://image.tmdb.org/t/p/w500{{ movie_display_poster_path }}" alt="" />
           {% else %}
@@ -450,12 +461,14 @@
       {% endif %}
 
       {% include 'catalog/_diary_entry_editor.html' %}
+      {% include 'catalog/_image_lightbox.html' %}
 
     </div>
   </div>
 {% endblock %}
 
 {% block extra_js %}
+  <script src="{{ STATIC_PREFIX }}js/image_lightbox.js"></script>
   <script src="{{ STATIC_PREFIX }}js/pages/diary.js?v=20260723a"></script>
   <script src="{{ STATIC_PREFIX }}js/pages/movie_detail.js"></script>
 {% endblock %}

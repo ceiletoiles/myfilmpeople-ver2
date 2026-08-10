@@ -488,3 +488,84 @@
 
   applyState();
 })();
+
+(function () {
+  var lightbox = window.ImageLightbox;
+  var posterContainer = document.querySelector('[data-movie-image-lightbox-trigger="poster"]');
+  var backdrop = document.querySelector('[data-movie-image-lightbox-trigger="backdrop"]');
+
+  if (!lightbox || typeof lightbox.open !== 'function') {
+    return;
+  }
+
+  function openFromElement(element) {
+    if (!element) {
+      return;
+    }
+
+    var src = element.getAttribute('data-image-lightbox-src') || '';
+    if (!src) {
+      return;
+    }
+
+    lightbox.open(
+      [
+        {
+          src: src,
+          fullUrl: src,
+          alt: element.getAttribute('data-image-lightbox-alt') || '',
+        },
+      ],
+      0
+    );
+  }
+
+  function bindDoubleTapOpen(element) {
+    if (!element) {
+      return;
+    }
+
+    var lastTapAt = 0;
+    var pointerDownX = 0;
+    var pointerDownY = 0;
+
+    element.addEventListener('pointerdown', function (event) {
+      if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+      }
+
+      pointerDownX = event.clientX;
+      pointerDownY = event.clientY;
+    });
+
+    element.addEventListener('pointerup', function (event) {
+      if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+      }
+
+      var movedX = Math.abs(event.clientX - pointerDownX);
+      var movedY = Math.abs(event.clientY - pointerDownY);
+      if (movedX > 18 || movedY > 18) {
+        lastTapAt = 0;
+        return;
+      }
+
+      var now = Date.now();
+      if (now - lastTapAt < 320) {
+        lastTapAt = 0;
+        event.preventDefault();
+        openFromElement(element);
+        return;
+      }
+
+      lastTapAt = now;
+    });
+
+    element.addEventListener('pointercancel', function () {
+      lastTapAt = 0;
+    });
+  }
+
+  bindDoubleTapOpen(posterContainer);
+  bindDoubleTapOpen(backdrop);
+})();

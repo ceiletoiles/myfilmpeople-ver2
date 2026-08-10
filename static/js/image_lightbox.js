@@ -12,7 +12,7 @@
   var fullscreenBtn = viewer.querySelector('[data-image-lightbox-fullscreen]');
   var galleries = Array.prototype.slice.call(document.querySelectorAll('[data-image-lightbox-gallery]'));
 
-  if (!imageEl || !stageEl || !galleries.length) {
+  if (!imageEl || !stageEl) {
     return;
   }
 
@@ -119,6 +119,28 @@
     enterFullscreen();
   }
 
+  function openItems(items, index) {
+    if (!items || !items.length) {
+      return;
+    }
+
+    state.items = items.map(function (item) {
+      return {
+        src: item && item.src ? item.src : '',
+        fullUrl: item && item.fullUrl ? item.fullUrl : item && item.src ? item.src : '',
+        alt: item && item.alt ? item.alt : '',
+        caption: item && item.caption ? item.caption : '',
+      };
+    });
+
+    state.index = Math.max(0, Math.min(index || 0, state.items.length - 1));
+    state.lastFocused = document.activeElement;
+    state.pendingCloseAfterFullscreenExit = false;
+    lockScroll();
+    state.open = true;
+    render(state.index);
+  }
+
   function lockScroll() {
     state.scrollY = window.scrollY || document.documentElement.scrollTop || 0;
     document.body.classList.add('image-lightbox-open');
@@ -196,7 +218,7 @@
 
   function openFromGallery(gallery, button) {
     var buttons = Array.prototype.slice.call(gallery.querySelectorAll('[data-image-lightbox-open]'));
-    state.items = buttons.map(function (candidateButton) {
+    var items = buttons.map(function (candidateButton) {
       var image = candidateButton.querySelector('img');
       return {
         button: candidateButton,
@@ -207,12 +229,7 @@
       };
     });
 
-    state.index = Math.max(0, buttons.indexOf(button));
-    state.lastFocused = document.activeElement;
-    state.pendingCloseAfterFullscreenExit = false;
-    lockScroll();
-    state.open = true;
-    render(state.index);
+    openItems(items, Math.max(0, buttons.indexOf(button)));
   }
 
   function closeViewer() {
@@ -331,4 +348,11 @@
     state.pointerTracking = false;
     state.pointerId = null;
   });
+
+  window.ImageLightbox = window.ImageLightbox || {};
+  window.ImageLightbox.open = openItems;
+  window.ImageLightbox.openSingle = function (item) {
+    openItems([item], 0);
+  };
+  window.ImageLightbox.close = closeViewer;
 })();

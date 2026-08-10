@@ -51,6 +51,7 @@ main {
   background-repeat: no-repeat;
   position: relative;
   display: none;
+  touch-action: manipulation;
 }
 
 /* Mobile: keep a normal backdrop proportion instead of full-screen height */
@@ -101,6 +102,7 @@ main {
 
 .movie-poster-container {
   min-width: 200px;
+  touch-action: manipulation;
 }
 
 .movie-poster-image {
@@ -181,8 +183,8 @@ main {
   border-right: 0;
   border-top: 0;
   background: transparent;
-  appearance: none;
   -webkit-appearance: none;
+  appearance: none;
   font: inherit;
   cursor: pointer;
 }
@@ -453,8 +455,8 @@ main {
   color: inherit;
   text-decoration: none;
   cursor: pointer;
-  appearance: none;
   -webkit-appearance: none;
+  appearance: none;
 }
 
 .followed-people-card:hover {
