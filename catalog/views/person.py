@@ -807,6 +807,18 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"director of photography": "Camera",
 			"editor": "Editing",
 		}
+		crew_job_lookup: dict[str, str] = {}
+		for credit in (credits.get("crew") or []):
+			if not isinstance(credit, dict):
+				continue
+			job = str(credit.get("job") or "").strip()
+			dept = str(credit.get("department") or "").strip()
+			if not job or not dept:
+				continue
+			job_n = job.lower()
+			crew_job_lookup.setdefault(job_n, dept)
+			for token in [token.strip().lower() for token in job.replace("/", ",").replace(";", ",").replace("|", ",").split(",") if token.strip()]:
+				crew_job_lookup.setdefault(token, dept)
 
 		def _follow_role_filter_key(role: str) -> str | None:
 			role_n = (role or "").strip().lower()
@@ -816,6 +828,9 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				return role_aliases[role_n]
 			if role_n in filter_lookup:
 				return filter_lookup[role_n]
+			dept = crew_job_lookup.get(role_n)
+			if dept and filter_counts.get(dept):
+				return dept
 			return None
 
 		def _is_released_item(item: dict[str, object]) -> bool:

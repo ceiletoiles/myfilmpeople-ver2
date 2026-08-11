@@ -55,10 +55,6 @@ def _letterboxd_release_year(tmdb_raw: dict[str, Any]) -> str:
 		for entry in entries:
 			if not isinstance(entry, dict):
 				continue
-			try:
-				release_type = int(entry.get("type") or 0)
-			except (TypeError, ValueError):
-				release_type = 0
 			raw_release_date = _clean_text(entry.get("release_date"))
 			if raw_release_date:
 				release_date = raw_release_date.split("T", 1)[0]

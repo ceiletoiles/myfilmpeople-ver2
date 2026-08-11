@@ -1878,6 +1878,72 @@ class RelatedLinksTests(TestCase):
 		)
 		self.assertContains(response, "Watched: 0/1")
 
+	@patch("catalog.views.person.TMDbClient.from_settings")
+	@patch("catalog.views.person.get_or_sync_person")
+	def test_person_detail_counts_watched_crew_roles_by_department(self, mock_get_person, mock_tmdb_from_settings) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="crew-watch-user", password="pw")
+		crew_roles = [
+			("Original Music Composer", 402, "Sound"),
+			("Casting", 403, "Production"),
+			("Editor", 404, "Editing"),
+			("Graphic Designer", 405, "Art"),
+		]
+		person = Person.objects.create(
+			tmdb_id=104,
+			name="Crew Watch Person",
+			profile_path="/profile.jpg",
+			tmdb_raw={"name": "Crew Watch Person", "external_ids": {}},
+			tmdb_credits_raw={
+				"cast": [],
+				"crew": [
+					{
+						"id": movie_id,
+						"title": role,
+						"job": role,
+						"department": dept,
+						"media_type": "movie",
+						"poster_path": f"/{movie_id}.jpg",
+						"release_date": "2024-01-01",
+						"popularity": 1.0,
+					}
+					for role, movie_id, dept in crew_roles
+				],
+			},
+			tmdb_last_sync_at=timezone.now(),
+		)
+		for role, movie_id, _dept in crew_roles:
+			PersonFollow.objects.create(user=user, person=person, name=person.name, role=role)
+			DiaryEntry.objects.create(
+				user=user,
+				original_title=role,
+				original_release_year=2024,
+				watched_date=date(2024, 1, 1),
+				tmdb_id=movie_id,
+				official_title=role,
+				release_date=date(2024, 1, 1),
+			)
+		mock_get_person.return_value = person
+		mock_client = Mock()
+		mock_client.get_person_credits.return_value = person.tmdb_credits_raw
+		mock_client.get_person_external_ids.return_value = {}
+		mock_tmdb_from_settings.return_value = mock_client
+
+		client = self.client
+		client.force_login(user)
+		response = client.get(reverse("person_detail", args=[person.tmdb_id]))
+
+		self.assertEqual(response.status_code, 200)
+		statuses = {
+			item["role"]: (item["watched_count"], item["total_count"])
+			for item in response.context["follow_role_statuses"]
+		}
+		self.assertEqual(statuses["Original Music Composer"], (1, 1))
+		self.assertEqual(statuses["Casting"], (1, 1))
+		self.assertEqual(statuses["Editor"], (1, 1))
+		self.assertEqual(statuses["Graphic Designer"], (1, 1))
+		self.assertContains(response, "Watched: 1/1")
+
 	@patch("catalog.models.build_movie_accent_color", return_value="#123456")
 	@patch("catalog.views.person.TMDbClient.from_settings")
 	@patch("catalog.views.person.get_or_sync_person")
