@@ -160,12 +160,12 @@
         <div class="movie-tabs credits-tabs">
           <button type="button" class="movie-tab-btn credits-tab{% if tab == 'cast' %} active{% endif %}" data-tab="cast">Cast</button>
           <button type="button" class="movie-tab-btn credits-tab{% if tab == 'crew' %} active{% endif %}" data-tab="crew">Crew</button>
+          <button type="button" class="movie-tab-btn credits-tab{% if tab == 'details' %} active{% endif %}" data-tab="details">Details</button>
           <button type="button" class="movie-tab-btn credits-tab{% if tab == 'release' %} active{% endif %}" data-tab="release">Releases</button>
           {% if watched_entries %}
             <button type="button" class="movie-tab-btn credits-tab{% if tab == 'watched' %} active{% endif %}" data-tab="watched">Watched</button>
           {% endif %}
-          <button type="button" class="movie-tab-btn credits-tab{% if tab == 'details' %} active{% endif %}" data-tab="details">Details</button>
-          <button type="button" class="movie-tab-btn credits-tab{% if tab == 'images' %} active{% endif %}" data-tab="images">Images</button>
+          <button type="button" class="movie-tab-btn credits-tab{% if tab == 'images' %} active{% endif %}" data-tab="images">Media</button>
         </div>
 
         <div class="credits-content">
@@ -415,7 +415,7 @@
           <section class="tab-panel images-section{% if tab == 'images' %} active{% endif %}" data-panel="images" id="imagesSection">
             <div class="details-list">
               <div class="detail-category">
-                <h3 class="detail-category-title">Images</h3>
+                <h3 class="detail-category-title">Media</h3>
                 <div class="detail-items movie-image-menu-items">
                   <a href="{% url 'movie_posters' movie.tmdb_id %}" class="detail-item detail-item-interactive movie-image-menu-link">
                     <p class="detail-name">Poster</p>

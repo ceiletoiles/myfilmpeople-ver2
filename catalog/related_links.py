@@ -45,7 +45,6 @@ def _letterboxd_release_year(tmdb_raw: dict[str, Any]) -> str:
 	if not isinstance(results, list):
 		return _year_from_release_date(_clean_text(tmdb_raw.get("release_date")))
 
-	premiere_dates: list[str] = []
 	all_dates: list[str] = []
 	for country_release in results:
 		if not isinstance(country_release, dict):
@@ -64,12 +63,6 @@ def _letterboxd_release_year(tmdb_raw: dict[str, Any]) -> str:
 			if raw_release_date:
 				release_date = raw_release_date.split("T", 1)[0]
 				all_dates.append(release_date)
-				if release_type == 1:
-					premiere_dates.append(release_date)
-
-	if premiere_dates:
-		premiere_dates.sort()
-		return _year_from_release_date(premiere_dates[0])
 
 	if all_dates:
 		all_dates.sort()
