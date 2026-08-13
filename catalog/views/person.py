@@ -764,6 +764,9 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				"poster_path",
 				"accent_color",
 				"watched_date",
+				"rating",
+				"liked",
+				"rewatch",
 				"created_at",
 				"id",
 			)
@@ -777,6 +780,9 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				"poster_path": entry.poster_path or "",
 				"accent_color": entry.accent_color or "",
 				"watched_date": entry.watched_date,
+				"rating": entry.rating,
+				"liked": entry.liked,
+				"rewatch": entry.rewatch,
 			}
 
 	for it in filmography_items:
@@ -787,6 +793,10 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		display_poster_path = watched_poster_path or str(it.get("poster_path") or "").strip()
 		it["display_poster_path"] = display_poster_path
 		it["watched_date"] = (watch_info or {}).get("watched_date")
+		it["rating"] = (watch_info or {}).get("rating")
+		it["liked"] = bool((watch_info or {}).get("liked"))
+		it["rewatch"] = bool((watch_info or {}).get("rewatch"))
+		it["has_diary_badges"] = it["rating"] is not None or it["liked"] or it["rewatch"]
 		accent_color = str((watch_info or {}).get("accent_color") or "").strip()
 		if not accent_color:
 			accent_color = fallback_movie_accent_color(display_poster_path or str(mid))
@@ -1381,6 +1391,9 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				"poster_path",
 				"accent_color",
 				"watched_date",
+				"rating",
+				"liked",
+				"rewatch",
 				"created_at",
 				"id",
 			)
@@ -1394,6 +1407,9 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 				"poster_path": entry.poster_path or "",
 				"accent_color": entry.accent_color or "",
 				"watched_date": entry.watched_date,
+				"rating": entry.rating,
+				"liked": entry.liked,
+				"rewatch": entry.rewatch,
 			}
 
 	for it in filmography_items:
@@ -1404,6 +1420,10 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		display_poster_path = watched_poster_path or str(it.get("poster_path") or "").strip()
 		it["display_poster_path"] = display_poster_path
 		it["watched_date"] = (watch_info or {}).get("watched_date")
+		it["rating"] = (watch_info or {}).get("rating")
+		it["liked"] = bool((watch_info or {}).get("liked"))
+		it["rewatch"] = bool((watch_info or {}).get("rewatch"))
+		it["has_diary_badges"] = it["rating"] is not None or it["liked"] or it["rewatch"]
 		accent_color = str((watch_info or {}).get("accent_color") or "").strip()
 		if not accent_color:
 			accent_color = fallback_movie_accent_color(display_poster_path or str(mid))

@@ -1977,11 +1977,25 @@ class RelatedLinksTests(TestCase):
 			tmdb_last_sync_at=timezone.now(),
 		)
 		PersonFollow.objects.create(user=user, person=person, name=person.name, role="Actor")
+		DiaryEntry.objects.create(
+			user=user,
+			original_title="Older Title",
+			original_release_year=2024,
+			watched_date=date(2024, 1, 15),
+			rating=Decimal("2.0"),
+			tmdb_id=202,
+			official_title="Example Film",
+			poster_path="/older-diary-poster.jpg",
+			release_date=date(2024, 1, 1),
+		)
 		entry = DiaryEntry.objects.create(
 			user=user,
 			original_title="Alternate Title",
 			original_release_year=2024,
 			watched_date=date(2024, 2, 1),
+			rating=Decimal("5.0"),
+			liked=True,
+			rewatch=True,
 			tmdb_id=202,
 			official_title="Example Film",
 			poster_path="/diary-poster.jpg",
@@ -2013,6 +2027,11 @@ class RelatedLinksTests(TestCase):
 		entry.refresh_from_db()
 		self.assertEqual(entry.accent_color, "#123456")
 		self.assertContains(response, "Watched: 1/1")
+		self.assertContains(response, "diary-rating-stars")
+		self.assertContains(response, "5 out of 5 stars")
+		self.assertContains(response, "diary-icon-like")
+		self.assertContains(response, "diary-icon-rewatch")
+		self.assertNotContains(response, "Watched Feb 1, 2024")
 
 	@patch("catalog.models.build_movie_accent_color", return_value="#123456")
 	@patch("catalog.views.person.TMDbClient.from_settings")

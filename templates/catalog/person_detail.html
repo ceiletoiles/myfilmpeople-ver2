@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static tz iso_dates %}
+{% load static tz iso_dates diary_tags %}
 
 {% block title %}{{ person.name }}{% endblock %}
 
@@ -162,10 +162,12 @@
                 <div class="filmography-meta">
                   <a class="filmography-title" href="{% url 'movie_detail' it.id %}"><strong>{{ it.title }}</strong></a>
                   <div class="filmography-year muted">{% if it.year %}{{ it.year }}{% else %}TBA{% endif %}</div>
-                  {% if it.is_watched and it.watched_date %}
-                    <div class="filmography-watch-note muted">Watched {{ it.watched_date|date:"M j, Y" }}</div>
-                  {% elif it.is_watched %}
-                    <div class="filmography-watch-note muted">Watched</div>
+                  {% if it.is_watched and it.has_diary_badges %}
+                    <span class="diary-badges diary-list-badges diary-entry-rating-row watched-entry-badges">
+                      {% if it.rating is not None %}<span class="diary-badge diary-rating-badge">{% diary_rating_stars it.rating %}</span>{% endif %}
+                      {% if it.liked %}<span class="diary-badge diary-icon-badge diary-icon-like" title="Liked" aria-label="Liked"><span class="diary-icon-mark" aria-hidden="true"></span></span>{% endif %}
+                      {% if it.rewatch %}<span class="diary-badge diary-icon-badge diary-icon-rewatch" title="Rewatch" aria-label="Rewatch"><span class="diary-icon-mark" aria-hidden="true"></span></span>{% endif %}
+                    </span>
                   {% endif %}
                   <div class="muted filmography-role">
                     {% if it.countdown_text %}
