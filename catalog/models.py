@@ -78,6 +78,7 @@ class DiaryAccount(models.Model):
 	letterboxd_username = models.CharField(max_length=80, blank=True, default="")
 	last_successful_sync_at = models.DateTimeField(null=True, blank=True)
 	newest_processed_guid = models.CharField(max_length=512, blank=True, default="")
+	suppressed_rss_items = models.JSONField(default=list, blank=True)
 
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)

@@ -421,6 +421,31 @@ def _diary_source_rss_guid(value: str) -> str:
 	return str(value or "").strip()
 
 
+def _diary_suppression_tokens(row: dict[str, object]) -> set[str]:
+	tokens: set[str] = set()
+	rss_guid = _diary_source_rss_guid(str(row.get("rss_guid") or ""))
+	if rss_guid:
+		tokens.add(f"guid:{rss_guid.casefold()}")
+	title = _normalize_title(str(row.get("original_title") or ""))
+	if title:
+		year = row.get("original_release_year")
+		watched_date = row.get("watched_date")
+		date_value = watched_date.isoformat() if isinstance(watched_date, date) else str(watched_date or "")
+		tokens.add(f"title-date:{title}:{int(year) if year is not None else ''}:{date_value}")
+	return tokens
+
+
+def _diary_entry_suppression_tokens(entry: DiaryEntry) -> set[str]:
+	return _diary_suppression_tokens(
+		{
+			"rss_guid": entry.rss_guid,
+			"original_title": entry.original_title,
+			"original_release_year": entry.original_release_year,
+			"watched_date": entry.watched_date,
+		}
+	)
+
+
 def _diary_entry_rss_guid(entry: DiaryEntry) -> str:
 	return _diary_source_rss_guid(entry.rss_guid)
 
@@ -1100,6 +1125,24 @@ def _run_diary_sync_job(*, job_id: UUID, user_id: int) -> None:
 				current_title=title + (f" ({year})" if year else ""),
 			)
 
+			account = _get_diary_account(user)
+			suppressed_items = {
+				str(token)
+				for token in (account.suppressed_rss_items or [])
+				if str(token).strip()
+			}
+			if _diary_suppression_tokens(row) & suppressed_items:
+				processed_items += 1
+				skipped_items += 1
+				_diary_sync_patch(
+					job_id,
+					processed_items=processed_items,
+					skipped_items=skipped_items,
+					current_label=f"Skipping deleted item {idx}/{len(items)}...",
+					current_title=title + (f" ({year})" if year else ""),
+				)
+				continue
+
 			existing_entry = None
 			if last_guid:
 				existing_entry = DiaryEntry.objects.filter(user=user, rss_guid=last_guid).first()
@@ -1531,6 +1574,31 @@ def diary_match_entry(request: HttpRequest) -> HttpResponse:
 		]
 	)
 	messages.success(request, f"Updated {entry.original_title} to {movie.title}.")
+	return redirect(_diary_redirect_target(request))
+
+
+@login_required
+def diary_entry_delete(request: HttpRequest, entry_id: int) -> HttpResponse:
+	if request.method != "POST":
+		return redirect("diary")
+
+	entry = _find_diary_entry_for_user(request.user, entry_id)
+	if entry is None:
+		return JsonResponse({"ok": False, "error": "Diary entry not found."}, status=404)
+
+	account = _get_diary_account(request.user)
+	suppressed_items = [
+		str(token)
+		for token in (account.suppressed_rss_items or [])
+		if str(token).strip()
+	]
+	suppressed_items.extend(_diary_entry_suppression_tokens(entry))
+	account.suppressed_rss_items = list(dict.fromkeys(suppressed_items))
+	account.save(update_fields=["suppressed_rss_items", "updated_at"])
+	entry.delete()
+
+	if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in (request.headers.get("accept") or ""):
+		return JsonResponse({"ok": True, "deleted_entry_id": entry_id})
 	return redirect(_diary_redirect_target(request))
 
 

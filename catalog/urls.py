@@ -32,6 +32,7 @@ urlpatterns = [
     path("diary/entry/<int:entry_id>/posters/", diary_entry_posters, name="diary_entry_posters"),
     path("diary/entry/<int:entry_id>/backdrops/", diary_entry_backdrops, name="diary_entry_backdrops"),
     path("diary/entry/<int:entry_id>/update/", views.diary_entry_update, name="diary_entry_update"),
+    path("diary/entry/<int:entry_id>/delete/", views.diary_entry_delete, name="diary_entry_delete"),
     path("diary/review/match/", views.diary_match_entry, name="diary_match_entry"),
     path("recent/", views.recent, name="recent"),
     path("new/", views.new_arrivals, name="new_arrivals"),

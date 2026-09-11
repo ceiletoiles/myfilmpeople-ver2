@@ -168,6 +168,7 @@
               data-entry-posters-url="{% url 'diary_entry_posters' entry.id %}"
               data-entry-backdrops-url="{% url 'diary_entry_backdrops' entry.id %}"
               data-entry-update-url="{% url 'diary_entry_update' entry.id %}"
+              data-entry-delete-url="{% url 'diary_entry_delete' entry.id %}"
               aria-label="Open {{ entry.original_title }}"
             >
               <span class="diary-list-day-box" aria-hidden="true">{{ entry.watched_date|date:"j" }}</span>

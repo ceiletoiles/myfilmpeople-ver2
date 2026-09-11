@@ -364,6 +364,60 @@ class DiaryPageTests(TestCase):
 		account = DiaryAccount.objects.get(user=self.user)
 		self.assertIsNotNone(account.last_successful_sync_at)
 
+	def test_deleted_diary_entry_is_not_recreated_by_rss_sync(self) -> None:
+		entry = DiaryEntry.objects.create(
+			user=self.user,
+			original_title="Come and See",
+			original_release_year=1985,
+			watched_date=date(2026, 7, 11),
+			rss_guid="https://letterboxd.com/film/come-and-see/",
+			tmdb_id=1,
+			official_title="Come and See",
+			match_source=DiaryEntry.MatchSource.AUTO,
+		)
+
+		delete_response = self.client.post(
+			reverse("diary_entry_delete", kwargs={"entry_id": entry.id}),
+			HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+			HTTP_ACCEPT="application/json",
+		)
+		self.assertEqual(delete_response.status_code, 200)
+		self.assertFalse(DiaryEntry.objects.filter(pk=entry.pk).exists())
+
+		rss_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <item>
+      <title>Come and See</title>
+      <guid>https://letterboxd.com/film/come-and-see/</guid>
+      <pubDate>Fri, 11 Jul 2026 10:00:00 +0000</pubDate>
+      <year>1985</year>
+    </item>
+  </channel>
+</rss>
+"""
+		self.client.post(reverse("diary_settings"), {"letterboxd_username": "@example_user"})
+		with patch("catalog.views.diary.requests.get") as mock_get, patch("catalog.views.diary.TMDbClient.from_settings") as mock_tmdb:
+			mock_response = Mock()
+			mock_response.text = rss_xml
+			mock_response.raise_for_status.return_value = None
+			mock_get.return_value = mock_response
+			mock_tmdb.return_value = Mock()
+
+			response = self.client.post(reverse("diary_sync_start"))
+			self.assertEqual(response.status_code, 200)
+			progress = None
+			for _ in range(30):
+				progress = self.client.get(response.json()["progress_url"]).json()
+				if progress.get("status") != "running":
+					break
+				time.sleep(0.1)
+
+		self.assertIsNotNone(progress)
+		self.assertEqual(progress.get("status"), "done")
+		self.assertEqual(DiaryEntry.objects.filter(user=self.user).count(), 0)
+		mock_tmdb.assert_not_called()
+
 	def test_diary_sync_prefers_letterboxd_watched_date_and_film_title(self) -> None:
 		rss_xml = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <rss version=\"2.0\" xmlns:letterboxd=\"https://letterboxd.com/rss/1.0/\" xmlns:tmdb=\"https://themoviedb.org/rss/1.0/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">

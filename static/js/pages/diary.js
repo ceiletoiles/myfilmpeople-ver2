@@ -583,6 +583,7 @@
     const postersButton = document.querySelector('[data-diary-editor-posters]');
     const backdropsButton = document.querySelector('[data-diary-editor-backdrops]');
     const editButton = document.querySelector('[data-diary-editor-edit]');
+    const deleteButton = document.querySelector('[data-diary-editor-delete]');
     const cancelEditButton = document.querySelector('[data-diary-editor-cancel-edit]');
     const releaseDisplay = document.querySelector('[data-diary-editor-release]');
     const ratingDisplay = document.querySelector('[data-diary-editor-rating-display]');
@@ -1227,6 +1228,39 @@
       if (!activeCard) return;
       openBackdropPicker(activeCard);
     });
+
+    if (deleteButton) {
+      deleteButton.addEventListener('click', async function () {
+        if (!activeCard) return;
+        if (!window.confirm('Delete this diary entry?')) return;
+        const deleteUrl = activeCard.getAttribute('data-entry-delete-url') || '';
+        if (!deleteUrl) return;
+        deleteButton.disabled = true;
+        try {
+          const resp = await fetch(deleteUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+              'X-CSRFToken': getCookie('csrftoken')
+            }
+          });
+          const data = await resp.json().catch(() => null);
+          if (!resp.ok || !data || data.ok === false) {
+            setSearchError((data && (data.error || data.message)) || ('Delete failed (' + resp.status + ')'));
+            return;
+          }
+          const entryShell = activeCard.closest('.diary-entry-shell');
+          if (entryShell) entryShell.remove();
+          closeEditor();
+        } catch (_) {
+          setSearchError('Network error while deleting.');
+        } finally {
+          deleteButton.disabled = false;
+        }
+      });
+    }
 
     cancelEditButton.addEventListener('click', function () {
       if (!activeCard) return;
