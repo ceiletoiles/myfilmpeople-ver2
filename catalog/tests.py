@@ -1751,6 +1751,59 @@ class RelatedLinksTests(TestCase):
 		)
 		self.assertContains(response, "Sort normally")
 
+	@patch("catalog.views.person.TMDbClient.from_settings")
+	def test_person_detail_can_toggle_documentaries(self, mock_tmdb_from_settings) -> None:
+		User = get_user_model()
+		user = User.objects.create_user(username="documentary-user", password="pw")
+		mock_client = Mock()
+		mock_client.get_person.return_value = {
+			"name": "Documentary Person",
+			"profile_path": "/profile.jpg",
+			"external_ids": {},
+		}
+		mock_client.get_person_credits.return_value = {
+			"cast": [
+				{
+					"id": 601,
+					"title": "Documentary Film",
+					"character": "Narrator",
+					"media_type": "movie",
+					"genre_ids": [99],
+					"release_date": "2024-01-01",
+				},
+				{
+					"id": 602,
+					"title": "Feature Film",
+					"character": "Lead",
+					"media_type": "movie",
+					"release_date": "2025-01-01",
+				},
+			],
+			"crew": [],
+		}
+		mock_client.get_person_external_ids.return_value = {}
+		mock_tmdb_from_settings.return_value = mock_client
+
+		client = self.client
+		client.force_login(user)
+		url = reverse("person_detail", args=[106])
+
+		response = client.get(url)
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual([item["title"] for item in response.context["filmography_items"]], ["Feature Film"])
+		self.assertContains(response, "Show documentaries")
+
+		response = client.post(reverse("person_toggle_documentaries", args=[106]))
+		self.assertRedirects(response, url)
+
+		response = client.get(url)
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(
+			{item["title"] for item in response.context["filmography_items"]},
+			{"Documentary Film", "Feature Film"},
+		)
+		self.assertContains(response, "Hide documentaries")
+
 	def test_build_movie_related_links_includes_letterboxd_premiere_search(self) -> None:
 		raw = {
 			"title": "Obsession",

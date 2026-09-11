@@ -29,6 +29,13 @@
         </button>
       </form>
 
+      <form method="post" action="{% url 'person_toggle_documentaries' person.tmdb_id %}" role="none">
+        {% csrf_token %}
+        <button type="submit" role="menuitem">
+          {% if hide_documentaries %}Show documentaries{% else %}Hide documentaries{% endif %}
+        </button>
+      </form>
+
       <a href="{{ filmography_sort_toggle_url }}" role="menuitem">
         {% if filmography_sort == 'popularity' %}
           Sort normally

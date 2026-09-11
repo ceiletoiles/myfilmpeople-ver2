@@ -42,6 +42,11 @@ urlpatterns = [
         views.person_toggle_self_appearances,
         name="person_toggle_self_appearances",
     ),
+    path(
+        "person/<int:tmdb_id>/toggle-documentaries/",
+        views.person_toggle_documentaries,
+        name="person_toggle_documentaries",
+    ),
     path("person/<int:tmdb_id>/note/", views.person_note, name="person_note"),
     path("person/<int:tmdb_id>/favorite/", views.person_toggle_favorite, name="person_toggle_favorite"),
     path("person/<int:tmdb_id>/sync/", views.person_sync, name="person_sync"),

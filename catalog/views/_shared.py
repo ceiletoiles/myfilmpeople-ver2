@@ -10,6 +10,7 @@ from django.db import close_old_connections
 
 
 SESSION_KEY_HIDE_SELF_APPEARANCES = "catalog_hide_self_appearances"
+SESSION_KEY_HIDE_DOCUMENTARIES = "catalog_hide_documentaries"
 
 
 def run_background_job(target, /, **kwargs) -> None:

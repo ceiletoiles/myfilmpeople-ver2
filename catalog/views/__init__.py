@@ -24,7 +24,7 @@ from .home import home
 from . import misc as misc
 from .movie import movie_backdrops, movie_detail, movie_posters, movie_related, movie_similar
 from .new_arrivals import new_arrivals
-from .person import person_detail, person_profile_images, person_toggle_self_appearances
+from .person import person_detail, person_profile_images, person_toggle_documentaries, person_toggle_self_appearances
 from .recent import recent
 from .search import search, search_suggest
 from .sync_jobs import (
@@ -77,6 +77,7 @@ __all__ = [
 	"person_detail",
 	"person_profile_images",
 	"person_toggle_self_appearances",
+	"person_toggle_documentaries",
 	"person_note",
 	"person_toggle_favorite",
 	"person_sync_progress",

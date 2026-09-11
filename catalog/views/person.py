@@ -29,6 +29,7 @@ from ..services import get_or_sync_person, get_or_sync_person_images, get_person
 from ..rate_limit import rate_limit
 from ..tmdb import TMDbClient, TMDbError, tmdb_image_url
 from ._shared import (
+	SESSION_KEY_HIDE_DOCUMENTARIES,
 	SESSION_KEY_HIDE_SELF_APPEARANCES,
 	_countdown_text,
 	_get_session_bool,
@@ -157,6 +158,11 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	hide_self_appearances = _get_session_bool(
 		request.session,
 		SESSION_KEY_HIDE_SELF_APPEARANCES,
+		default=True,
+	)
+	hide_documentaries = _get_session_bool(
+		request.session,
+		SESSION_KEY_HIDE_DOCUMENTARIES,
 		default=True,
 	)
 
@@ -541,7 +547,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		mid = item.get("id")
 		if not isinstance(mid, int):
 			continue
-		if _is_documentary(item):
+		if hide_documentaries and _is_documentary(item):
 			continue
 		character = str(item.get("character") or "").strip()
 		if hide_self_appearances and _is_self_character(character):
@@ -554,7 +560,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		mid = item.get("id")
 		if not isinstance(mid, int):
 			continue
-		if _is_documentary(item):
+		if hide_documentaries and _is_documentary(item):
 			continue
 		dept = str(item.get("department") or "").strip()
 		job = str(item.get("job") or "").strip()
@@ -1018,6 +1024,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"filmography_sort": filmography_sort,
 			"filmography_sort_toggle_url": filmography_sort_toggle_url,
 			"hide_self_appearances": hide_self_appearances,
+			"hide_documentaries": hide_documentaries,
 		},
 	)
 
@@ -1054,7 +1061,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	# Derived payloads (known-for + filmography) can be expensive; cache them.
 	last_sync = getattr(person, "tmdb_last_sync_at", None)
 	last_sync_key = last_sync.isoformat() if last_sync else "live"
-	derived_cache_key = f"person:derived:v2:{tmdb_id}:{int(hide_self_appearances)}:{last_sync_key}"
+	derived_cache_key = f"person:derived:v3:{tmdb_id}:{int(hide_self_appearances)}:{int(hide_documentaries)}:{last_sync_key}"
 	derived = cache.get(derived_cache_key)
 	if is_followed:
 		derived = None
@@ -1192,6 +1199,8 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 		mid = item.get("id")
 		if not isinstance(mid, int):
 			continue
+		if hide_documentaries and _is_documentary(item):
+			continue
 		character = str(item.get("character") or "").strip()
 		if hide_self_appearances and _is_self_character(character):
 			continue
@@ -1202,6 +1211,8 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 	for item in crew_items:
 		mid = item.get("id")
 		if not isinstance(mid, int):
+			continue
+		if hide_documentaries and _is_documentary(item):
 			continue
 		dept = str(item.get("department") or "").strip()
 		job = str(item.get("job") or "").strip()
@@ -1519,6 +1530,7 @@ def person_detail(request: HttpRequest, tmdb_id: int) -> HttpResponse:
 			"filmography_filters": filmography_filters,
 			"default_filmography_filter": default_filmography_filter,
 			"hide_self_appearances": hide_self_appearances,
+			"hide_documentaries": hide_documentaries,
 		},
 	)
 
@@ -1606,6 +1618,23 @@ def person_toggle_self_appearances(request: HttpRequest, tmdb_id: int) -> HttpRe
 		default=True,
 	)
 	request.session[SESSION_KEY_HIDE_SELF_APPEARANCES] = not current
+	request.session.modified = True
+
+	return redirect("person_detail", tmdb_id=tmdb_id)
+
+
+@rate_limit(limit=20, window_seconds=60, bucket_name="person_toggle_documentaries")
+@login_required
+def person_toggle_documentaries(request: HttpRequest, tmdb_id: int) -> HttpResponse:
+	if request.method != "POST":
+		return redirect("person_detail", tmdb_id=tmdb_id)
+
+	current = _get_session_bool(
+		request.session,
+		SESSION_KEY_HIDE_DOCUMENTARIES,
+		default=True,
+	)
+	request.session[SESSION_KEY_HIDE_DOCUMENTARIES] = not current
 	request.session.modified = True
 
 	return redirect("person_detail", tmdb_id=tmdb_id)
