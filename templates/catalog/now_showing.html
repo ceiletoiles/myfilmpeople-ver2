@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Now showing{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/pages/now_showing.css?v=20261113" />
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/pages/now_showing.js' %}" defer></script>
+{% endblock %}
+
+{% block page_header %}
+  <div class="page-header">
+    <button type="button" class="nav-icon-btn" data-menu-toggle aria-controls="site-drawer" aria-expanded="false">
+      <img class="nav-icon" src="{% static 'img/menu.svg' %}" width="24" height="24" alt="" aria-hidden="true" />
+      <span class="sr-only">Open menu</span>
+    </button>
+    <div class="page-header-content">
+      <h1>Now showing</h1>
+      <p class="page-tagline">Movies currently listed in {{ city }}.</p>
+    </div>
+    <span class="page-header-spacer" aria-hidden="true"></span>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <section class="now-showing-summary">
+    <div><strong>{{ movies|length }}</strong> movies</div>
+    <div class="now-showing-refresh-area">
+      {% if last_synced_at %}<div class="muted">Updated {{ last_synced_at|date:"M d, Y" }}</div>{% endif %}
+      <form method="post" action="{% url 'now_showing_refresh' %}" data-now-showing-refresh>
+        {% csrf_token %}
+        <input type="hidden" name="city" value="{{ city }}" />
+        <button type="submit" class="secondary" data-now-showing-refresh-button>Refresh movies</button>
+      </form>
+      <div class="now-showing-refresh-status" data-now-showing-refresh-status role="status" aria-live="polite" hidden></div>
+    </div>
+  </section>
+
+  {% if movies %}
+    <div class="now-showing-grid">
+      {% for movie in movies %}
+        <article class="now-showing-card">
+          <a href="{{ movie.bookmyshow_url }}" target="_blank" rel="noopener noreferrer" class="now-showing-poster-link">
+            {% if movie.tmdb_poster_path %}
+              <img src="https://image.tmdb.org/t/p/w342{{ movie.tmdb_poster_path }}" alt="{{ movie.title }} poster" class="now-showing-poster" loading="lazy" />
+            {% else %}
+              <img src="{% static 'img/placeholder-movie.svg' %}" alt="" class="now-showing-poster" />
+            {% endif %}
+          </a>
+          <div class="now-showing-info">
+            <h2><a href="{{ movie.bookmyshow_url }}" target="_blank" rel="noopener noreferrer">{{ movie.title }}</a></h2>
+            <div class="now-showing-meta">
+              {% if movie.languages %}{{ movie.languages|join:", " }}{% endif %}
+              {% if movie.rating %} · {{ movie.rating }}{% endif %}
+            </div>
+            {% if movie.genres %}<div class="muted">{{ movie.genres|join:", " }}</div>{% endif %}
+            {% if movie.director %}<div class="muted">Director: {{ movie.director }}</div>{% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card now-showing-empty">
+      <p>No movie snapshot is available yet.</p>
+      <p class="muted">The weekly BookYourShow sync will populate this page after its first successful run.</p>
+    </div>
+  {% endif %}
+{% endblock %}

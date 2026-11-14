@@ -35,6 +35,7 @@ Contents
 - Person / Company / Movie detail pages (cached payloads for followed entities)
 - Collaboration Finder: pick multiple people and see shared movies + per-person roles
 - Upcoming page: aggregated upcoming releases for people and companies you follow
+- Now showing page: weekly movie-only BookYourShow listings for the configured city
 - Notification-style "New Movie Arrivals" when a followed entity has new movies or metadata updates
 - TMDb JSON proxy endpoint for safe server-side forwarding of GET requests to TMDb
 
@@ -101,6 +102,9 @@ Environment variables (.env example)
 - EMAIL_USE_TLS=1
 - TMDB_API_KEY=your_tmdb_api_key
 - TMDB_API_READ_ACCESS_TOKEN=your_tmdb_read_token
+- BOOKYOURSHOW_CITY=Bengaluru
+- BOOKYOURSHOW_SYNC_URL=https://your-bookyourshow-service/api/now-showing/sync
+- BOOKYOURSHOW_SYNC_KEY=shared-secret-with-bookyourshow-service
 - TMDB_LANGUAGE=en-US
 - REDIS_URL=redis://127.0.0.1:6379/1
 - REDIS_KEY_PREFIX=myfilmpeople
@@ -150,6 +154,7 @@ Routes / important pages
 - `/search/` — Search (DB-first, TMDb top-up)
 - `/collaboration/` — Collaboration Finder (shared movies between people)
 - `/upcoming/` — Upcoming movies for followed people and companies
+- `/now-showing/` — Weekly BookYourShow movie listings for the configured city
 - `/person/<tmdb_id>/`, `/company/<tmdb_id>/`, `/movie/<tmdb_id>/` — detail pages
 - `/tmdb/<endpoint>/` — TMDb proxy endpoint (server-side GET forwarding)
 - `/me/` — User profile

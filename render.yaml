@@ -17,6 +17,10 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
+      - key: TMDB_API_KEY
+        sync: false
+      - key: TMDB_API_READ_ACCESS_TOKEN
+        sync: false
       - key: BREVO_API_KEY
         sync: false
       - key: DEFAULT_FROM_EMAIL
@@ -40,6 +44,41 @@ services:
           type: redis
           name: myfilmpeople-redis
           property: connectionString
+
+      - key: BOOKYOURSHOW_CITY
+        value: "Bengaluru"
+      - key: BOOKYOURSHOW_SYNC_URL
+        sync: false
+      - key: BOOKYOURSHOW_SYNC_KEY
+        sync: false
+
+  - type: cron
+    name: myfilmpeople-now-showing-weekly
+    runtime: python
+    schedule: "30 4 * * 0"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py sync_now_showing --city Bengaluru
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.8"
+      - key: DEBUG
+        value: "0"
+      - key: ALLOWED_HOSTS
+        value: "myfilmpeople.onrender.com"
+      - key: SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: TMDB_API_KEY
+        sync: false
+      - key: TMDB_API_READ_ACCESS_TOKEN
+        sync: false
+      - key: BOOKYOURSHOW_CITY
+        value: "Bengaluru"
+      - key: BOOKYOURSHOW_SYNC_URL
+        sync: false
+      - key: BOOKYOURSHOW_SYNC_KEY
+        sync: false
 
   - type: redis
     name: myfilmpeople-redis

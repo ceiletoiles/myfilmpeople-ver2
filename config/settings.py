@@ -243,6 +243,11 @@ TMDB_PERSON_COMEBACK_THRESHOLD_YEARS = int(
     os.getenv("TMDB_PERSON_COMEBACK_THRESHOLD_YEARS", "5")
 )
 
+# BookYourShow / Apify movie snapshot integration.
+BOOKYOURSHOW_CITY = os.getenv("BOOKYOURSHOW_CITY", "Bengaluru")
+BOOKYOURSHOW_SYNC_URL = os.getenv("BOOKYOURSHOW_SYNC_URL", "")
+BOOKYOURSHOW_SYNC_KEY = os.getenv("BOOKYOURSHOW_SYNC_KEY", "")
+
 
 # Redis / Django cache
 REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/1")

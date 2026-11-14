@@ -69,6 +69,40 @@ class Movie(models.Model):
 		]
 
 
+class NowShowingMovie(models.Model):
+	"""Latest movie-only listings imported from the BookYourShow Apify sync."""
+
+	city = models.CharField(max_length=120, db_index=True)
+	bookmyshow_url = models.URLField(max_length=500)
+	title = models.CharField(max_length=255)
+	tmdb_id = models.PositiveIntegerField(null=True, blank=True, db_index=True)
+	tmdb_poster_path = models.CharField(max_length=255, blank=True)
+	poster_url = models.URLField(max_length=1000, blank=True)
+	languages = models.JSONField(default=list, blank=True)
+	genres = models.JSONField(default=list, blank=True)
+	rating = models.CharField(max_length=30, blank=True)
+	release_date = models.DateField(null=True, blank=True)
+	runtime_minutes = models.PositiveIntegerField(null=True, blank=True)
+	director = models.CharField(max_length=255, blank=True)
+	cast = models.JSONField(default=list, blank=True)
+	is_active = models.BooleanField(default=True, db_index=True)
+	last_seen_at = models.DateTimeField(default=timezone.now, db_index=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		constraints = [
+			models.UniqueConstraint(
+				fields=["city", "bookmyshow_url"],
+				name="uniq_now_showing_city_url",
+			)
+		]
+		ordering = ["title", "id"]
+
+	def __str__(self) -> str:
+		return f"{self.title} ({self.city})"
+
+
 class DiaryAccount(models.Model):
 	user = models.OneToOneField(
 		settings.AUTH_USER_MODEL,

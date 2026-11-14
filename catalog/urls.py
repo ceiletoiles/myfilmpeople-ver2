@@ -36,6 +36,9 @@ urlpatterns = [
     path("diary/review/match/", views.diary_match_entry, name="diary_match_entry"),
     path("recent/", views.recent, name="recent"),
     path("new/", views.new_arrivals, name="new_arrivals"),
+    path("now-showing/", views.now_showing, name="now_showing"),
+    path("now-showing/refresh/", views.now_showing_refresh, name="now_showing_refresh"),
+    path("now-showing/refresh/progress/<uuid:job_id>/", views.now_showing_refresh_progress, name="now_showing_refresh_progress"),
     path("person/<int:tmdb_id>/", views.person_detail, name="person_detail"),
     path("person/<int:tmdb_id>/profile-pics/", views.person_profile_images, name="person_profile_images"),
     path(
