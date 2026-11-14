@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import date
+import os
+import time
 
 import requests
 from django.db import transaction
@@ -15,15 +17,31 @@ def sync_now_showing(*, city: str, source_url: str, sync_key: str = "") -> dict[
 	if not city or not source_url:
 		raise ValueError("BOOKYOURSHOW_CITY and BOOKYOURSHOW_SYNC_URL are required")
 	headers = {"X-Sync-Key": sync_key} if sync_key else {}
-	try:
-		response = requests.post(source_url, headers=headers, timeout=300)
-		response.raise_for_status()
-		snapshot = response.json()
-	except requests.HTTPError as exc:
-		detail = (exc.response.text or "").strip()[:500] if exc.response is not None else ""
-		raise RuntimeError(f"BookYourShow sync failed: {exc}{f' - {detail}' if detail else ''}") from exc
-	except (requests.RequestException, ValueError) as exc:
-		raise RuntimeError(f"BookYourShow sync failed: {exc}") from exc
+	request_timeout = int(os.getenv("BOOKYOURSHOW_HTTP_TIMEOUT_SECONDS", "900"))
+	last_error = None
+	for attempt in range(4):
+		try:
+			response = requests.post(source_url, headers=headers, timeout=request_timeout)
+			if response.status_code in {502, 503, 504} and attempt < 3:
+				response.close()
+				time.sleep(5 * (attempt + 1))
+				continue
+			response.raise_for_status()
+			snapshot = response.json()
+			break
+		except requests.HTTPError as exc:
+			detail = (exc.response.text or "").strip()[:500] if exc.response is not None else ""
+			if exc.response is not None and exc.response.status_code in {502, 503, 504} and attempt < 3:
+				time.sleep(5 * (attempt + 1))
+				continue
+			raise RuntimeError(f"BookYourShow sync failed: {exc}{f' - {detail}' if detail else ''}") from exc
+		except requests.RequestException as exc:
+			last_error = exc
+			if attempt >= 3:
+				raise RuntimeError(f"BookYourShow sync failed: {exc}") from exc
+			time.sleep(5 * (attempt + 1))
+	else:
+		raise RuntimeError(f"BookYourShow sync failed: {last_error or 'service did not respond'}")
 	items = snapshot.get("items") if isinstance(snapshot, dict) else None
 	if not isinstance(items, list):
 		raise RuntimeError("BookYourShow response did not contain an items list")
