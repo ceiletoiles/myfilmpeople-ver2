@@ -69,7 +69,10 @@ def now_showing_refresh(request: HttpRequest) -> JsonResponse:
 		return JsonResponse({"error": "POST required"}, status=405)
 	city = (request.POST.get("city") or getattr(settings, "BOOKYOURSHOW_CITY", "Bengaluru")).strip() or "Bengaluru"
 	active_id = cache.get(_active_job_key(city))
-	progress_url = lambda job_id: reverse("now_showing_refresh_progress", kwargs={"job_id": str(job_id)})
+
+	def progress_url(job_id: UUID) -> str:
+		return reverse("now_showing_refresh_progress", kwargs={"job_id": str(job_id)})
+
 	if active_id:
 		try:
 			job_id = UUID(str(active_id))
